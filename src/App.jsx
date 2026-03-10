@@ -11,7 +11,8 @@ import {
   signInWithEmailLink,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { auth, db, storage } from "./firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 const VERCEL_URL = "https://vaulte-roan.vercel.app";
 const actionCodeSettings = {
@@ -572,41 +573,21 @@ export default function App() {
                     <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={e => {
                       const file = e.target.files[0];
                       if (!file) return;
-                      const resizeAndSave = (dataUrl) => {
-                        return new Promise((resolve) => {
-                          const img = new Image();
-                          img.onload = () => {
-                            const SIZE = 400;
-                            const canvas = document.createElement("canvas");
-                            canvas.width = SIZE;
-                            canvas.height = SIZE;
-                            const ctx = canvas.getContext("2d");
-                            const scale = Math.max(SIZE / img.width, SIZE / img.height);
-                            const dx = (SIZE - img.width * scale) / 2;
-                            const dy = (SIZE - img.height * scale) / 2;
-                            ctx.drawImage(img, dx, dy, img.width * scale, img.height * scale);
-                            resolve(canvas.toDataURL("image/jpeg", 0.75));
-                          };
-                          img.onerror = () => resolve(dataUrl);
-                          img.src = dataUrl;
-                        });
-                      };
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        try {
-                          const resized = await resizeAndSave(ev.target.result);
-                          const uid = auth.currentUser?.uid;
-                          if (!uid) { alert("Not logged in"); return; }
-                          const updated = { ...profile, photoURL: resized };
-                          await saveProfile(uid, updated);
-                          setProfile(updated);
-                          showToast("PHOTO UPDATED");
-                        } catch(err) {
-                          console.error("Photo save error:", err);
-                          alert("Could not save photo: " + err.message);
-                        }
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const uid = auth.currentUser?.uid;
+                        if (!uid) { alert("Not logged in"); return; }
+                        showToast("UPLOADING...");
+                        const storageRef = ref(storage, "profile-photos/" + uid + ".jpg");
+                        await uploadBytes(storageRef, file);
+                        const downloadURL = await getDownloadURL(storageRef);
+                        const updated = { ...profile, photoURL: downloadURL };
+                        await saveProfile(uid, updated);
+                        setProfile(updated);
+                        showToast("PHOTO UPDATED");
+                      } catch(err) {
+                        console.error("Photo upload error:", err);
+                        alert("Could not upload photo: " + err.message);
+                      }
                     }} />
                     <label htmlFor="photo-upload" style={{ cursor:"pointer", display:"block" }}>
                       {profile.photoURL
@@ -618,7 +599,16 @@ export default function App() {
                       }
                     </label>
                     {profile.photoURL && (
-                      <button onClick={() => { const u = {...profile}; delete u.photoURL; saveProfile(auth.currentUser.uid, u); setProfile(u); showToast("PHOTO REMOVED"); }}
+                      <button onClick={async () => {
+                        try {
+                          const storageRef = ref(storage, "profile-photos/" + auth.currentUser.uid + ".jpg");
+                          await deleteObject(storageRef).catch(() => {});
+                          const u = {...profile}; delete u.photoURL;
+                          await saveProfile(auth.currentUser.uid, u);
+                          setProfile(u);
+                          showToast("PHOTO REMOVED");
+                        } catch(err) { console.error(err); }
+                      }}
                         style={{ marginTop:"8px", background:"none", border:"none", color:"rgba(200,80,80,0.5)", fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", cursor:"pointer", textTransform:"uppercase" }}>
                         Remove Photo
                       </button>
