@@ -543,14 +543,50 @@ export default function App() {
                   <button className="btn-ghost" onClick={openEdit}>Edit Profile</button>
                 </div>
 
-                {/* Avatar + name */}
+                {/* Avatar + name + photo upload */}
                 <div style={{ padding:"24px 28px", background:"linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.03))", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"8px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"20px" }} className="fade-up-2">
+                  {/* Left: initials avatar */}
                   <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#c9a84c,#b8962e)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Cinzel',serif", fontSize:"20px", color:"#0d0d0f", fontWeight:"600", flexShrink:0 }}>
                     {profile.firstName?.[0]}{profile.lastName?.[0]}
                   </div>
-                  <div>
+                  {/* Centre: name, uid, member since */}
+                  <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"18px", letterSpacing:"2px" }}>{profile.firstName} {profile.lastName}</div>
-                    <div style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", marginTop:"3px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
+                    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"rgba(212,175,55,0.1)", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"20px", padding:"3px 10px", margin:"6px 0" }}>
+                      <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"9px" }}>◆</span>
+                      <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"2px", color:"rgba(212,175,55,0.7)" }}>{profile.uid}</span>
+                    </div>
+                    <div style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
+                  </div>
+                  {/* Right: photo upload */}
+                  <div style={{ flexShrink:0, textAlign:"center" }}>
+                    <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => {
+                        const updated = { ...profile, photoURL: ev.target.result };
+                        saveProfile(auth.currentUser.uid, updated);
+                        setProfile(updated);
+                        showToast("PHOTO UPDATED");
+                      };
+                      reader.readAsDataURL(file);
+                    }} />
+                    <label htmlFor="photo-upload" style={{ cursor:"pointer", display:"block" }}>
+                      {profile.photoURL
+                        ? <img src={profile.photoURL} alt="Profile" style={{ width:"72px", height:"72px", borderRadius:"50%", objectFit:"cover", border:"2px solid rgba(212,175,55,0.4)" }} />
+                        : <div style={{ width:"72px", height:"72px", borderRadius:"50%", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"4px", transition:"border-color 0.3s" }}>
+                            <span style={{ fontSize:"20px" }}>📷</span>
+                            <span style={{ fontFamily:"'Cinzel',serif", fontSize:"8px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)" }}>ADD PHOTO</span>
+                          </div>
+                      }
+                    </label>
+                    {profile.photoURL && (
+                      <button onClick={() => { const u = {...profile}; delete u.photoURL; saveProfile(auth.currentUser.uid, u); setProfile(u); showToast("PHOTO REMOVED"); }}
+                        style={{ marginTop:"6px", background:"none", border:"none", color:"rgba(200,80,80,0.5)", fontFamily:"'Cinzel',serif", fontSize:"8px", letterSpacing:"1px", cursor:"pointer", textTransform:"uppercase" }}>
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -558,7 +594,6 @@ export default function App() {
                   <InfoCard icon="✉️" label="Email Address" value={profile.email} />
                   <InfoCard icon="📞" label="Telephone"     value={profile.phone} />
                   <InfoCard icon="🏠" label="Address"       value={[profile.address, profile.city, profile.postcode].filter(Boolean).join(", ")} />
-                  <InfoCard icon="🔑" label="Unique ID"     value={profile.uid} />
                 </div>
               </div>
             )}
