@@ -13,6 +13,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import NutritionTracker from "./NutritionTracker";
 import { auth, db, storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
@@ -604,6 +605,7 @@ export default function App() {
             <div style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
             {navItem("home",    "Home",       "⌂")}
             {navItem("account", "My Account", "◈")}
+            {navItem("nutrition", "Nutrition", "🥗")}
             <div style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
@@ -645,6 +647,13 @@ export default function App() {
                       </div>
                   }
                 </div>
+              </div>
+            )}
+
+            {/* NUTRITION panel */}
+            {activePanel === "nutrition" && (
+              <div className="fade-up" style={{ margin:"-24px" }}>
+                <NutritionTracker userId={auth.currentUser?.uid} />
               </div>
             )}
 
