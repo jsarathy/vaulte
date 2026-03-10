@@ -531,8 +531,8 @@ export default function App() {
                 {/* Right: profile photo */}
                 <div style={{ flexShrink:0, marginLeft:"40px" }}>
                   {profile.photoURL
-                    ? <img src={profile.photoURL} alt="Profile" style={{ width:"1.5in", height:"1.5in", borderRadius:"8px", objectFit:"cover", border:"2px solid rgba(212,175,55,0.35)", boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }} />
-                    : <div style={{ width:"1.5in", height:"1.5in", borderRadius:"8px", border:"2px dashed rgba(212,175,55,0.2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", background:"rgba(212,175,55,0.03)" }}>
+                    ? <img src={profile.photoURL} alt="Profile" style={{ width:"144px", height:"144px", borderRadius:"8px", objectFit:"cover", border:"2px solid rgba(212,175,55,0.35)", boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }} />
+                    : <div style={{ width:"144px", height:"144px", borderRadius:"8px", border:"2px dashed rgba(212,175,55,0.2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", background:"rgba(212,175,55,0.03)" }}>
                         <span style={{ fontSize:"32px", opacity:0.4 }}>👤</span>
                         <span style={{ fontFamily:"'Cinzel',serif", fontSize:"8px", letterSpacing:"1px", color:"rgba(212,175,55,0.3)", textAlign:"center" }}>NO PHOTO<br/>YET</span>
                       </div>
@@ -574,17 +574,30 @@ export default function App() {
                       if (!file) return;
                       const reader = new FileReader();
                       reader.onload = ev => {
-                        const updated = { ...profile, photoURL: ev.target.result };
-                        saveProfile(auth.currentUser.uid, updated);
-                        setProfile(updated);
-                        showToast("PHOTO UPDATED");
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement("canvas");
+                          const SIZE = 300;
+                          canvas.width = SIZE; canvas.height = SIZE;
+                          const ctx = canvas.getContext("2d");
+                          const scale = Math.max(SIZE/img.width, SIZE/img.height);
+                          const x = (SIZE - img.width*scale)/2;
+                          const y = (SIZE - img.height*scale)/2;
+                          ctx.drawImage(img, x, y, img.width*scale, img.height*scale);
+                          const resized = canvas.toDataURL("image/jpeg", 0.7);
+                          const updated = { ...profile, photoURL: resized };
+                          saveProfile(auth.currentUser.uid, updated);
+                          setProfile(updated);
+                          showToast("PHOTO UPDATED");
+                        };
+                        img.src = ev.target.result;
                       };
                       reader.readAsDataURL(file);
                     }} />
                     <label htmlFor="photo-upload" style={{ cursor:"pointer", display:"block" }}>
                       {profile.photoURL
-                        ? <img src={profile.photoURL} alt="Profile" style={{ width:"120px", height:"120px", borderRadius:"8px", objectFit:"cover", border:"2px solid rgba(212,175,55,0.4)", boxShadow:"0 4px 16px rgba(0,0,0,0.3)" }} />
-                        : <div style={{ width:"120px", height:"120px", borderRadius:"8px", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(212,175,55,0.03)" }}>
+                        ? <img src={profile.photoURL} alt="Profile" style={{ width:"144px", height:"144px", borderRadius:"8px", objectFit:"cover", border:"2px solid rgba(212,175,55,0.4)", boxShadow:"0 4px 16px rgba(0,0,0,0.3)" }} />
+                        : <div style={{ width:"144px", height:"144px", borderRadius:"8px", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(212,175,55,0.03)" }}>
                             <span style={{ fontSize:"32px" }}>📷</span>
                             <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)" }}>CLICK TO<br/>ADD PHOTO</span>
                           </div>
