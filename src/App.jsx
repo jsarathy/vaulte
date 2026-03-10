@@ -6,9 +6,18 @@ import {
   onAuthStateChanged,
   deleteUser,
   updatePassword,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
+
+const VERCEL_URL = "https://vaulte-roan.vercel.app";
+const actionCodeSettings = {
+  url: VERCEL_URL,
+  handleCodeInApp: true,
+};
 
 // ── Helpers ──────────────────────────────────────────────────
 const generateUID = () => "USR-" + Math.random().toString(36).substr(2, 9).toUpperCase();
@@ -102,12 +111,31 @@ export default function App() {
   const [savingEdit, setSavingEdit]   = useState(false);
   const [signupData, setSignupData]   = useState({ firstName:"", lastName:"", email:"", password:"", phone:"", address:"", city:"", postcode:"" });
   const [loginData, setLoginData]     = useState({ email:"", password:"" });
+  const [magicEmail, setMagicEmail]   = useState("");
+  const [magicSent, setMagicSent]     = useState(false);
+  const [loginMode, setLoginMode]     = useState("password");
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
   const go = (p) => { setError(""); setPage(p); };
 
-  // Listen for auth state changes (auto login/logout)
+  // Handle magic link redirect + normal auth state
   useEffect(() => {
+    if (isSignInWithEmailLink(auth, window.location.href)) {
+      let email = window.localStorage.getItem("vaulte:magicEmail");
+      if (!email) email = window.prompt("Please enter your email to confirm sign in:");
+      if (email) {
+        signInWithEmailLink(auth, email, window.location.href)
+          .then(async (cred) => {
+            window.localStorage.removeItem("vaulte:magicEmail");
+            window.history.replaceState({}, document.title, "/");
+            const prof = await fetchProfile(cred.user.uid);
+            if (prof) { setProfile(prof); setPage("account"); showToast("WELCOME BACK"); }
+            else { setSignupData(s => ({ ...s, email })); setPage("signup"); }
+          })
+          .catch(e => { setError(e.message); setPage("login"); });
+      }
+      return;
+    }
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const prof = await fetchProfile(user.uid);
@@ -165,7 +193,19 @@ export default function App() {
     setLoading(false);
   };
 
-  // ── Logout ──
+  // ── Magic Link ──
+  const handleMagicLink = async () => {
+    if (!magicEmail) { setError("Please enter your email address."); return; }
+    setLoading(true); setError("");
+    try {
+      await sendSignInLinkToEmail(auth, magicEmail, actionCodeSettings);
+      window.localStorage.setItem("vaulte:magicEmail", magicEmail);
+      setMagicSent(true);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
   const handleLogout = async () => {
     await signOut(auth);
     setProfile(null);
@@ -286,18 +326,71 @@ export default function App() {
           <h2 style={hdg}>Welcome Back</h2>
           <p style={sub}>Sign in to your account</p>
         </div>
-        <ErrorBox msg={error} />
-        <div className="fade-up-2">
-          <Field label="Email Address" type="email"    value={loginData.email}    onChange={v => setLoginData({...loginData,email:v})}    placeholder="jane@example.com" />
-          <Field label="Password"      type="password" value={loginData.password} onChange={v => setLoginData({...loginData,password:v})} placeholder="••••••••" />
-        </div>
-        <div className="fade-up-3">
-          <button className="btn-primary" onClick={handleLogin} disabled={loading}>
-            {loading && <span className="spinner" />}Sign In
+
+        {/* Toggle tabs */}
+        <div style={{ display:"flex", gap:"0", marginBottom:"28px", border:"1px solid rgba(212,175,55,0.2)", borderRadius:"4px", overflow:"hidden" }}>
+          <button onClick={() => { setLoginMode("password"); setError(""); setMagicSent(false); }}
+            style={{ flex:1, padding:"10px", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", cursor:"pointer", border:"none", transition:"all 0.3s", textTransform:"uppercase",
+              background: loginMode === "password" ? "rgba(212,175,55,0.15)" : "transparent",
+              color: loginMode === "password" ? "#d4af37" : "rgba(212,175,55,0.4)" }}>
+            Password
           </button>
-          <div className="divider">or</div>
-          <button className="btn-ghost" style={{ width:"100%" }} onClick={() => go("signup")}>Create an Account</button>
+          <button onClick={() => { setLoginMode("magic"); setError(""); setMagicSent(false); }}
+            style={{ flex:1, padding:"10px", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", cursor:"pointer", border:"none", borderLeft:"1px solid rgba(212,175,55,0.2)", transition:"all 0.3s", textTransform:"uppercase",
+              background: loginMode === "magic" ? "rgba(212,175,55,0.15)" : "transparent",
+              color: loginMode === "magic" ? "#d4af37" : "rgba(212,175,55,0.4)" }}>
+            Magic Link
+          </button>
         </div>
+
+        <ErrorBox msg={error} />
+
+        {/* Password login */}
+        {loginMode === "password" && (
+          <div className="fade-up-2">
+            <Field label="Email Address" type="email"    value={loginData.email}    onChange={v => setLoginData({...loginData,email:v})}    placeholder="jane@example.com" />
+            <Field label="Password"      type="password" value={loginData.password} onChange={v => setLoginData({...loginData,password:v})} placeholder="••••••••" />
+            <button className="btn-primary" onClick={handleLogin} disabled={loading}>
+              {loading && <span className="spinner" />}Sign In
+            </button>
+          </div>
+        )}
+
+        {/* Magic link login */}
+        {loginMode === "magic" && !magicSent && (
+          <div className="fade-up-2">
+            <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", marginBottom:"20px", lineHeight:"1.6" }}>
+              Enter your email and we'll send you a sign-in link — no password needed.
+            </p>
+            <Field label="Email Address" type="email" value={magicEmail} onChange={setMagicEmail} placeholder="jane@example.com" />
+            <button className="btn-primary" onClick={handleMagicLink} disabled={loading}>
+              {loading && <span className="spinner" />}Send Me a Link
+            </button>
+          </div>
+        )}
+
+        {/* Magic link sent confirmation */}
+        {loginMode === "magic" && magicSent && (
+          <div className="fade-up-2" style={{ textAlign:"center", padding:"16px 0" }}>
+            <div style={{ fontSize:"40px", marginBottom:"16px" }}>✉️</div>
+            <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"14px", letterSpacing:"2px", marginBottom:"12px" }}>CHECK YOUR INBOX</div>
+            <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", lineHeight:"1.6" }}>
+              We sent a sign-in link to<br />
+              <span style={{ color:"#d4af37" }}>{magicEmail}</span><br /><br />
+              Click the link in the email to sign in.
+            </p>
+            <button className="btn-ghost" style={{ marginTop:"24px", width:"100%" }} onClick={() => { setMagicSent(false); setMagicEmail(""); }}>
+              Use a different email
+            </button>
+          </div>
+        )}
+
+        {!magicSent && (
+          <>
+            <div className="divider">or</div>
+            <button className="btn-ghost" style={{ width:"100%" }} onClick={() => go("signup")}>Create an Account</button>
+          </>
+        )}
       </div>
     </div>
   );
