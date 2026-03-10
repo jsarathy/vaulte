@@ -532,11 +532,15 @@ export default function App() {
                 {/* Right: profile photo */}
                 <div style={{ flexShrink:0, marginLeft:"40px" }}>
                   {profile.photoURL
-                    ? <div style={{ width:"200px", height:"200px", borderRadius:"12px", overflow:"hidden", border:"2px solid rgba(212,175,55,0.4)", boxShadow:"0 8px 32px rgba(0,0,0,0.5)", flexShrink:0 }}>
-                        <img src={profile.photoURL} alt="Profile" crossOrigin="anonymous"
-                          style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
-                        />
-                      </div>
+                    ? <div style={{
+                        width:"200px", height:"200px", flexShrink:0,
+                        borderRadius:"12px",
+                        backgroundImage:`url(${profile.photoURL})`,
+                        backgroundSize:"cover",
+                        backgroundPosition:"center",
+                        border:"2px solid rgba(212,175,55,0.4)",
+                        boxShadow:"0 8px 32px rgba(0,0,0,0.5)"
+                      }} />
                     : <div style={{ width:"200px", height:"200px", borderRadius:"12px", border:"2px dashed rgba(212,175,55,0.25)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"12px", background:"rgba(212,175,55,0.03)" }}>
                         <span style={{ fontSize:"48px", opacity:0.3 }}>👤</span>
                         <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"2px", color:"rgba(212,175,55,0.3)", textAlign:"center" }}>NO PHOTO YET</span>
@@ -595,11 +599,15 @@ export default function App() {
                     }} />
                     <label htmlFor="photo-upload" style={{ cursor:"pointer", display:"block" }}>
                       {profile.photoURL
-                        ? <div style={{ width:"200px", height:"200px", borderRadius:"12px", overflow:"hidden", border:"2px solid rgba(212,175,55,0.4)", boxShadow:"0 4px 16px rgba(0,0,0,0.3)" }}>
-                            <img src={profile.photoURL} crossOrigin="anonymous" alt="Profile"
-                              style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
-                            />
-                          </div>
+                        ? <div style={{
+                            width:"200px", height:"200px",
+                            borderRadius:"12px",
+                            backgroundImage:`url(${profile.photoURL})`,
+                            backgroundSize:"cover",
+                            backgroundPosition:"center",
+                            border:"2px solid rgba(212,175,55,0.4)",
+                            boxShadow:"0 4px 16px rgba(0,0,0,0.3)"
+                          }} />
                         : <div style={{ width:"200px", height:"200px", borderRadius:"12px", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(212,175,55,0.03)" }}>
                             <span style={{ fontSize:"40px" }}>📷</span>
                             <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)", textAlign:"center" }}>CLICK TO<br/>ADD PHOTO</span>
