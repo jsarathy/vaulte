@@ -572,25 +572,39 @@ export default function App() {
                     <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={e => {
                       const file = e.target.files[0];
                       if (!file) return;
+                      const resizeAndSave = (dataUrl) => {
+                        return new Promise((resolve) => {
+                          const img = new Image();
+                          img.onload = () => {
+                            const SIZE = 400;
+                            const canvas = document.createElement("canvas");
+                            canvas.width = SIZE;
+                            canvas.height = SIZE;
+                            const ctx = canvas.getContext("2d");
+                            const scale = Math.max(SIZE / img.width, SIZE / img.height);
+                            const dx = (SIZE - img.width * scale) / 2;
+                            const dy = (SIZE - img.height * scale) / 2;
+                            ctx.drawImage(img, dx, dy, img.width * scale, img.height * scale);
+                            resolve(canvas.toDataURL("image/jpeg", 0.75));
+                          };
+                          img.onerror = () => resolve(dataUrl);
+                          img.src = dataUrl;
+                        });
+                      };
                       const reader = new FileReader();
-                      reader.onload = ev => {
-                        const img = new Image();
-                        img.onload = () => {
-                          const canvas = document.createElement("canvas");
-                          const SIZE = 300;
-                          canvas.width = SIZE; canvas.height = SIZE;
-                          const ctx = canvas.getContext("2d");
-                          const scale = Math.max(SIZE/img.width, SIZE/img.height);
-                          const x = (SIZE - img.width*scale)/2;
-                          const y = (SIZE - img.height*scale)/2;
-                          ctx.drawImage(img, x, y, img.width*scale, img.height*scale);
-                          const resized = canvas.toDataURL("image/jpeg", 0.7);
+                      reader.onload = async (ev) => {
+                        try {
+                          const resized = await resizeAndSave(ev.target.result);
+                          const uid = auth.currentUser?.uid;
+                          if (!uid) { alert("Not logged in"); return; }
                           const updated = { ...profile, photoURL: resized };
-                          saveProfile(auth.currentUser.uid, updated);
+                          await saveProfile(uid, updated);
                           setProfile(updated);
                           showToast("PHOTO UPDATED");
-                        };
-                        img.src = ev.target.result;
+                        } catch(err) {
+                          console.error("Photo save error:", err);
+                          alert("Could not save photo: " + err.message);
+                        }
                       };
                       reader.readAsDataURL(file);
                     }} />
