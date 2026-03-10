@@ -570,7 +570,7 @@ export default function App() {
                   </div>
                   {/* Right: photo upload */}
                   <div style={{ flexShrink:0, textAlign:"center" }}>
-                    <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={e => {
+                    <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={async e => {
                       const file = e.target.files[0];
                       if (!file) return;
                       try {
