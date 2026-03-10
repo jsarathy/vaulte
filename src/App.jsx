@@ -135,6 +135,7 @@ export default function App() {
   const [editing, setEditing]         = useState(false);
   const [editData, setEditData]       = useState({});
   const [savingEdit, setSavingEdit]   = useState(false);
+  const [activePanel, setActivePanel]   = useState("home");
   const [signupData, setSignupData]   = useState({ firstName:"", lastName:"", email:"", password:"", phone:"", address:"", city:"", postcode:"" });
   const [loginData, setLoginData]     = useState({ email:"", password:"" });
   const [magicEmail, setMagicEmail]   = useState("");
@@ -423,7 +424,6 @@ export default function App() {
 
   // ── Account Page ──
   if (page === "account" && profile) {
-    const [activePanel, setActivePanel] = useState("home");
 
     const InfoCard = ({ icon, label, value }) => (
       <div className="info-card">
