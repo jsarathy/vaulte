@@ -423,6 +423,8 @@ export default function App() {
 
   // ── Account Page ──
   if (page === "account" && profile) {
+    const [activePanel, setActivePanel] = useState("home");
+
     const InfoCard = ({ icon, label, value }) => (
       <div className="info-card">
         <div style={{ fontSize:"20px", marginTop:"2px", flexShrink:0 }}>{icon}</div>
@@ -435,8 +437,21 @@ export default function App() {
       </div>
     );
 
+    const navItem = (id, label, icon) => (
+      <button onClick={() => setActivePanel(id)} style={{
+        display:"flex", alignItems:"center", gap:"12px", width:"100%",
+        padding:"12px 16px", background: activePanel === id ? "rgba(212,175,55,0.12)" : "transparent",
+        border:"none", borderLeft: activePanel === id ? "2px solid #d4af37" : "2px solid transparent",
+        color: activePanel === id ? "#d4af37" : "rgba(240,234,214,0.45)",
+        fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
+        cursor:"pointer", transition:"all 0.25s", textTransform:"uppercase", textAlign:"left",
+      }}>
+        <span style={{ fontSize:"16px" }}>{icon}</span>{label}
+      </button>
+    );
+
     return (
-      <div style={{ ...bg, alignItems:"flex-start", paddingTop:"48px", paddingBottom:"48px" }}>
+      <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'Cormorant Garamond',serif" }}>
         <style>{globalStyle}</style>
         {toast && <div className="toast">✦ {toast}</div>}
 
@@ -471,49 +486,82 @@ export default function App() {
           </div>
         )}
 
-        <div style={{ width:"100%", maxWidth:"640px" }}>
-          {/* Header */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"36px" }} className="fade-up">
-            <div>
-              <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"6px" }}>VAULTE</div>
-              <h1 style={{ ...hdg, fontSize:"30px", marginBottom:0 }}>My Account</h1>
+        {/* Top bar */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 32px", borderBottom:"1px solid rgba(212,175,55,0.1)", background:"rgba(0,0,0,0.2)" }}>
+          <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"20px", letterSpacing:"6px" }}>VAULTE</div>
+          <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
+            <div style={{ fontFamily:"'Cinzel',serif", color:"rgba(212,175,55,0.5)", fontSize:"10px", letterSpacing:"2px" }}>
+              {profile.firstName} {profile.lastName}
             </div>
-            <button className="btn-ghost" onClick={handleLogout}>Sign Out</button>
+            <button className="btn-ghost" style={{ padding:"8px 20px", fontSize:"10px" }} onClick={handleLogout}>Sign Out</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ display:"flex", flex:1 }}>
+
+          {/* Left Sidebar */}
+          <div style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
+            <div style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
+            {navItem("home",    "Home",       "⌂")}
+            {navItem("account", "My Account", "◈")}
+            <div style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
+              <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
+            </div>
           </div>
 
-          {/* Profile Hero */}
-          <div style={{ padding:"28px 32px", background:"linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.04))", border:"1px solid rgba(212,175,55,0.3)", borderRadius:"8px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"24px", flexWrap:"wrap" }} className="fade-up-2">
-            <div style={{ width:"68px", height:"68px", borderRadius:"50%", background:"linear-gradient(135deg,#c9a84c,#b8962e)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Cinzel',serif", fontSize:"24px", color:"#0d0d0f", fontWeight:"600", flexShrink:0 }}>
-              {profile.firstName?.[0]}{profile.lastName?.[0]}
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"22px", fontWeight:"400", letterSpacing:"2px" }}>
-                {profile.firstName} {profile.lastName}
+          {/* Main Content */}
+          <div style={{ flex:1, padding:"48px", overflowY:"auto" }}>
+
+            {/* HOME panel */}
+            {activePanel === "home" && (
+              <div className="fade-up">
+                <div style={{ color:"rgba(212,175,55,0.4)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"16px" }}>
+                  {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
+                </div>
+                <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"42px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.2", marginBottom:"16px" }}>
+                  Welcome,<br />{profile.firstName}.
+                </h1>
+                <p style={{ color:"rgba(240,234,214,0.35)", fontSize:"16px", fontStyle:"italic", letterSpacing:"0.5px", marginBottom:"48px" }}>
+                  Good to have you back.
+                </p>
+                <div style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"rgba(212,175,55,0.08)", border:"1px solid rgba(212,175,55,0.2)", borderRadius:"20px", padding:"6px 16px" }}>
+                  <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"10px" }}>◆</span>
+                  <span style={{ fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", color:"rgba(212,175,55,0.6)" }}>{profile.uid}</span>
+                </div>
               </div>
-              <div style={{ color:"rgba(240,234,214,0.45)", fontSize:"13px", marginTop:"4px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
-              <div style={{ marginTop:"10px", display:"inline-flex", alignItems:"center", gap:"8px", background:"rgba(212,175,55,0.12)", border:"1px solid rgba(212,175,55,0.3)", borderRadius:"20px", padding:"4px 14px" }}>
-                <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"10px" }}>◆</span>
-                <span style={{ fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", color:"#d4af37" }}>{profile.uid}</span>
+            )}
+
+            {/* MY ACCOUNT panel */}
+            {activePanel === "account" && (
+              <div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"32px" }} className="fade-up">
+                  <div>
+                    <div style={{ color:"rgba(212,175,55,0.4)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"8px" }}>PROFILE</div>
+                    <h2 style={{ ...hdg, fontSize:"26px", marginBottom:0 }}>My Account</h2>
+                  </div>
+                  <button className="btn-ghost" onClick={openEdit}>Edit Profile</button>
+                </div>
+
+                {/* Avatar + name */}
+                <div style={{ padding:"24px 28px", background:"linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.03))", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"8px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"20px" }} className="fade-up-2">
+                  <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#c9a84c,#b8962e)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Cinzel',serif", fontSize:"20px", color:"#0d0d0f", fontWeight:"600", flexShrink:0 }}>
+                    {profile.firstName?.[0]}{profile.lastName?.[0]}
+                  </div>
+                  <div>
+                    <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"18px", letterSpacing:"2px" }}>{profile.firstName} {profile.lastName}</div>
+                    <div style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", marginTop:"3px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
+                  </div>
+                </div>
+
+                <div style={{ display:"grid", gap:"12px" }} className="fade-up-3">
+                  <InfoCard icon="✉️" label="Email Address" value={profile.email} />
+                  <InfoCard icon="📞" label="Telephone"     value={profile.phone} />
+                  <InfoCard icon="🏠" label="Address"       value={[profile.address, profile.city, profile.postcode].filter(Boolean).join(", ")} />
+                  <InfoCard icon="🔑" label="Unique ID"     value={profile.uid} />
+                </div>
               </div>
-            </div>
-            <button className="btn-ghost" style={{ whiteSpace:"nowrap" }} onClick={openEdit}>Edit Profile</button>
-          </div>
-
-          {/* Info Cards */}
-          <div style={{ display:"grid", gap:"12px" }} className="fade-up-3">
-            <InfoCard icon="✉️" label="Email Address" value={profile.email} />
-            <InfoCard icon="📞" label="Telephone"     value={profile.phone} />
-            <InfoCard icon="🏠" label="Address"       value={[profile.address, profile.city, profile.postcode].filter(Boolean).join(", ")} />
-            <InfoCard icon="🔑" label="Unique ID"     value={profile.uid} />
-          </div>
-
-          {/* Danger Zone */}
-          <div style={{ marginTop:"32px", padding:"20px 24px", border:"1px solid rgba(200,80,80,0.2)", borderRadius:"6px", background:"rgba(200,80,80,0.04)" }} className="fade-up-4">
-            <div style={{ color:"rgba(200,80,80,0.7)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", marginBottom:"12px" }}>DANGER ZONE</div>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:"12px" }}>
-              <p style={{ color:"rgba(240,234,214,0.35)", fontSize:"13px", fontStyle:"italic" }}>Permanently delete your account and all data.</p>
-              <button className="btn-danger" onClick={handleDeleteAccount}>Delete Account</button>
-            </div>
+            )}
           </div>
         </div>
       </div>
