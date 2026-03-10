@@ -46,10 +46,15 @@ const makeMeals = () => DEFAULT_MEAL_SLOTS.map(s => ({ id:genId(), name:s.name, 
 const dayRef = (uid, date) => doc(db, "users", uid, "nutrition_days", date);
 
 async function loadAllDays(uid) {
-  const snap = await getDocs(collection(db, "users", uid, "nutrition_days"));
-  const days = [];
-  snap.forEach(d => days.push(d.data()));
-  return days.sort((a,b) => b.date.localeCompare(a.date));
+  try {
+    const snap = await getDocs(collection(db, "users", uid, "nutrition_days"));
+    const days = [];
+    snap.forEach(d => days.push(d.data()));
+    return days.sort((a,b) => b.date.localeCompare(a.date));
+  } catch (err) {
+    console.error("loadAllDays error:", err);
+    return [];
+  }
 }
 
 async function saveDay(uid, dayData) {
@@ -162,21 +167,26 @@ export default function NutritionTracker({ userId }) {
 
   // ── Load data ──
   useEffect(() => {
+    if (!userId) { setLoading(false); return; }
     (async () => {
-      setLoading(true);
-      const days = await loadAllDays(userId);
-      setAllDays(days);
-      if (days.length > 0) {
-        const first = days[0];
-        setCurrentDate(first.date);
-        setCurrentDayData(first);
-        setChatDate(first.date);
-        // Init compare with last 5 days
-        const slots = days.slice(0,5).map(d => d.date);
-        setCompareSlots([...slots, ...Array(5-slots.length).fill(null)].slice(0,5));
-        setCompareData(days.slice(0,5).map(d => d).concat(Array(5).fill(null)).slice(0,5));
+      try {
+        setLoading(true);
+        const days = await loadAllDays(userId);
+        setAllDays(days);
+        if (days.length > 0) {
+          const first = days[0];
+          setCurrentDate(first.date);
+          setCurrentDayData(first);
+          setChatDate(first.date);
+          const slots = days.slice(0,5).map(d => d.date);
+          setCompareSlots([...slots, ...Array(5-slots.length).fill(null)].slice(0,5));
+          setCompareData(days.slice(0,5).map(d => d).concat(Array(5).fill(null)).slice(0,5));
+        }
+      } catch(err) {
+        console.error("Init error:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
   }, [userId]);
 
