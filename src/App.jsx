@@ -515,19 +515,28 @@ export default function App() {
 
             {/* HOME panel */}
             {activePanel === "home" && (
-              <div className="fade-up">
-                <div style={{ color:"rgba(212,175,55,0.4)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"16px" }}>
-                  {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
+              <div className="fade-up" style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                {/* Left: welcome text */}
+                <div>
+                  <div style={{ color:"rgba(212,175,55,0.4)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"16px" }}>
+                    {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
+                  </div>
+                  <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"42px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.2", marginBottom:"16px" }}>
+                    Welcome,<br />{profile.firstName}.
+                  </h1>
+                  <p style={{ color:"rgba(240,234,214,0.35)", fontSize:"16px", fontStyle:"italic", letterSpacing:"0.5px" }}>
+                    Good to have you back.
+                  </p>
                 </div>
-                <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"42px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.2", marginBottom:"16px" }}>
-                  Welcome,<br />{profile.firstName}.
-                </h1>
-                <p style={{ color:"rgba(240,234,214,0.35)", fontSize:"16px", fontStyle:"italic", letterSpacing:"0.5px", marginBottom:"48px" }}>
-                  Good to have you back.
-                </p>
-                <div style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"rgba(212,175,55,0.08)", border:"1px solid rgba(212,175,55,0.2)", borderRadius:"20px", padding:"6px 16px" }}>
-                  <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"10px" }}>◆</span>
-                  <span style={{ fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", color:"rgba(212,175,55,0.6)" }}>{profile.uid}</span>
+                {/* Right: profile photo */}
+                <div style={{ flexShrink:0, marginLeft:"40px" }}>
+                  {profile.photoURL
+                    ? <img src={profile.photoURL} alt="Profile" style={{ width:"144px", height:"144px", borderRadius:"8px", objectFit:"cover", border:"2px solid rgba(212,175,55,0.35)", boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }} />
+                    : <div style={{ width:"144px", height:"144px", borderRadius:"8px", border:"2px dashed rgba(212,175,55,0.2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", background:"rgba(212,175,55,0.03)" }}>
+                        <span style={{ fontSize:"32px", opacity:0.4 }}>👤</span>
+                        <span style={{ fontFamily:"'Cinzel',serif", fontSize:"8px", letterSpacing:"1px", color:"rgba(212,175,55,0.3)", textAlign:"center" }}>NO PHOTO<br/>YET</span>
+                      </div>
+                  }
                 </div>
               </div>
             )}
@@ -574,17 +583,17 @@ export default function App() {
                     }} />
                     <label htmlFor="photo-upload" style={{ cursor:"pointer", display:"block" }}>
                       {profile.photoURL
-                        ? <img src={profile.photoURL} alt="Profile" style={{ width:"72px", height:"72px", borderRadius:"50%", objectFit:"cover", border:"2px solid rgba(212,175,55,0.4)" }} />
-                        : <div style={{ width:"72px", height:"72px", borderRadius:"50%", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"4px", transition:"border-color 0.3s" }}>
-                            <span style={{ fontSize:"20px" }}>📷</span>
-                            <span style={{ fontFamily:"'Cinzel',serif", fontSize:"8px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)" }}>ADD PHOTO</span>
+                        ? <img src={profile.photoURL} alt="Profile" style={{ width:"120px", height:"120px", borderRadius:"8px", objectFit:"cover", border:"2px solid rgba(212,175,55,0.4)", boxShadow:"0 4px 16px rgba(0,0,0,0.3)" }} />
+                        : <div style={{ width:"120px", height:"120px", borderRadius:"8px", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(212,175,55,0.03)" }}>
+                            <span style={{ fontSize:"32px" }}>📷</span>
+                            <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)" }}>CLICK TO<br/>ADD PHOTO</span>
                           </div>
                       }
                     </label>
                     {profile.photoURL && (
                       <button onClick={() => { const u = {...profile}; delete u.photoURL; saveProfile(auth.currentUser.uid, u); setProfile(u); showToast("PHOTO REMOVED"); }}
-                        style={{ marginTop:"6px", background:"none", border:"none", color:"rgba(200,80,80,0.5)", fontFamily:"'Cinzel',serif", fontSize:"8px", letterSpacing:"1px", cursor:"pointer", textTransform:"uppercase" }}>
-                        Remove
+                        style={{ marginTop:"8px", background:"none", border:"none", color:"rgba(200,80,80,0.5)", fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", cursor:"pointer", textTransform:"uppercase" }}>
+                        Remove Photo
                       </button>
                     )}
                   </div>
