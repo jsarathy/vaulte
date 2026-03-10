@@ -9,6 +9,8 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { auth, db, storage } from "./firebase";
@@ -234,6 +236,37 @@ export default function App() {
     }
     setLoading(false);
   };
+  // ── Google Sign In ──
+  const handleGoogleSignIn = async () => {
+    setLoading(true); setError("");
+    try {
+      const provider = new GoogleAuthProvider();
+      const cred = await signInWithPopup(auth, provider);
+      let prof = await fetchProfile(cred.user.uid);
+      if (!prof) {
+        prof = {
+          firstName: cred.user.displayName?.split(" ")[0] || "",
+          lastName:  cred.user.displayName?.split(" ").slice(1).join(" ") || "",
+          email:     cred.user.email,
+          phone:     "", address:   "", city:      "", postcode:  "",
+          photoURL:  cred.user.photoURL || "",
+          uid:       generateUID(),
+          firebaseUid: cred.user.uid,
+          createdAt: new Date().toLocaleDateString("en-GB", { day:"numeric", month:"long", year:"numeric" }),
+        };
+        await saveProfile(cred.user.uid, prof);
+        showToast("ACCOUNT CREATED");
+      } else {
+        showToast("WELCOME BACK");
+      }
+      setProfile(prof);
+      setPage("account");
+    } catch (e) {
+      if (e.code !== "auth/popup-closed-by-user") setError(e.message);
+    }
+    setLoading(false);
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     setProfile(null);
@@ -336,6 +369,25 @@ export default function App() {
             {loading && <span className="spinner" />}Create My Account
           </button>
           <div className="divider">or</div>
+          <button onClick={handleGoogleSignIn} disabled={loading} style={{
+            width:"100%", padding:"12px", marginBottom:"12px",
+            background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
+            borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
+            fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
+            transition:"all 0.3s", textTransform:"uppercase"
+          }}
+            onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+            onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
+              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
+              <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
+            </svg>
+            Continue with Google
+          </button>
           <button className="btn-ghost" style={{ width:"100%" }} onClick={() => go("login")}>Sign In Instead</button>
         </div>
       </div>
@@ -370,6 +422,52 @@ export default function App() {
             Magic Link
           </button>
         </div>
+
+        {/* Google Sign In */}
+        <button onClick={handleGoogleSignIn} disabled={loading} style={{
+          width:"100%", padding:"12px", marginBottom:"20px",
+          background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
+          borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
+          fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
+          display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
+          transition:"all 0.3s", textTransform:"uppercase"
+        }}
+          onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+          onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+        >
+          <svg width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
+            <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <div className="divider">or</div>
+
+        {/* Google Sign In */}
+        <button onClick={handleGoogleSignIn} disabled={loading} style={{
+          width:"100%", padding:"12px", marginBottom:"20px",
+          background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
+          borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
+          fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
+          display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
+          transition:"all 0.3s", textTransform:"uppercase"
+        }}
+          onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+          onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+        >
+          <svg width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
+            <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <div className="divider">or</div>
 
         <ErrorBox msg={error} />
 
