@@ -468,6 +468,12 @@ export default function NutritionTracker({ userId }) {
     if (!day) { day = { date:addDate, notes:"", meals:makeMeals() }; }
 
     let targetMealId = addMealId;
+    // Handle slot sentinel (date had no day yet, dropdown used __slot__+name)
+    if (targetMealId && targetMealId.startsWith("__slot__")) {
+      const slotName = targetMealId.replace("__slot__", "");
+      const match = day.meals.find(m => m.name === slotName);
+      targetMealId = match ? match.id : null;
+    }
     if (!targetMealId && addMealName) {
       const newMeal = { id:genId(), name:addMealName, is_exercise:0, items:[] };
       day = { ...day, meals:[...day.meals, newMeal] };
@@ -883,9 +889,13 @@ export default function NutritionTracker({ userId }) {
                   <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>Meal</div>
                   <select value={addMealId} onChange={e=>setAddMealId(e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}>
                     <option value="">— select —</option>
-                    {(allDays.find(d=>d.date===addDate)?.meals || DEFAULT_MEAL_SLOTS).map((m,i) => (
-                      <option key={m.id||i} value={m.id||""}>{m.name}</option>
-                    ))}
+                    {(() => {
+                      const existing = allDays.find(d=>d.date===addDate);
+                      const meals = existing ? existing.meals : DEFAULT_MEAL_SLOTS;
+                      return meals.map((m,i) => (
+                        <option key={m.id||i} value={m.id || ("__slot__"+m.name)}>{m.name}</option>
+                      ));
+                    })()}
                   </select>
                 </div>
                 <div>
