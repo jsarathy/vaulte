@@ -309,6 +309,9 @@ export default function NutritionTracker({ userId }) {
   const [addMealId, setAddMealId] = useState("");
   const [addMealName, setAddMealName] = useState("");
   const [addItem, setAddItem] = useState({ name:"", kcal:"", fat:"", sat_fat:"", carbs:"", sugar:"", fibre:"", net_carbs:"", protein:"" });
+  const [nameDropdown, setNameDropdown] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const nameInputRef = useRef(null);
   const [addMsg, setAddMsg] = useState(null);
 
   // Compare state
@@ -890,9 +893,76 @@ export default function NutritionTracker({ userId }) {
                   <input value={addMealName} onChange={e=>setAddMealName(e.target.value)} placeholder="e.g. 🍽 Dinner" style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>
                 </div>
               </div>
-              <div style={{ marginBottom:"10px" }}>
+              <div style={{ marginBottom:"10px", position:"relative" }}>
                 <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>Food Item Name</div>
-                <input value={addItem.name} onChange={e=>setAddItem({...addItem,name:e.target.value})} placeholder="e.g. Pinto bean stew (1 portion)" style={{ width:"100%", padding:"5px 9px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>
+                <input
+                  ref={nameInputRef}
+                  value={addItem.name}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setAddItem({...addItem, name:val});
+                    if (val.length > 1) {
+                      const q = val.toLowerCase();
+                      const matches = userRecipes.filter(r => r.name.toLowerCase().includes(q));
+                      setNameDropdown(matches);
+                      setShowDropdown(matches.length > 0);
+                    } else {
+                      setShowDropdown(false);
+                    }
+                  }}
+                  onBlur={async () => {
+                    // Small delay so dropdown click fires first
+                    setTimeout(async () => {
+                      setShowDropdown(false);
+                      const name = addItem.name.trim();
+                      if (!name) return;
+                      // Check if name matches any recipe exactly (already filled)
+                      const exact = userRecipes.find(r => r.name.toLowerCase() === name.toLowerCase());
+                      if (exact) return;
+                      // Check if any nutrition is already filled in
+                      const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
+                      if (hasNutrition) return;
+                      // Unknown item — ask Claude to create a recipe
+                      const yes = window.confirm(`"${name}" is not in your recipe library. Open Claude to create and save a recipe for it?`);
+                      if (yes) {
+                        setBuilderInput(name);
+                        setBuilderPreview(null);
+                        setBuilderError("");
+                        setRecipeBuilder(true);
+                      }
+                    }, 150);
+                  }}
+                  onFocus={() => {
+                    if (nameDropdown.length > 0) setShowDropdown(true);
+                  }}
+                  placeholder="e.g. Pinto bean stew (1 portion)"
+                  style={{ width:"100%", padding:"5px 9px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}
+                />
+                {/* Autocomplete dropdown */}
+                {showDropdown && (
+                  <div style={{ position:"absolute", top:"100%", left:0, right:0, background:"#fff", border:"1px solid #DDEAF6", borderRadius:"0 0 6px 6px", boxShadow:"0 4px 12px rgba(0,0,0,0.1)", zIndex:100, maxHeight:"180px", overflowY:"auto" }}>
+                    {nameDropdown.map(r => (
+                      <div key={r.id}
+                        onMouseDown={() => {
+                          // Use nutrition from recipe (per serving)
+                          const n = r.nutrition || {};
+                          setAddItem({
+                            name: r.name,
+                            kcal: n.kcal || "", fat: n.fat || "", sat_fat: n.sat_fat || "",
+                            carbs: n.carbs || "", sugar: n.sugar || "", fibre: n.fibre || "",
+                            net_carbs: n.net_carbs || "", protein: n.protein || ""
+                          });
+                          setShowDropdown(false);
+                        }}
+                        style={{ padding:"8px 12px", cursor:"pointer", borderBottom:"1px solid #F0F4F8", fontSize:"12px" }}
+                        onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"}
+                        onMouseOut={e=>e.currentTarget.style.background="#fff"}>
+                        <div style={{ fontWeight:"bold", color:"#1F4E79" }}>{r.name}</div>
+                        <div style={{ fontSize:"11px", color:"#6B8CAE" }}>{r.nutrition?.kcal} kcal · P:{r.nutrition?.protein}g F:{r.nutrition?.fat}g C:{r.nutrition?.carbs}g · per serving</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))", gap:"8px", marginBottom:"10px" }}>
                 {[["kcal","kcal"],["fat","Fat (g)"],["sat_fat","Sat Fat (g)"],["carbs","Carbs (g)"],["sugar","Sugar (g)"],["fibre","Fibre (g)"],["net_carbs","Net Carbs (g)"],["protein","Protein (g)"]].map(([key,label]) => (
@@ -996,6 +1066,14 @@ export default function NutritionTracker({ userId }) {
                           <button onClick={async () => {
                             await saveRecipe(userId, builderPreview);
                             setUserRecipes(prev => [...prev, builderPreview].sort((a,b)=>a.name.localeCompare(b.name)));
+                            // Auto-fill the add item form with the saved recipe nutrition
+                            const n = builderPreview.nutrition || {};
+                            setAddItem({
+                              name: builderPreview.name,
+                              kcal: n.kcal || "", fat: n.fat || "", sat_fat: n.sat_fat || "",
+                              carbs: n.carbs || "", sugar: n.sugar || "", fibre: n.fibre || "",
+                              net_carbs: n.net_carbs || "", protein: n.protein || ""
+                            });
                             setRecipeBuilder(false);
                             setBuilderPreview(null);
                             setBuilderInput("");
