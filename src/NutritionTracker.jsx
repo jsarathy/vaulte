@@ -126,6 +126,105 @@ function calcMacros(tdee, weight, proteinPerKg, fatPct) {
   return { protein_g, fat_g, carbs_g, fibre_g:30, net_carbs:Math.max(0,carbs_g-30) };
 }
 
+
+async function seedInitialData(uid) {
+  const g = genId;
+  const days = [
+    { date:"2026-03-04", notes:"First tracked day", meals:[
+      { id:g(), name:"☕ Breakfast", is_exercise:0, items:[
+        { id:g(), name:"Huel RTD Strawberries & Cream 250ml", kcal:200, fat:9, sat_fat:2.5, carbs:17, sugar:0.75, fibre:3.6, net_carbs:13.4, protein:11, recipe_name:"Huel RTD Strawberries & Cream" },
+        { id:g(), name:"Black coffee (5oz)", kcal:5, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+        { id:g(), name:"Whole milk (1oz / 30ml)", kcal:18, fat:1, sat_fat:0.6, carbs:1.4, sugar:1.4, fibre:0, net_carbs:1.4, protein:0.9 },
+        { id:g(), name:"White sugar (1 tsp / 4g)", kcal:16, fat:0, sat_fat:0, carbs:4, sugar:4, fibre:0, net_carbs:4, protein:0 },
+      ]},
+      { id:g(), name:"🏋️ Morning Exercise", is_exercise:1, items:[] },
+      { id:g(), name:"🥤 Post-Workout", is_exercise:0, items:[] },
+      { id:g(), name:"🥗 Lunch", is_exercise:0, items:[
+        { id:g(), name:"Egg white omelet (100g egg white, 4g butter, 20g veg)", kcal:89, fat:3.6, sat_fat:2.1, carbs:1.5, sugar:0.8, fibre:0.5, net_carbs:1, protein:11.5, recipe_name:"Egg White Omelet" },
+        { id:g(), name:"Carrot (100g)", kcal:41, fat:0.2, sat_fat:0, carbs:9.6, sugar:4.7, fibre:2.8, net_carbs:6.8, protein:0.9 },
+        { id:g(), name:"Cucumber (75g)", kcal:11, fat:0.1, sat_fat:0, carbs:2.4, sugar:1.5, fibre:0.5, net_carbs:1.9, protein:0.6 },
+        { id:g(), name:"Jason's Ciabattin bread (1 slice)", kcal:111, fat:0.4, sat_fat:0.1, carbs:23, sugar:1.1, fibre:0.7, net_carbs:22.3, protein:5 },
+        { id:g(), name:"Butter for toast (0.5g)", kcal:4, fat:0.4, sat_fat:0.3, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+        { id:g(), name:"M&S Potato & Onion Rosti x2", kcal:140, fat:6.5, sat_fat:2, carbs:16, sugar:1, fibre:2.8, net_carbs:13.2, protein:2 },
+      ]},
+      { id:g(), name:"🍎 Snack", is_exercise:0, items:[
+        { id:g(), name:"Huel RTD Salted Caramel 250ml", kcal:200, fat:9, sat_fat:2.5, carbs:17, sugar:0.75, fibre:3.6, net_carbs:13.4, protein:11 },
+      ]},
+      { id:g(), name:"🍹 Drinks", is_exercise:0, items:[
+        { id:g(), name:"Nimbu pani (330ml soda, 0.5 lime, salt)", kcal:9, fat:0.1, sat_fat:0, carbs:2.6, sugar:0.8, fibre:0.7, net_carbs:1.9, protein:0.2, recipe_name:"Nimbu Pani" },
+        { id:g(), name:"Sencha matcha tea", kcal:2, fat:0, sat_fat:0, carbs:0.4, sugar:0, fibre:0, net_carbs:0.4, protein:0.2 },
+      ]},
+      { id:g(), name:"🌙 Dinner", is_exercise:0, items:[
+        { id:g(), name:"Pinto bean stew (1 of 4 portions)", kcal:338, fat:11, sat_fat:0, carbs:46, sugar:0, fibre:15, net_carbs:31, protein:15, recipe_name:"Pinto Bean Stew" },
+        { id:g(), name:"Baby tomatoes (100g)", kcal:18, fat:0.2, sat_fat:0, carbs:3.5, sugar:3.5, fibre:1, net_carbs:2.5, protein:0.9 },
+        { id:g(), name:"El Paso flour tortillas x1.5", kcal:113, fat:3.4, sat_fat:0.8, carbs:18, sugar:0, fibre:0.8, net_carbs:17.2, protein:2.3 },
+        { id:g(), name:"M&S Grilled Turkish green olives x4", kcal:40, fat:4, sat_fat:0.6, carbs:0.5, sugar:0, fibre:0.5, net_carbs:0, protein:0.3 },
+        { id:g(), name:"Scotch whisky (35ml)", kcal:77, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+        { id:g(), name:"Green grapes (150g)", kcal:104, fat:0.2, sat_fat:0, carbs:27, sugar:27, fibre:0.9, net_carbs:26.1, protein:1.1 },
+      ]},
+    ]},
+    { date:"2026-03-05", notes:"Bike session day", meals:[
+      { id:g(), name:"☕ Breakfast", is_exercise:0, items:[
+        { id:g(), name:"Black coffee (5oz)", kcal:5, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+        { id:g(), name:"Whole milk (1oz / 30ml)", kcal:18, fat:1, sat_fat:0.6, carbs:1.4, sugar:1.4, fibre:0, net_carbs:1.4, protein:0.9 },
+        { id:g(), name:"White sugar (1 tsp / 4g)", kcal:16, fat:0, sat_fat:0, carbs:4, sugar:4, fibre:0, net_carbs:4, protein:0 },
+      ]},
+      { id:g(), name:"🏋️ Morning Exercise", is_exercise:1, items:[
+        { id:g(), name:"Stationary bike — calories burned", kcal:-85, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+      ]},
+      { id:g(), name:"🥤 Post-Workout", is_exercise:0, items:[
+        { id:g(), name:"Huel RTD Strawberries & Cream 250ml", kcal:200, fat:9, sat_fat:2.5, carbs:17, sugar:0.75, fibre:3.6, net_carbs:13.4, protein:11, recipe_name:"Huel RTD Strawberries & Cream" },
+      ]},
+      { id:g(), name:"🥗 Lunch", is_exercise:0, items:[
+        { id:g(), name:"Egg white omelet (100g egg white, 4g butter, 20g veg)", kcal:89, fat:3.6, sat_fat:2.1, carbs:1.5, sugar:0.8, fibre:0.5, net_carbs:1, protein:11.5, recipe_name:"Egg White Omelet" },
+        { id:g(), name:"Cucumber (85g)", kcal:13, fat:0.1, sat_fat:0, carbs:2.7, sugar:1.7, fibre:0.6, net_carbs:2.1, protein:0.7 },
+        { id:g(), name:"Carrot (115g)", kcal:47, fat:0.2, sat_fat:0, carbs:11, sugar:5.4, fibre:3.2, net_carbs:7.8, protein:1 },
+        { id:g(), name:"Strong Roots sweet potato hash brown x2", kcal:156, fat:7.8, sat_fat:0, carbs:18, sugar:1, fibre:2, net_carbs:16, protein:2.2 },
+        { id:g(), name:"Jason's Ciabattin bread (1 slice)", kcal:111, fat:0.4, sat_fat:0.1, carbs:23, sugar:1.1, fibre:0.7, net_carbs:22.3, protein:5 },
+        { id:g(), name:"Butter for toast (2g)", kcal:14, fat:1.6, sat_fat:1, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+        { id:g(), name:"Nimbu pani (330ml soda, 0.5 lime, salt)", kcal:9, fat:0.1, sat_fat:0, carbs:2.6, sugar:0.8, fibre:0.7, net_carbs:1.9, protein:0.2, recipe_name:"Nimbu Pani" },
+        { id:g(), name:"Walnuts (30g)", kcal:196, fat:19.6, sat_fat:1.8, carbs:4, sugar:0.7, fibre:2, net_carbs:2, protein:4.6 },
+      ]},
+      { id:g(), name:"🍎 Snack", is_exercise:0, items:[] },
+      { id:g(), name:"🌆 Evening Workout", is_exercise:1, items:[] },
+      { id:g(), name:"🌙 Dinner", is_exercise:0, items:[
+        { id:g(), name:"El Paso flour tortillas x1.5", kcal:113, fat:2.6, sat_fat:0.9, carbs:20.3, sugar:1.2, fibre:1.2, net_carbs:19.1, protein:3.2 },
+        { id:g(), name:"Pinto bean stew (1 portion)", kcal:338, fat:11, sat_fat:1.5, carbs:46, sugar:2, fibre:15, net_carbs:31, protein:15, recipe_name:"Pinto Bean Stew" },
+        { id:g(), name:"Grilled Spanish olives x6", kcal:60, fat:6, sat_fat:0.9, carbs:0.6, sugar:0, fibre:0.5, net_carbs:0.1, protein:0.4 },
+        { id:g(), name:"Dry sherry (30ml)", kcal:32, fat:0, sat_fat:0, carbs:0.2, sugar:0.2, fibre:0, net_carbs:0.2, protein:0 },
+        { id:g(), name:"Cotton candy grapes (125g)", kcal:77, fat:0.2, sat_fat:0, carbs:19, sugar:17, fibre:0.6, net_carbs:18.4, protein:0.8 },
+      ]},
+    ]},
+    { date:"2026-03-06", notes:"Today", meals:[
+      { id:g(), name:"☕ Breakfast", is_exercise:0, items:[
+        { id:g(), name:"Black coffee (5oz)", kcal:5, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+        { id:g(), name:"Whole milk (1oz / 30ml)", kcal:18, fat:1, sat_fat:0.6, carbs:1.4, sugar:1.4, fibre:0, net_carbs:1.4, protein:0.9 },
+        { id:g(), name:"White sugar (1 tsp / 4g)", kcal:16, fat:0, sat_fat:0, carbs:4, sugar:4, fibre:0, net_carbs:4, protein:0 },
+      ]},
+      { id:g(), name:"🏋️ Morning Exercise", is_exercise:1, items:[
+        { id:g(), name:"Stationary bike — calories burned", kcal:-100, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0 },
+      ]},
+      { id:g(), name:"🥤 Post-Workout", is_exercise:0, items:[] },
+      { id:g(), name:"🥗 Lunch", is_exercise:0, items:[
+        { id:g(), name:"Egg white omelet", kcal:51, fat:0, sat_fat:0, carbs:1, sugar:0, fibre:0, net_carbs:1, protein:11, recipe_name:"Egg White Omelet" },
+        { id:g(), name:"Jason's Ciabattin bread (1 slice)", kcal:83, fat:0.9, sat_fat:0.1, carbs:16, sugar:0.8, fibre:0.7, net_carbs:15.3, protein:3 },
+        { id:g(), name:"Strong Roots sweet potato hash brown x2", kcal:156, fat:7.8, sat_fat:0, carbs:18, sugar:1, fibre:2, net_carbs:16, protein:2.2 },
+        { id:g(), name:"Nimbu pani", kcal:45, fat:0, sat_fat:0, carbs:11, sugar:10, fibre:0, net_carbs:11, protein:0.2, recipe_name:"Nimbu Pani" },
+        { id:g(), name:"Cucumber (115g)", kcal:17, fat:0.1, sat_fat:0, carbs:3.6, sugar:2, fibre:0.7, net_carbs:2.9, protein:0.7 },
+        { id:g(), name:"Carrot (125g)", kcal:51, fat:0.2, sat_fat:0, carbs:11.9, sugar:5.9, fibre:3.5, net_carbs:8.4, protein:1.1 },
+        { id:g(), name:"Walnuts (30g)", kcal:196, fat:19.6, sat_fat:1.8, carbs:4, sugar:0.7, fibre:2, net_carbs:2, protein:4.6 },
+      ]},
+      { id:g(), name:"🍎 Snack", is_exercise:0, items:[] },
+      { id:g(), name:"🌆 Evening Workout", is_exercise:1, items:[] },
+      { id:g(), name:"🌙 Dinner", is_exercise:0, items:[] },
+    ]},
+  ];
+  for (const day of days) {
+    await saveDay(uid, day);
+  }
+  return days.sort((a,b) => b.date.localeCompare(a.date));
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function NutritionTracker({ userId }) {
   const [allDays, setAllDays] = useState([]);
@@ -171,7 +270,10 @@ export default function NutritionTracker({ userId }) {
     (async () => {
       try {
         setLoading(true);
-        const days = await loadAllDays(userId);
+        let days = await loadAllDays(userId);
+        if (days.length === 0) {
+          days = await seedInitialData(userId);
+        }
         setAllDays(days);
         if (days.length > 0) {
           const first = days[0];
