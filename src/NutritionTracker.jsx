@@ -17,7 +17,7 @@ const DEFAULT_MEAL_SLOTS = [
   { name:"🌙 Dinner",           is_exercise:0 },
 ];
 
-const SEED_RECIPES = [
+const INITIAL_RECIPES = [
   { id:"r1", name:"Pinto Bean Stew", description:"A hearty, high-protein, high-fibre stew. Makes 4 portions.", source:"Home recipe", servings:4, prep_time:"10 minutes", cook_time:"30 minutes",
     ingredients:[{amount:"606g",item:"Cooked pinto beans"},{amount:"102g",item:"Onion, chopped"},{amount:"~60g",item:"Green chillies"},{amount:"3 tbsp",item:"Gingelly (sesame) oil"},{amount:"201g",item:"Mutti Polpa chopped tomatoes"},{amount:"1 tsp",item:"Salt"},{amount:"1 pinch",item:"Asafoetida (hing)"}],
     steps:["Heat gingelly oil over medium heat.","Add asafoetida, sizzle 10 seconds.","Add onion, sauté until translucent.","Add chillies, cook 2 min.","Add tomatoes, cook until oil separates.","Add pinto beans and salt. Mix well.","Simmer 10–15 min until thickened.","Serve hot with tortillas or bread."],
@@ -44,6 +44,24 @@ const makeMeals = () => DEFAULT_MEAL_SLOTS.map(s => ({ id:genId(), name:s.name, 
 
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 const dayRef = (uid, date) => doc(db, "users", uid, "nutrition_days", date);
+const recipeRef = (uid, id) => doc(db, "users", uid, "recipes", id);
+
+async function loadAllRecipes(uid) {
+  try {
+    const snap = await getDocs(collection(db, "users", uid, "recipes"));
+    const recipes = [];
+    snap.forEach(d => recipes.push(d.data()));
+    return recipes.sort((a,b) => a.name.localeCompare(b.name));
+  } catch(err) { console.error("loadAllRecipes error:", err); return []; }
+}
+
+async function saveRecipe(uid, recipe) {
+  await setDoc(recipeRef(uid, recipe.id), recipe);
+}
+
+async function deleteRecipe(uid, id) {
+  await deleteDoc(recipeRef(uid, id));
+}
 
 async function loadAllDays(uid) {
   try {
@@ -88,6 +106,37 @@ Each item must have exactly these fields:
 - protein (number): protein in grams
 Use accurate nutritional database values. Round to 1 decimal place. Return ONLY valid JSON array.`,
       messages:[{role:"user", content:text}]
+    })
+  });
+  const data = await res.json();
+  let raw = data.content?.[0]?.text?.trim() || "";
+  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
+  return JSON.parse(raw);
+}
+
+async function claudeCreateRecipe(description) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:1000,
+      system:`You are a recipe and nutrition expert. The user will describe a recipe.
+Return ONLY a JSON object — no markdown, no explanation. The object must have exactly these fields:
+{
+  "name": string,
+  "description": string (one sentence),
+  "source": string (e.g. "Home recipe"),
+  "servings": number,
+  "prep_time": string (e.g. "10 minutes"),
+  "cook_time": string (e.g. "25 minutes"),
+  "ingredients": [ { "amount": string, "item": string } ],
+  "steps": [ string ],
+  "notes": string,
+  "nutrition": { "kcal": number, "fat": number, "sat_fat": number, "carbs": number, "sugar": number, "fibre": number, "net_carbs": number, "protein": number }
+}
+nutrition is PER SERVING. Use accurate nutritional database values. Return ONLY valid JSON.`,
+      messages:[{role:"user", content:description}]
     })
   });
   const data = await res.json();
@@ -222,6 +271,10 @@ async function seedInitialData(uid) {
   for (const day of days) {
     await saveDay(uid, day);
   }
+  // Also seed built-in recipes
+  for (const r of INITIAL_RECIPES) {
+    await saveRecipe(uid, r);
+  }
   return days.sort((a,b) => b.date.localeCompare(a.date));
 }
 
@@ -235,6 +288,12 @@ export default function NutritionTracker({ userId }) {
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [recipeModal, setRecipeModal] = useState(null);
+  const [userRecipes, setUserRecipes] = useState([]);
+  const [recipeBuilder, setRecipeBuilder] = useState(false);
+  const [builderInput, setBuilderInput] = useState("");
+  const [builderLoading, setBuilderLoading] = useState(false);
+  const [builderPreview, setBuilderPreview] = useState(null);
+  const [builderError, setBuilderError] = useState("");
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
@@ -274,6 +333,8 @@ export default function NutritionTracker({ userId }) {
         if (days.length === 0) {
           days = await seedInitialData(userId);
         }
+        const recipes = await loadAllRecipes(userId);
+        setUserRecipes(recipes);
         setAllDays(days);
         if (days.length > 0) {
           const first = days[0];
@@ -667,7 +728,7 @@ export default function NutritionTracker({ userId }) {
                             </thead>
                             <tbody>
                               {meal.items?.map(item => {
-                                const recipe = SEED_RECIPES.find(r => r.name === item.recipe_name);
+                                const recipe = userRecipes.find(r => r.name === item.recipe_name);
                                 return (
                                   <tr key={item.id} style={{ background: meal.is_exercise?"#E8F5E9":"inherit" }}>
                                     <td style={{ padding:"5px 8px", fontSize:"12px", color: meal.is_exercise?"#2E7D32":"inherit", fontWeight: meal.is_exercise?"bold":"normal" }}>
@@ -853,17 +914,126 @@ export default function NutritionTracker({ userId }) {
               {addMsg && <div style={{ marginTop:"8px", padding:"7px 10px", borderRadius:"4px", fontSize:"12px", background:addMsg.ok?"#E8F5E9":"#FFEBEE", color:addMsg.ok?"#2E7D32":"#c62828" }}>{addMsg.text}</div>}
             </div>
 
+            {/* Recipe Builder Modal */}
+            {recipeBuilder && (
+              <div onClick={e => e.target === e.currentTarget && setRecipeBuilder(false)}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ background:"#fff", borderRadius:"10px", width:"640px", maxWidth:"95vw", maxHeight:"88vh", overflowY:"auto", boxShadow:"0 8px 40px rgba(0,0,0,0.3)" }}>
+                  <div style={{ background:"#1F4E79", color:"#fff", padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", borderRadius:"10px 10px 0 0" }}>
+                    <div style={{ fontSize:"15px", fontWeight:"bold" }}>🤖 Create Recipe with Claude</div>
+                    <button onClick={() => { setRecipeBuilder(false); setBuilderPreview(null); setBuilderInput(""); setBuilderError(""); }}
+                      style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
+                  </div>
+                  <div style={{ padding:"18px" }}>
+                    {!builderPreview ? (
+                      <>
+                        <p style={{ color:"#6B8CAE", fontSize:"13px", marginBottom:"12px", lineHeight:1.5 }}>
+                          Describe your recipe in natural language — ingredients, quantities, cooking method, how many servings. Claude will generate the full recipe with nutrition per serving.
+                        </p>
+                        <textarea value={builderInput} onChange={e=>setBuilderInput(e.target.value)}
+                          placeholder={"e.g. Pinto bean stew — 606g cooked pinto beans, 102g onion, 6 green chillies, 3 tbsp sesame oil, 200g chopped tomatoes, salt and hing. Sauté onion and chillies, add tomatoes, add beans, simmer 15 min. Makes 4 portions of ~225g each."}
+                          style={{ width:"100%", minHeight:"120px", padding:"10px", border:"1px solid #DDEAF6", borderRadius:"6px", fontSize:"13px", fontFamily:"inherit", resize:"vertical", background:"#F0F4F8", boxSizing:"border-box" }}/>
+                        {builderError && <div style={{ color:"#c62828", fontSize:"12px", marginTop:"6px" }}>{builderError}</div>}
+                        <div style={{ display:"flex", justifyContent:"flex-end", marginTop:"12px" }}>
+                          <button disabled={builderLoading || !builderInput.trim()} onClick={async () => {
+                            setBuilderLoading(true); setBuilderError("");
+                            try {
+                              const recipe = await claudeCreateRecipe(builderInput);
+                              recipe.id = genId();
+                              setBuilderPreview(recipe);
+                            } catch(err) {
+                              setBuilderError("Could not parse recipe. Try adding more detail about ingredients and quantities.");
+                            }
+                            setBuilderLoading(false);
+                          }} style={{ background: builderLoading||!builderInput.trim() ? "#ccc":"#2E75B6", color:"#fff", border:"none", borderRadius:"4px", padding:"9px 18px", cursor: builderLoading||!builderInput.trim()?"not-allowed":"pointer", fontSize:"13px", fontWeight:"bold" }}>
+                            {builderLoading ? "⏳ Generating…" : "Generate Recipe →"}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ background:"#E8F5E9", border:"1px solid #A5D6A7", borderRadius:"6px", padding:"10px 14px", marginBottom:"14px", fontSize:"13px", color:"#2E7D32" }}>
+                          ✓ Recipe generated — review and save below
+                        </div>
+                        {/* Preview */}
+                        <div style={{ marginBottom:"10px" }}>
+                          <div style={{ fontWeight:"bold", fontSize:"16px", color:"#1F4E79", marginBottom:"2px" }}>{builderPreview.name}</div>
+                          <div style={{ fontSize:"12px", color:"#6B8CAE", marginBottom:"8px" }}>{builderPreview.description}</div>
+                          <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"10px" }}>
+                            {builderPreview.servings && <span style={{ background:"#D6E4F0", color:"#1F4E79", borderRadius:"20px", padding:"2px 10px", fontSize:"11px", fontWeight:"bold" }}>🍽 Serves {builderPreview.servings}</span>}
+                            {builderPreview.prep_time && <span style={{ background:"#D6E4F0", color:"#1F4E79", borderRadius:"20px", padding:"2px 10px", fontSize:"11px", fontWeight:"bold" }}>⏱ Prep: {builderPreview.prep_time}</span>}
+                            {builderPreview.cook_time && <span style={{ background:"#D6E4F0", color:"#1F4E79", borderRadius:"20px", padding:"2px 10px", fontSize:"11px", fontWeight:"bold" }}>🍳 Cook: {builderPreview.cook_time}</span>}
+                          </div>
+                          {builderPreview.nutrition && (
+                            <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"12px" }}>
+                              {[["kcal","kcal"],["fat","Fat"],["sat_fat","Sat F"],["carbs","Carbs"],["sugar","Sugar"],["fibre","Fibre"],["net_carbs","Net C"],["protein","Prot"]].map(([k,l]) => (
+                                <div key={k} style={{ textAlign:"center", background:"#D6E4F0", borderRadius:"4px", padding:"4px 2px" }}>
+                                  <div style={{ fontWeight:"bold", color:"#1F4E79", fontSize:"13px" }}>{builderPreview.nutrition[k]||0}</div>
+                                  <div style={{ fontSize:"9px", color:"#6B8CAE" }}>{l}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ fontWeight:"bold", color:"#2E75B6", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Ingredients</div>
+                          <ul style={{ listStyle:"none", padding:0, marginBottom:"10px" }}>
+                            {builderPreview.ingredients?.map((ing,i) => (
+                              <li key={i} style={{ padding:"3px 0", borderBottom:"1px solid #F0F4F8", display:"flex", gap:"10px", fontSize:"12px" }}>
+                                <span style={{ fontWeight:"bold", color:"#1F4E79", minWidth:"60px" }}>{ing.amount}</span>
+                                <span>{ing.item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div style={{ fontWeight:"bold", color:"#2E75B6", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Method</div>
+                          <ol style={{ paddingLeft:"20px", marginBottom:"10px" }}>
+                            {builderPreview.steps?.map((s,i) => <li key={i} style={{ fontSize:"12px", padding:"3px 0", lineHeight:1.5 }}>{s}</li>)}
+                          </ol>
+                          {builderPreview.notes && <div style={{ background:"#FFF8E1", borderLeft:"3px solid #F57F17", padding:"8px 12px", borderRadius:"0 4px 4px 0", fontSize:"12px", color:"#5D4037" }}>{builderPreview.notes}</div>}
+                        </div>
+                        <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end", marginTop:"14px", borderTop:"1px solid #DDEAF6", paddingTop:"14px" }}>
+                          <button onClick={() => setBuilderPreview(null)} style={{ background:"transparent", color:"#2E75B6", border:"1px solid #2E75B6", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>
+                            ← Regenerate
+                          </button>
+                          <button onClick={async () => {
+                            await saveRecipe(userId, builderPreview);
+                            setUserRecipes(prev => [...prev, builderPreview].sort((a,b)=>a.name.localeCompare(b.name)));
+                            setRecipeBuilder(false);
+                            setBuilderPreview(null);
+                            setBuilderInput("");
+                          }} style={{ background:"#2E7D32", color:"#fff", border:"none", borderRadius:"4px", padding:"8px 18px", cursor:"pointer", fontSize:"13px", fontWeight:"bold" }}>
+                            ✓ Save Recipe
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Recipes list */}
             <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px" }}>
-              <div style={{ fontWeight:"bold", color:"#1F4E79", marginBottom:"10px", fontSize:"13px" }}>📖 Saved Recipes</div>
-              {SEED_RECIPES.map(r => (
-                <div key={r.id} onClick={() => setRecipeModal(r)} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderBottom:"1px solid #DDEAF6", cursor:"pointer", borderRadius:"4px", transition:"background 0.15s" }}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+                <div style={{ fontWeight:"bold", color:"#1F4E79", fontSize:"13px" }}>📖 Saved Recipes</div>
+                <button onClick={() => { setRecipeBuilder(true); setBuilderPreview(null); setBuilderInput(""); setBuilderError(""); }}
+                  style={{ background:"#2E75B6", color:"#fff", border:"none", borderRadius:"4px", padding:"5px 12px", cursor:"pointer", fontSize:"11px", fontWeight:"bold", display:"flex", alignItems:"center", gap:"5px" }}>
+                  🤖 Create with Claude
+                </button>
+              </div>
+              {userRecipes.map(r => (
+                <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderBottom:"1px solid #DDEAF6", borderRadius:"4px", transition:"background 0.15s" }}
                   onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
-                  <div>
+                  <div onClick={() => setRecipeModal(r)} style={{ flex:1, cursor:"pointer" }}>
                     <div style={{ fontWeight:"bold", fontSize:"13px", color:"#1F4E79" }}>{r.name}</div>
                     <div style={{ fontSize:"11px", color:"#6B8CAE" }}>{r.description}</div>
                   </div>
-                  <div style={{ fontSize:"12px", color:"#2E75B6", fontWeight:"bold", whiteSpace:"nowrap", marginLeft:"12px" }}>{r.nutrition?.kcal} kcal</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px", marginLeft:"12px" }}>
+                    <div style={{ fontSize:"12px", color:"#2E75B6", fontWeight:"bold", whiteSpace:"nowrap" }}>{r.nutrition?.kcal} kcal</div>
+                    <button onClick={async () => {
+                        if (!confirm("Delete this recipe?")) return;
+                        await deleteRecipe(userId, r.id);
+                        setUserRecipes(prev => prev.filter(ur => ur.id !== r.id));
+                      }} style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"11px", opacity:0.5, padding:"0 3px" }}>✕</button>
+                  </div>
                 </div>
               ))}
             </div>
