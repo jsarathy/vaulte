@@ -86,7 +86,7 @@ async function loadDay(uid, date) {
 
 // ── Claude API ────────────────────────────────────────────────────────────────
 async function claudeParseFood(text) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/claude", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
@@ -115,7 +115,7 @@ Use accurate nutritional database values. Round to 1 decimal place. Return ONLY 
 }
 
 async function claudeCreateRecipe(description) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/claude", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
@@ -146,7 +146,7 @@ nutrition is PER SERVING. Use accurate nutritional database values. Return ONLY 
 }
 
 async function claudeChat(messages) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/claude", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
