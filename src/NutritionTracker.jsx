@@ -83,6 +83,51 @@ const EXERCISE_COMPENDIUM = [
   { cat:"Daily", name:"Carrying heavy loads",               met:7.5  },
 ];
 
+const WEIGHT_PROJECTION = [
+  {week:1,  date:"09 Mar 2026", projected:84.0,  phase:"Phase 1 — Active"},
+  {week:2,  date:"16 Mar 2026", projected:83.1,  phase:"Phase 1 — Active"},
+  {week:3,  date:"23 Mar 2026", projected:82.2,  phase:"Phase 1 — Active"},
+  {week:4,  date:"30 Mar 2026", projected:81.3,  phase:"Phase 1 — Active"},
+  {week:5,  date:"06 Apr 2026", projected:80.8,  phase:"Phase 1 — Active"},
+  {week:6,  date:"13 Apr 2026", projected:80.3,  phase:"Phase 1 — Active"},
+  {week:7,  date:"20 Apr 2026", projected:79.7,  phase:"Phase 1 — Active"},
+  {week:8,  date:"27 Apr 2026", projected:79.2,  phase:"Phase 1 — Active"},
+  {week:9,  date:"04 May 2026", projected:78.7,  phase:"Phase 1 — Active"},
+  {week:10, date:"11 May 2026", projected:78.2,  phase:"Phase 1 — Active"},
+  {week:11, date:"18 May 2026", projected:77.7,  phase:"Phase 1 — Active"},
+  {week:12, date:"25 May 2026", projected:77.1,  phase:"Phase 1 — Active"},
+  {week:13, date:"01 Jun 2026", projected:76.6,  phase:"Phase 1 — Active"},
+  {week:14, date:"08 Jun 2026", projected:76.3,  phase:"Phase 1 — Active"},
+  {week:15, date:"15 Jun 2026", projected:75.9,  phase:"Phase 1 — Active"},
+  {week:16, date:"22 Jun 2026", projected:75.6,  phase:"Phase 1 — Active"},
+  {week:17, date:"29 Jun 2026", projected:75.2,  phase:"Phase 1 — Active"},
+  {week:18, date:"06 Jul 2026", projected:74.9,  phase:"Phase 1 — Active"},
+  {week:19, date:"13 Jul 2026", projected:74.5,  phase:"Phase 1 — Active"},
+  {week:20, date:"20 Jul 2026", projected:74.2,  phase:"Phase 1 — Active"},
+  {week:21, date:"27 Jul 2026", projected:73.8,  phase:"Phase 1 — Active"},
+  {week:22, date:"03 Aug 2026", projected:73.6,  phase:"Phase 1 — Active"},
+  {week:23, date:"10 Aug 2026", projected:73.4,  phase:"Phase 1 — Active"},
+  {week:24, date:"17 Aug 2026", projected:73.2,  phase:"Phase 1 — Active"},
+  {week:25, date:"24 Aug 2026", projected:73.0,  phase:"RESET"},
+  {week:26, date:"31 Aug 2026", projected:73.0,  phase:"RESET"},
+  {week:27, date:"07 Sep 2026", projected:73.0,  phase:"Phase 3 — Resume"},
+  {week:28, date:"14 Sep 2026", projected:72.6,  phase:"Phase 3 — Resume"},
+  {week:29, date:"21 Sep 2026", projected:72.2,  phase:"Phase 3 — Resume"},
+  {week:30, date:"28 Sep 2026", projected:71.8,  phase:"Phase 3 — Resume"},
+  {week:31, date:"05 Oct 2026", projected:71.4,  phase:"Phase 3 — Resume"},
+  {week:32, date:"12 Oct 2026", projected:71.0,  phase:"Phase 3 — Resume"},
+  {week:33, date:"19 Oct 2026", projected:70.6,  phase:"Phase 3 — Resume"},
+  {week:34, date:"26 Oct 2026", projected:70.2,  phase:"Phase 3 — Resume"},
+  {week:35, date:"02 Nov 2026", projected:69.8,  phase:"Phase 3 — Resume"},
+  {week:36, date:"09 Nov 2026", projected:69.5,  phase:"Phase 3 — Resume"},
+  {week:37, date:"16 Nov 2026", projected:69.2,  phase:"Phase 3 — Resume"},
+  {week:38, date:"23 Nov 2026", projected:68.9,  phase:"Phase 3 — Resume"},
+  {week:39, date:"30 Nov 2026", projected:68.6,  phase:"Phase 3 — Resume"},
+  {week:40, date:"07 Dec 2026", projected:68.3,  phase:"Phase 3 — Resume"},
+  {week:41, date:"14 Dec 2026", projected:68.0,  phase:"Phase 3 — Resume"},
+  {week:42, date:"21 Dec 2026", projected:67.7,  phase:"Phase 3 — Resume"},
+];
+
 const INITIAL_RECIPES = [
   { id:"r1", name:"Pinto Bean Stew", description:"A hearty, high-protein, high-fibre stew. Makes 4 portions.", source:"Home recipe", servings:4, prep_time:"10 minutes", cook_time:"30 minutes",
     ingredients:[{amount:"606g",item:"Cooked pinto beans"},{amount:"102g",item:"Onion, chopped"},{amount:"~60g",item:"Green chillies"},{amount:"3 tbsp",item:"Gingelly (sesame) oil"},{amount:"201g",item:"Mutti Polpa chopped tomatoes"},{amount:"1 tsp",item:"Salt"},{amount:"1 pinch",item:"Asafoetida (hing)"}],
@@ -379,6 +424,11 @@ export default function NutritionTracker({ userId }) {
   const [polarLoading, setPolarLoading] = useState(false);
   const [polarLogModal, setPolarLogModal] = useState(null); // session being logged
 
+  // Weight tracker state
+  const [weightLog, setWeightLog] = useState([]);  // [{week, date, projected, actual, phase}]
+  const [weightLoading, setWeightLoading] = useState(false);
+  const [weightMsg, setWeightMsg] = useState(null);
+
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
@@ -423,6 +473,17 @@ export default function NutritionTracker({ userId }) {
         const recipes = await loadAllRecipes(userId);
         setUserRecipes(recipes);
         // Load Polar connection status + pending sessions
+        // Load weight log
+        const wSnap = await getDocs(collection(db, "users", userId, "weight_log"));
+        if (wSnap.empty) {
+          // Seed from the spreadsheet projection
+          const seed = WEIGHT_PROJECTION.map(r => ({ ...r, actual: r.week === 1 ? 84.0 : null }));
+          setWeightLog(seed);
+        } else {
+          const rows = wSnap.docs.map(d => d.data()).sort((a,b) => a.week - b.week);
+          setWeightLog(rows);
+        }
+
         const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
         if (polarDoc.exists()) {
           setPolarConnected(polarDoc.data().connected || false);
@@ -734,7 +795,7 @@ export default function NutritionTracker({ userId }) {
       <div style={S.header}>
         <span style={{ fontSize:"16px", fontWeight:"bold" }}>🥗 Nutrition Tracker</span>
         <div style={{ display:"flex", gap:"4px" }}>
-          {[["log","Daily Log"],["compare","Compare"],["add","Add Entry"],["chat","🤖 Claude"]].map(([id,label]) => (
+          {[["log","Daily Log"],["compare","Compare"],["add","Add Entry"],["weight","⚖️ Weight"],["chat","🤖 Claude"]].map(([id,label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
               style={{ background: activeTab===id?"#2E75B6":"transparent", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", padding:"5px 12px", borderRadius:"4px", cursor:"pointer", fontSize:"12px", transition:"background 0.2s" }}>
               {label}
@@ -744,7 +805,7 @@ export default function NutritionTracker({ userId }) {
       </div>
 
       <div style={S.body}>
-        {/* Sidebar — only for log, compare, add tabs */}
+        {/* Sidebar — only for log, compare, add, weight tabs */}
         {activeTab !== "chat" && (
           <div style={S.sidebar}>
             <div style={S.sidebarHead}>📅 Calendar</div>
@@ -1767,6 +1828,270 @@ Use realistic values per ${weight}g.` }]
             </div>
           </div>
         )}
+
+        {/* ── WEIGHT TRACKER TAB ── */}
+        {activeTab === "weight" && (
+          <div style={{ ...S.main, display:"flex", gap:"14px", alignItems:"flex-start", padding:"16px" }}>
+
+            {/* ── LEFT: Weekly Log Table (55%) ── */}
+            <div style={{ flex:"0 0 55%", minWidth:0 }}>
+              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>⚖️ Weekly Weight Log</div>
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"hidden" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px" }}>
+                  <thead>
+                    <tr style={{ background:"#1F4E79", color:"#fff" }}>
+                      {["Wk","Date","Phase","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].map(h => (
+                        <th key={h} style={{ padding:"7px 8px", textAlign: h==="Wk"||h==="Proj (kg)"||h==="Actual (kg)"||h==="vs Proj"||h==="Cum Loss" ? "right" : "left", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weightLog.map((row, i) => {
+                      const vsProj = row.actual != null ? (row.actual - row.projected).toFixed(1) : null;
+                      const cumLoss = row.actual != null ? (84.0 - row.actual).toFixed(1) : null;
+                      const isReset = row.phase === "RESET";
+                      const isP3 = row.phase === "Phase 3 — Resume";
+                      const rowBg = isReset ? "#FFF8E1" : isP3 ? "#F3F8FF" : i%2===0 ? "#fff" : "#F7FAFD";
+                      const today = new Date();
+                      const rowDate = new Date(row.date + " 2026");
+                      const isPast = rowDate <= today;
+                      const isCurrent = row.actual != null && (i === weightLog.length-1 || weightLog[i+1]?.actual == null);
+                      return (
+                        <tr key={row.week} style={{ background: isCurrent ? "#E3F2FD" : rowBg }}>
+                          <td style={{ padding:"5px 8px", textAlign:"right", color:"#6B8CAE", fontSize:"11px" }}>{row.week}</td>
+                          <td style={{ padding:"5px 8px", color:"#1F4E79", whiteSpace:"nowrap", fontWeight: isPast?"600":"normal" }}>{row.date}</td>
+                          <td style={{ padding:"5px 8px" }}>
+                            <span style={{ fontSize:"10px", padding:"1px 6px", borderRadius:"10px", fontWeight:"bold",
+                              background: isReset?"#FFF3CD":isP3?"#E3F2FD":"#E8F5E9",
+                              color: isReset?"#795548":isP3?"#1F4E79":"#2E7D32" }}>
+                              {isReset ? "RESET" : isP3 ? "P3" : "P1"}
+                            </span>
+                          </td>
+                          <td style={{ padding:"5px 8px", textAlign:"right", color:"#6B8CAE" }}>{row.projected.toFixed(1)}</td>
+                          <td style={{ padding:"5px 8px", textAlign:"right" }}>
+                            <input
+                              type="number" step="0.1" min="50" max="120"
+                              value={row.actual ?? ""}
+                              placeholder={isPast ? "—" : ""}
+                              onChange={async e => {
+                                const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                                const updated = weightLog.map((r,j) => j===i ? {...r, actual:val} : r);
+                                setWeightLog(updated);
+                                // Save to Firestore
+                                const docRef = doc(db, "users", userId, "weight_log", String(row.week));
+                                await setDoc(docRef, {...row, actual:val});
+                              }}
+                              style={{ width:"60px", padding:"2px 4px", border:"1px solid #DDEAF6", borderRadius:"4px",
+                                fontSize:"12px", textAlign:"right",
+                                background: row.actual != null ? "#E8F5E9" : "#fff",
+                                fontWeight: row.actual != null ? "bold" : "normal",
+                                color: row.actual != null ? "#2E7D32" : "#1a2a3a" }}
+                            />
+                          </td>
+                          <td style={{ padding:"5px 8px", textAlign:"right", fontWeight:"bold",
+                            color: vsProj == null ? "#ccc" : parseFloat(vsProj) > 0 ? "#c62828" : parseFloat(vsProj) < 0 ? "#2E7D32" : "#6B8CAE" }}>
+                            {vsProj == null ? "—" : `${parseFloat(vsProj)>0?"+":""}${vsProj}`}
+                          </td>
+                          <td style={{ padding:"5px 8px", textAlign:"right", color: cumLoss ? "#2E75B6" : "#ccc", fontWeight: cumLoss ? "bold" : "normal" }}>
+                            {cumLoss == null ? "—" : `-${cumLoss} kg`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {weightMsg && (
+                <div style={{ marginTop:"8px", padding:"7px 10px", borderRadius:"4px", fontSize:"12px",
+                  background:weightMsg.ok?"#E8F5E9":"#FFEBEE", color:weightMsg.ok?"#2E7D32":"#c62828" }}>
+                  {weightMsg.text}
+                </div>
+              )}
+            </div>
+
+            {/* ── RIGHT: Chart + Specs (45%) ── */}
+            <div style={{ flex:"0 0 43%", minWidth:0 }}>
+
+              {/* SVG Trajectory Chart */}
+              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>📉 Trajectory</div>
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px", marginBottom:"14px" }}>
+                {(() => {
+                  const W = 380, H = 200, PAD = { top:12, right:12, bottom:32, left:38 };
+                  const cW = W - PAD.left - PAD.right;
+                  const cH = H - PAD.top - PAD.bottom;
+                  const allProj = weightLog.map(r => r.projected);
+                  const allActual = weightLog.filter(r => r.actual != null).map(r => r.actual);
+                  const minW = Math.min(...allProj, ...allActual) - 1;
+                  const maxW = Math.max(...allProj, ...allActual) + 1;
+                  const n = weightLog.length;
+                  const xScale = i => PAD.left + (i / (n-1)) * cW;
+                  const yScale = v => PAD.top + cH - ((v - minW) / (maxW - minW)) * cH;
+
+                  // Phase bands
+                  const resetStart = weightLog.findIndex(r => r.phase === "RESET");
+                  const p3Start = weightLog.findIndex(r => r.phase === "Phase 3 — Resume");
+
+                  // Projected path
+                  const projPath = weightLog.map((r,i) => `${i===0?"M":"L"}${xScale(i).toFixed(1)},${yScale(r.projected).toFixed(1)}`).join(" ");
+
+                  // Actual path (only logged points)
+                  const actualPts = weightLog.reduce((acc,r,i) => r.actual!=null ? [...acc,[i,r.actual]] : acc, []);
+                  const actualPath = actualPts.map(([i,v],j) => `${j===0?"M":"L"}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`).join(" ");
+
+                  // Target zone band (70–72 kg)
+                  const tZoneY1 = yScale(72);
+                  const tZoneY2 = yScale(70);
+
+                  // Y axis ticks
+                  const yTicks = [];
+                  for (let w = Math.ceil(minW); w <= Math.floor(maxW); w += 2) yTicks.push(w);
+
+                  // X axis ticks — months
+                  const months = [];
+                  weightLog.forEach((r,i) => {
+                    const parts = r.date.split(" ");
+                    if (parts[0] === "09" || parts[0] === "01") months.push({i, label: parts[1].slice(0,3)});
+                  });
+
+                  return (
+                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display:"block" }}>
+                      {/* Phase bands */}
+                      {resetStart > 0 && p3Start > resetStart && (
+                        <rect x={xScale(resetStart)} y={PAD.top} width={xScale(p3Start)-xScale(resetStart)} height={cH}
+                          fill="#FFF8E1" opacity="0.7"/>
+                      )}
+                      {p3Start > 0 && (
+                        <rect x={xScale(p3Start)} y={PAD.top} width={xScale(n-1)-xScale(p3Start)} height={cH}
+                          fill="#EBF3FB" opacity="0.5"/>
+                      )}
+                      {/* Target zone */}
+                      <rect x={PAD.left} y={tZoneY1} width={cW} height={tZoneY2-tZoneY1}
+                        fill="#C8E6C9" opacity="0.4"/>
+                      <text x={PAD.left+3} y={tZoneY1-2} fontSize="8" fill="#2E7D32">Target 70–72 kg</text>
+
+                      {/* Grid lines */}
+                      {yTicks.map(w => (
+                        <line key={w} x1={PAD.left} x2={PAD.left+cW} y1={yScale(w)} y2={yScale(w)}
+                          stroke="#DDEAF6" strokeWidth="0.5"/>
+                      ))}
+
+                      {/* Y axis labels */}
+                      {yTicks.map(w => (
+                        <text key={w} x={PAD.left-4} y={yScale(w)+3} fontSize="8" fill="#6B8CAE" textAnchor="end">{w}</text>
+                      ))}
+
+                      {/* X axis month labels */}
+                      {months.map(({i, label}) => (
+                        <text key={i} x={xScale(i)} y={H-PAD.bottom+12} fontSize="8" fill="#6B8CAE" textAnchor="middle">{label}</text>
+                      ))}
+
+                      {/* Projected line */}
+                      <path d={projPath} fill="none" stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>
+
+                      {/* Actual line */}
+                      {actualPath && <path d={actualPath} fill="none" stroke="#2E75B6" strokeWidth="2.5"/>}
+
+                      {/* Actual dots */}
+                      {actualPts.map(([i,v]) => (
+                        <circle key={i} cx={xScale(i)} cy={yScale(v)} r="3" fill="#2E75B6" stroke="#fff" strokeWidth="1"/>
+                      ))}
+
+                      {/* Phase labels */}
+                      <text x={xScale(2)} y={PAD.top+10} fontSize="8" fill="#2E7D32" fontWeight="bold">Phase 1</text>
+                      {resetStart>0 && <text x={xScale(resetStart+0.5)} y={PAD.top+10} fontSize="8" fill="#795548" fontWeight="bold">RESET</text>}
+                      {p3Start>0  && <text x={xScale(p3Start+1)}  y={PAD.top+10} fontSize="8" fill="#1F4E79" fontWeight="bold">Phase 3</text>}
+
+                      {/* Legend */}
+                      <line x1={W-90} y1={H-8} x2={W-75} y2={H-8} stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>
+                      <text x={W-72} y={H-5} fontSize="8" fill="#6B8CAE">Projected</text>
+                      <line x1={W-32} y1={H-8} x2={W-17} y2={H-8} stroke="#2E75B6" strokeWidth="2.5"/>
+                      <text x={W-14} y={H-5} fontSize="8" fill="#6B8CAE">Actual</text>
+                    </svg>
+                  );
+                })()}
+              </div>
+
+              {/* Plan Specs */}
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"hidden" }}>
+                <div style={{ background:"#1F4E79", color:"#fff", padding:"8px 12px", fontSize:"12px", fontWeight:"bold" }}>📋 Plan Specifications</div>
+                <div style={{ padding:"10px 12px" }}>
+
+                  {/* Personal Stats */}
+                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Personal Stats</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 12px", marginBottom:"10px", fontSize:"11px" }}>
+                    {[["Age","60 years"],["Sex","Male"],["Height","165 cm"],["Start Weight","84.0 kg"],["Start BMI","30.9"],["Target","70–72 kg by Dec 2026"],["Target BMI","25.7–26.4"],["VO₂ Max","33 — Fair (↑ improving)"]].map(([k,v]) => (
+                      <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
+                        <span style={{ color:"#6B8CAE" }}>{k}</span>
+                        <span style={{ color:"#1F4E79", fontWeight:"600" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Daily Plan */}
+                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Daily Plan</div>
+                  <div style={{ fontSize:"11px", marginBottom:"10px" }}>
+                    {[
+                      ["🌅 AM Cycling","20 min · Target HR 128–140 bpm · ~180–200 kcal"],
+                      ["🌆 PM Cycling","30 min · Target HR 100–110 bpm · ~150–180 kcal"],
+                      ["🍽 Calories","1,800 kcal/day · Protein 80–100 g/day"],
+                      ["📅 Active Days","5–6 days/week · 1–2 rest days"],
+                      ["⚡ Total Deficit","~600–650 kcal/day · ~0.5–0.6 kg/week"],
+                    ].map(([k,v]) => (
+                      <div key={k} style={{ display:"flex", gap:"6px", padding:"3px 0", borderBottom:"1px solid #F0F4F8" }}>
+                        <span style={{ color:"#1F4E79", fontWeight:"600", whiteSpace:"nowrap", minWidth:"90px" }}>{k}</span>
+                        <span style={{ color:"#6B8CAE" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Milestones */}
+                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Milestone Roadmap</div>
+                  <div style={{ fontSize:"11px", marginBottom:"10px" }}>
+                    {[
+                      ["9 Mar 2026","84.0 kg","START — Plan begins","Phase 1"],
+                      ["End Apr 2026","~80–81 kg","Clothes noticeably looser","Phase 1"],
+                      ["End Jun 2026","~77–78 kg","Mirror change visible","Phase 1"],
+                      ["End Jul 2026","~75–76 kg","Plateau zone — prepare","Phase 1"],
+                      ["1–14 Aug 2026","~75–76 kg","Eat at maintenance 2,136 kcal","RESET"],
+                      ["Sep 2026","~75–76 kg","Recalibrated plan restarts","Phase 3"],
+                      ["End Oct 2026","~73–74 kg","+ 10 min PM / 1,700 kcal","Phase 3"],
+                      ["Dec 2026","~70–72 kg","🎯 TARGET ZONE","Phase 3"],
+                    ].map(([date,wt,note,phase]) => (
+                      <div key={date} style={{ display:"grid", gridTemplateColumns:"80px 60px 1fr 40px", gap:"4px", padding:"3px 0", borderBottom:"1px solid #F0F4F8", alignItems:"center" }}>
+                        <span style={{ color:"#6B8CAE" }}>{date}</span>
+                        <span style={{ color:"#2E75B6", fontWeight:"bold" }}>{wt}</span>
+                        <span style={{ color:"#1F4E79" }}>{note}</span>
+                        <span style={{ fontSize:"9px", padding:"1px 4px", borderRadius:"8px", textAlign:"center",
+                          background: phase==="RESET"?"#FFF3CD":phase==="Phase 3"?"#E3F2FD":"#E8F5E9",
+                          color: phase==="RESET"?"#795548":phase==="Phase 3"?"#1F4E79":"#2E7D32" }}>{phase==="Phase 1"?"P1":phase==="Phase 3"?"P3":"RST"}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Plateau Levers */}
+                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Plateau Levers — pull one at a time</div>
+                  <div style={{ fontSize:"11px" }}>
+                    {[
+                      ["Lever 1","Extend PM session to 40 mins","Easiest — no intensity change needed"],
+                      ["Lever 2","Drop calories to 1,650–1,700 kcal","Recalculate at new bodyweight first"],
+                      ["Lever 3","2-week diet break at maintenance","Resets leptin & adaptive thermogenesis"],
+                    ].map(([lbl,action,note]) => (
+                      <div key={lbl} style={{ padding:"4px 0", borderBottom:"1px solid #F0F4F8" }}>
+                        <div style={{ display:"flex", gap:"6px" }}>
+                          <span style={{ fontWeight:"bold", color:"#1F4E79", minWidth:"46px" }}>{lbl}</span>
+                          <span style={{ color:"#1F4E79" }}>{action}</span>
+                        </div>
+                        <div style={{ color:"#6B8CAE", paddingLeft:"52px", marginTop:"1px" }}>{note}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
