@@ -17,6 +17,72 @@ const DEFAULT_MEAL_SLOTS = [
   { name:"🌙 Dinner",           is_exercise:0 },
 ];
 
+const EXERCISE_COMPENDIUM = [
+  // Cardio
+  { cat:"Cardio", name:"Walking, slow (2 mph)",             met:2.5  },
+  { cat:"Cardio", name:"Walking, moderate (3 mph)",         met:3.5  },
+  { cat:"Cardio", name:"Walking, brisk (3.5 mph)",          met:4.3  },
+  { cat:"Cardio", name:"Walking, fast (4 mph)",             met:5.0  },
+  { cat:"Cardio", name:"Jogging, light (5 mph)",            met:7.0  },
+  { cat:"Cardio", name:"Running, moderate (6 mph)",         met:9.8  },
+  { cat:"Cardio", name:"Running, fast (7.5 mph)",           met:12.3 },
+  { cat:"Cardio", name:"Running, very fast (10 mph)",       met:16.0 },
+  { cat:"Cardio", name:"Cycling, leisure (<10 mph)",        met:4.0  },
+  { cat:"Cardio", name:"Cycling, moderate (12–14 mph)",     met:8.0  },
+  { cat:"Cardio", name:"Cycling, vigorous (16–19 mph)",     met:12.0 },
+  { cat:"Cardio", name:"Cycling, stationary, moderate",     met:6.8  },
+  { cat:"Cardio", name:"Cycling, stationary, vigorous",     met:8.8  },
+  { cat:"Cardio", name:"Elliptical trainer, moderate",      met:5.0  },
+  { cat:"Cardio", name:"Elliptical trainer, vigorous",      met:8.5  },
+  { cat:"Cardio", name:"Rowing machine, moderate",          met:7.0  },
+  { cat:"Cardio", name:"Rowing machine, vigorous",          met:8.5  },
+  { cat:"Cardio", name:"Jump rope, moderate",               met:10.0 },
+  { cat:"Cardio", name:"Jump rope, fast",                   met:12.3 },
+  { cat:"Cardio", name:"Stair climbing machine",            met:9.0  },
+  { cat:"Cardio", name:"Hiking, moderate terrain",          met:5.3  },
+  { cat:"Cardio", name:"Hiking, steep terrain",             met:7.8  },
+  // Strength & HIIT
+  { cat:"Strength", name:"Weight training, light effort",   met:3.0  },
+  { cat:"Strength", name:"Weight training, vigorous",       met:6.0  },
+  { cat:"Strength", name:"Bodyweight exercises (general)",  met:3.8  },
+  { cat:"Strength", name:"Circuit training (minimal rest)", met:8.0  },
+  { cat:"Strength", name:"HIIT, general",                   met:8.0  },
+  { cat:"Strength", name:"HIIT, vigorous",                  met:10.3 },
+  { cat:"Strength", name:"Kettlebell training",             met:8.2  },
+  { cat:"Strength", name:"Calisthenics, light",             met:3.5  },
+  { cat:"Strength", name:"Calisthenics, vigorous",          met:8.0  },
+  { cat:"Strength", name:"CrossFit / functional training",  met:9.0  },
+  // Flexibility & Mind-Body
+  { cat:"Flexibility", name:"Yoga, Hatha",                  met:2.5  },
+  { cat:"Flexibility", name:"Yoga, Power/Vinyasa",          met:4.0  },
+  { cat:"Flexibility", name:"Pilates, general",             met:3.0  },
+  { cat:"Flexibility", name:"Stretching, light",            met:2.3  },
+  { cat:"Flexibility", name:"Tai Chi",                      met:3.0  },
+  // Swimming & Water
+  { cat:"Swimming", name:"Swimming, leisurely",             met:6.0  },
+  { cat:"Swimming", name:"Swimming, moderate laps",         met:7.0  },
+  { cat:"Swimming", name:"Swimming, vigorous laps",         met:9.8  },
+  { cat:"Swimming", name:"Water aerobics",                  met:5.5  },
+  // Sports
+  { cat:"Sports", name:"Football / soccer, recreational",   met:7.0  },
+  { cat:"Sports", name:"Football / soccer, competitive",    met:10.0 },
+  { cat:"Sports", name:"Basketball, game",                  met:8.0  },
+  { cat:"Sports", name:"Tennis, singles",                   met:8.0  },
+  { cat:"Sports", name:"Tennis, doubles",                   met:6.0  },
+  { cat:"Sports", name:"Badminton, recreational",           met:5.5  },
+  { cat:"Sports", name:"Cricket, batting/fielding",         met:5.0  },
+  { cat:"Sports", name:"Golf, carrying clubs",              met:5.3  },
+  { cat:"Sports", name:"Squash",                            met:12.0 },
+  { cat:"Sports", name:"Table tennis / ping pong",          met:4.0  },
+  { cat:"Sports", name:"Volleyball, recreational",          met:3.0  },
+  { cat:"Sports", name:"Dancing, aerobic/general",          met:6.5  },
+  { cat:"Sports", name:"Dancing, ballroom, slow",           met:3.0  },
+  // Daily activity
+  { cat:"Daily", name:"Gardening, general",                 met:3.5  },
+  { cat:"Daily", name:"House cleaning, vigorous",           met:3.5  },
+  { cat:"Daily", name:"Carrying heavy loads",               met:7.5  },
+];
+
 const INITIAL_RECIPES = [
   { id:"r1", name:"Pinto Bean Stew", description:"A hearty, high-protein, high-fibre stew. Makes 4 portions.", source:"Home recipe", servings:4, prep_time:"10 minutes", cook_time:"30 minutes",
     ingredients:[{amount:"606g",item:"Cooked pinto beans"},{amount:"102g",item:"Onion, chopped"},{amount:"~60g",item:"Green chillies"},{amount:"3 tbsp",item:"Gingelly (sesame) oil"},{amount:"201g",item:"Mutti Polpa chopped tomatoes"},{amount:"1 tsp",item:"Salt"},{amount:"1 pinch",item:"Asafoetida (hing)"}],
@@ -297,6 +363,14 @@ export default function NutritionTracker({ userId }) {
   const [ingredientModal, setIngredientModal] = useState(null); // { name }
   const [ingredientWeight, setIngredientWeight] = useState("100");
   const [ingredientLoading, setIngredientLoading] = useState(false);
+  // ── Exercise tracker state ──
+  const [exSearch, setExSearch] = useState("");
+  const [exSelected, setExSelected] = useState(null);
+  const [exDuration, setExDuration] = useState("30");
+  const [exHRavg, setExHRavg] = useState("");
+  const [exHRmax, setExHRmax] = useState("");
+  const [exResult, setExResult] = useState(null);
+  const [exMsg, setExMsg] = useState(null);
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
@@ -879,8 +953,10 @@ export default function NutritionTracker({ userId }) {
 
         {/* ── ADD ENTRY TAB ── */}
         {activeTab === "add" && (
-          <div style={S.main}>
-            <div style={{ fontSize:"18px", fontWeight:"bold", color:"#1F4E79", marginBottom:"14px" }}>Add Food Entry</div>
+          <div style={{ ...S.main, display:"flex", gap:"14px", alignItems:"flex-start" }}>
+            {/* ── LEFT: Food (65%) ── */}
+            <div style={{ flex:"0 0 65%", minWidth:0 }}>
+            <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>🥗 Add Food Entry</div>
             <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px", marginBottom:"12px" }}>
               <div style={{ fontWeight:"bold", color:"#1F4E79", marginBottom:"10px", fontSize:"13px" }}>Add Food Item</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))", gap:"8px", marginBottom:"10px" }}>
@@ -1223,6 +1299,165 @@ Use realistic values per ${weight}g.` }]
                 </div>
               ))}
             </div>
+            </div>{/* end left col */}
+
+            {/* ── RIGHT: Exercise (35%) ── */}
+            <div style={{ flex:"0 0 35%", minWidth:0 }}>
+              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>🏋️ Add Exercise</div>
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px" }}>
+
+                {/* Exercise search */}
+                <div style={{ marginBottom:"10px" }}>
+                  <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"4px" }}>Search Exercise</div>
+                  <input value={exSearch} onChange={e => setExSearch(e.target.value)}
+                    placeholder="e.g. running, cycling, yoga…"
+                    style={{ width:"100%", padding:"6px 9px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", boxSizing:"border-box" }}/>
+                </div>
+
+                {/* Exercise list */}
+                <div style={{ maxHeight:"200px", overflowY:"auto", border:"1px solid #DDEAF6", borderRadius:"6px", marginBottom:"10px" }}>
+                  {EXERCISE_COMPENDIUM
+                    .filter(ex => !exSearch || ex.name.toLowerCase().includes(exSearch.toLowerCase()) || ex.cat.toLowerCase().includes(exSearch.toLowerCase()))
+                    .map(ex => (
+                      <div key={ex.name} onClick={() => { setExSelected(ex); setExResult(null); }}
+                        style={{ padding:"7px 10px", borderBottom:"1px solid #F0F4F8", cursor:"pointer", fontSize:"12px",
+                          background: exSelected?.name === ex.name ? "#D6E4F0" : "transparent" }}>
+                        <div style={{ fontWeight:"bold", color:"#1F4E79" }}>{ex.name}</div>
+                        <div style={{ fontSize:"10px", color:"#6B8CAE" }}>{ex.cat} · MET {ex.met}</div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Duration + HR inputs */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px", marginBottom:"10px" }}>
+                  {[
+                    ["Duration (min)", exDuration, setExDuration, "30"],
+                    ["Avg HR (bpm)", exHRavg, setExHRavg, "optional"],
+                    ["Max HR (bpm)", exHRmax, setExHRmax, `${220 - calcAge}`],
+                  ].map(([label, val, setter, ph]) => (
+                    <div key={label}>
+                      <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>{label}</div>
+                      <input type="number" value={val} onChange={e => { setter(e.target.value); setExResult(null); }}
+                        placeholder={String(ph)}
+                        style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", boxSizing:"border-box" }}/>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calculate button */}
+                <button disabled={!exSelected || !exDuration}
+                  onClick={() => {
+                    const met = exSelected.met;
+                    const mins = parseFloat(exDuration) || 0;
+                    const weight = calcWeight || 80;
+                    const hrs = mins / 60;
+                    const kcal = Math.round(met * weight * hrs);
+
+                    // Fat burn % from heart rate if available
+                    const hrAvg = parseFloat(exHRavg);
+                    const hrMax = parseFloat(exHRmax) || (220 - (calcAge || 40));
+                    let fatPct = null;
+                    let zone = null;
+                    if (hrAvg && hrMax) {
+                      const pctHRmax = hrAvg / hrMax * 100;
+                      if (pctHRmax < 60) { fatPct = 82; zone = "Recovery (<60%)"; }
+                      else if (pctHRmax < 65) { fatPct = 75; zone = "Fat Burn (60–65%)"; }
+                      else if (pctHRmax < 70) { fatPct = 67; zone = "Fat Burn (65–70%)"; }
+                      else if (pctHRmax < 75) { fatPct = 55; zone = "Aerobic (70–75%)"; }
+                      else if (pctHRmax < 80) { fatPct = 43; zone = "Aerobic (75–80%)"; }
+                      else if (pctHRmax < 85) { fatPct = 30; zone = "Threshold (80–85%)"; }
+                      else if (pctHRmax < 90) { fatPct = 20; zone = "Threshold (85–90%)"; }
+                      else { fatPct = 8; zone = "VO₂ Max (>90%)"; }
+                    } else {
+                      // Estimate from MET
+                      if (met <= 3) { fatPct = 75; zone = "Light"; }
+                      else if (met <= 5) { fatPct = 60; zone = "Moderate"; }
+                      else if (met <= 8) { fatPct = 40; zone = "Vigorous"; }
+                      else { fatPct = 20; zone = "Very Vigorous"; }
+                    }
+                    const fatKcal = Math.round(kcal * fatPct / 100);
+                    const fatGrams = Math.round(fatKcal / 9);
+                    setExResult({ kcal, fatPct, fatKcal, fatGrams, zone, mins, weight, met });
+                  }}
+                  style={{ width:"100%", background: !exSelected || !exDuration ? "#ccc" : "#2E75B6",
+                    color:"#fff", border:"none", borderRadius:"6px", padding:"8px", cursor: !exSelected || !exDuration ? "not-allowed" : "pointer",
+                    fontSize:"13px", fontWeight:"bold", marginBottom:"10px" }}>
+                  Calculate
+                </button>
+
+                {/* Result card */}
+                {exResult && (
+                  <div style={{ background:"#F0F4F8", borderRadius:"8px", padding:"12px", marginBottom:"10px" }}>
+                    <div style={{ fontWeight:"bold", color:"#1F4E79", fontSize:"13px", marginBottom:"8px" }}>
+                      {exSelected.name} · {exResult.mins} min
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"8px" }}>
+                      {[
+                        ["🔥 Kcal Burned", `${exResult.kcal} kcal`],
+                        ["❤️ HR Zone", exResult.zone],
+                        ["🧈 Fat Burn %", `${exResult.fatPct}%`],
+                        ["🧈 Fat Burned", `${exResult.fatGrams}g (${exResult.fatKcal} kcal)`],
+                      ].map(([label, val]) => (
+                        <div key={label} style={{ background:"#fff", borderRadius:"6px", padding:"7px 10px", border:"1px solid #DDEAF6" }}>
+                          <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"2px" }}>{label}</div>
+                          <div style={{ fontWeight:"bold", fontSize:"12px", color:"#1F4E79" }}>{val}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"10px" }}>
+                      Based on MET {exResult.met} × {exResult.weight}kg bodyweight
+                      {exHRavg && exHRmax ? ` · HR ${exHRavg}/${exHRmax} bpm` : " · HR-based zone estimated from MET"}
+                    </div>
+                    <div style={{ display:"flex", gap:"8px" }}>
+                      <select value={addMealId} onChange={e=>setAddMealId(e.target.value)}
+                        style={{ flex:1, padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"11px" }}>
+                        <option value="">— select meal slot —</option>
+                        {(() => {
+                          const existing = allDays.find(d=>d.date===addDate);
+                          const meals = existing ? existing.meals : DEFAULT_MEAL_SLOTS;
+                          return meals.map((m,i) => (
+                            <option key={m.id||i} value={m.id || ("__slot__"+m.name)}>{m.name}</option>
+                          ));
+                        })()}
+                      </select>
+                      <button onClick={async () => {
+                        let day = allDays.find(d => d.date === addDate) || await loadDay(userId, addDate);
+                        if (!day) { day = { date:addDate, notes:"", meals:makeMeals() }; }
+                        let targetMealId = addMealId;
+                        if (targetMealId && targetMealId.startsWith("__slot__")) {
+                          const slotName = targetMealId.replace("__slot__", "");
+                          const match = day.meals.find(m => m.name === slotName);
+                          targetMealId = match ? match.id : null;
+                        }
+                        if (!targetMealId) { setExMsg({ ok:false, text:"Select a meal slot" }); return; }
+                        const item = {
+                          id:genId(), name:`${exSelected.name} (${exResult.mins} min)`,
+                          kcal: -exResult.kcal, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
+                          is_exercise:1, fat_burned_g:exResult.fatGrams, fat_burned_kcal:exResult.fatKcal
+                        };
+                        const updated = { ...day, meals: day.meals.map(m =>
+                          m.id === targetMealId ? { ...m, items:[...m.items, item] } : m
+                        )};
+                        await persistDay(updated);
+                        if (addDate === currentDate) setCurrentDayData(updated);
+                        setExMsg({ ok:true, text:"✅ Exercise logged!" });
+                        setExResult(null); setExSelected(null); setExSearch("");
+                        setExDuration("30"); setExHRavg(""); setExHRmax("");
+                        setTimeout(() => setExMsg(null), 3000);
+                      }} style={{ background:"#2E7D32", color:"#fff", border:"none", borderRadius:"4px", padding:"5px 12px", cursor:"pointer", fontSize:"12px", fontWeight:"bold", whiteSpace:"nowrap" }}>
+                        Log It
+                      </button>
+                    </div>
+                    {exMsg && <div style={{ marginTop:"8px", padding:"6px 10px", borderRadius:"4px", fontSize:"12px",
+                      background:exMsg.ok?"#E8F5E9":"#FFEBEE", color:exMsg.ok?"#2E7D32":"#c62828" }}>{exMsg.text}</div>}
+                  </div>
+                )}
+
+                <div style={{ fontSize:"10px", color:"#6B8CAE", lineHeight:1.6, borderTop:"1px solid #F0F4F8", paddingTop:"8px" }}>
+                  <strong>Fat burn %</strong> derived from heart rate zone (if HR provided) or MET intensity. Source: 2011 Compendium of Physical Activities (Ainsworth et al.)
+                </div>
+              </div>
+            </div>{/* end right col */}
           </div>
         )}
 
