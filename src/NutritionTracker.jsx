@@ -153,6 +153,81 @@ const INITIAL_RECIPES = [
 
 const makeMeals = () => DEFAULT_MEAL_SLOTS.map(s => ({ id:genId(), name:s.name, is_exercise:s.is_exercise, items:[] }));
 
+// ── Weight Plan Config + Projection Engine ────────────────────────────────────
+const DEFAULT_PLAN_CONFIG = {
+  // Personal
+  age:60, sex:"m", heightCm:165,
+  startWeightKg:84.0, startDate:"2026-03-09",
+  targetWeightMinKg:70, targetWeightMaxKg:72,
+  vo2max:33,
+  // AM session
+  amDurationMin:20, amHRMin:128, amHRMax:140, amKcalMin:180, amKcalMax:200,
+  // PM session
+  pmDurationMin:30, pmHRMin:100, pmHRMax:110, pmKcalMin:150, pmKcalMax:180,
+  // Nutrition
+  dailyCaloriesKcal:1800, proteinMinG:80, proteinMaxG:100, activeDaysPerWeek:5.5,
+  // Plan structure
+  phase1Weeks:24, resetWeeks:2, weeklyLossKg:0.55, maintenanceCaloriesKcal:2136,
+  // Plateau levers
+  lever1PmMin:40, lever2CaloriesKcal:1675,
+};
+
+function generateWeightProjection(cfg) {
+  const rows = [];
+  let d = new Date(cfg.startDate + "T12:00:00");
+  const phase1EndWeight = parseFloat((cfg.startWeightKg - (cfg.phase1Weeks - 1) * cfg.weeklyLossKg).toFixed(1));
+
+  for (let week = 1; week <= 60; week++) {
+    const dateStr = `${String(d.getDate()).padStart(2,"0")} ${d.toLocaleString("en-GB",{month:"short"})} ${d.getFullYear()}`;
+    let phase, projected;
+    if (week <= cfg.phase1Weeks) {
+      phase = "Phase 1 — Active";
+      projected = parseFloat((cfg.startWeightKg - (week - 1) * cfg.weeklyLossKg).toFixed(1));
+    } else if (week <= cfg.phase1Weeks + cfg.resetWeeks) {
+      phase = "RESET";
+      projected = phase1EndWeight;
+    } else {
+      const p3Week = week - cfg.phase1Weeks - cfg.resetWeeks;
+      phase = "Phase 3 — Resume";
+      projected = parseFloat((phase1EndWeight - p3Week * cfg.weeklyLossKg).toFixed(1));
+    }
+    projected = Math.max(projected, parseFloat((cfg.targetWeightMinKg - 0.5).toFixed(1)));
+    rows.push({ week, date: dateStr, projected, phase });
+    d = new Date(d.getTime() + 7*24*60*60*1000);
+    if (phase === "Phase 3 — Resume" && projected <= cfg.targetWeightMinKg) {
+      // Add 2 tail weeks then stop
+      for (let e = 1; e <= 2; e++) {
+        const ed = new Date(d.getTime() + (e-1)*7*24*60*60*1000);
+        rows.push({ week:week+e, date:`${String(ed.getDate()).padStart(2,"0")} ${ed.toLocaleString("en-GB",{month:"short"})} ${ed.getFullYear()}`, projected:cfg.targetWeightMinKg, phase:"Phase 3 — Resume" });
+      }
+      break;
+    }
+    if (week >= 52) break;
+  }
+  return rows;
+}
+
+function deriveMilestones(cfg, proj) {
+  const toMY = (ds) => { if(!ds)return""; const p=ds.split(" "); return p.length>=3?`${p[1]} ${p[2]}`:ds; };
+  const p1rows = proj.filter(r=>r.phase==="Phase 1 — Active");
+  const loss4 = p1rows.find(r=>r.projected<=cfg.startWeightKg-4);
+  const loss8 = p1rows.find(r=>r.projected<=cfg.startWeightKg-8);
+  const resetRow = proj.find(r=>r.phase==="RESET");
+  const p3rows = proj.filter(r=>r.phase==="Phase 3 — Resume");
+  const p3Start = p3rows[0];
+  const p3mid = p3rows[Math.floor(p3rows.length/2)];
+  const targetRow = p3rows.find(r=>r.projected<=cfg.targetWeightMaxKg);
+  return [
+    {date:proj[0]?.date||"", weight:`${cfg.startWeightKg.toFixed(1)} kg`, note:"START — Plan begins", phase:"Phase 1"},
+    loss4&&{date:toMY(loss4.date), weight:`~${loss4.projected.toFixed(0)} kg`, note:"Clothes noticeably looser", phase:"Phase 1"},
+    loss8&&{date:toMY(loss8.date), weight:`~${loss8.projected.toFixed(0)} kg`, note:"Mirror change visible", phase:"Phase 1"},
+    resetRow&&{date:resetRow.date, weight:`~${resetRow.projected.toFixed(0)} kg`, note:`Maintenance at ${cfg.maintenanceCaloriesKcal} kcal`, phase:"RESET"},
+    p3Start&&{date:toMY(p3Start.date), weight:`~${p3Start.projected.toFixed(0)} kg`, note:"Recalibrated plan restarts", phase:"Phase 3"},
+    p3mid&&p3mid!==p3Start&&{date:toMY(p3mid.date), weight:`~${p3mid.projected.toFixed(0)} kg`, note:`PM +${cfg.lever1PmMin-cfg.pmDurationMin} min / ${cfg.lever2CaloriesKcal} kcal option`, phase:"Phase 3"},
+    targetRow&&{date:toMY(targetRow.date), weight:`${cfg.targetWeightMinKg}–${cfg.targetWeightMaxKg} kg`, note:"🎯 TARGET ZONE", phase:"Phase 3"},
+  ].filter(Boolean);
+}
+
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 const dayRef = (uid, date) => doc(db, "users", uid, "nutrition_days", date);
 const recipeRef = (uid, id) => doc(db, "users", uid, "recipes", id);
@@ -425,9 +500,12 @@ export default function NutritionTracker({ userId }) {
   const [polarLogModal, setPolarLogModal] = useState(null); // session being logged
 
   // Weight tracker state
-  const [weightLog, setWeightLog] = useState([]);  // [{week, date, projected, actual, phase}]
+  const [weightLog, setWeightLog] = useState([]);
   const [weightLoading, setWeightLoading] = useState(false);
   const [weightMsg, setWeightMsg] = useState(null);
+  const [weightPlanConfig, setWeightPlanConfig] = useState(DEFAULT_PLAN_CONFIG);
+  const [editingPlan, setEditingPlan] = useState(false);
+  const [editCfg, setEditCfg] = useState(DEFAULT_PLAN_CONFIG);
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
@@ -475,15 +553,23 @@ export default function NutritionTracker({ userId }) {
         const recipes = await loadAllRecipes(userId);
         setUserRecipes(recipes);
         // Load Polar connection status + pending sessions
-        // Load weight log
+        // Load weight plan config
+        const cfgDoc = await getDoc(doc(db, "users", userId, "weight_plan", "settings"));
+        const cfg = cfgDoc.exists() ? { ...DEFAULT_PLAN_CONFIG, ...cfgDoc.data() } : DEFAULT_PLAN_CONFIG;
+        setWeightPlanConfig(cfg);
+        setEditCfg(cfg);
+
+        // Generate projection and merge with stored actuals
+        const proj = generateWeightProjection(cfg);
         const wSnap = await getDocs(collection(db, "users", userId, "weight_log"));
         if (wSnap.empty) {
-          // Seed from the spreadsheet projection
-          const seed = WEIGHT_PROJECTION.map(r => ({ ...r, actual: r.week === 1 ? 84.0 : null }));
+          const seed = proj.map(r => ({ ...r, actual: r.week === 1 ? cfg.startWeightKg : null }));
+          await setDoc(doc(db, "users", userId, "weight_log", "1"), seed[0]);
           setWeightLog(seed);
         } else {
-          const rows = wSnap.docs.map(d => d.data()).sort((a,b) => a.week - b.week);
-          setWeightLog(rows);
+          const actuals = {};
+          wSnap.docs.forEach(d => { const data = d.data(); if (data.actual != null) actuals[d.id] = data.actual; });
+          setWeightLog(proj.map(r => ({ ...r, actual: actuals[String(r.week)] ?? null })));
         }
 
         // Load persisted chat history
@@ -578,6 +664,20 @@ export default function NutritionTracker({ userId }) {
       return [dayData, ...filtered].sort((a,b) => b.date.localeCompare(a.date));
     });
     setCurrentDayData(dayData);
+  };
+
+  // ── Save weight plan config + regenerate projection ──
+  const savePlanConfig = async (cfg) => {
+    setWeightPlanConfig(cfg);
+    setEditCfg(cfg);
+    setEditingPlan(false);
+    try {
+      await setDoc(doc(db, "users", userId, "weight_plan", "settings"), cfg);
+    } catch(e) { console.warn("Plan config save failed:", e); }
+    const proj = generateWeightProjection(cfg);
+    const actuals = {};
+    weightLog.forEach(r => { if (r.actual != null) actuals[r.week] = r.actual; });
+    setWeightLog(proj.map(r => ({ ...r, actual: actuals[r.week] ?? null })));
   };
 
   // ── Delete item ──
@@ -1906,26 +2006,26 @@ Use realistic values per ${weight}g.` }]
 
             {/* ── LEFT: Weekly Log Table (55%) ── */}
             <div style={{ flex:"0 0 55%", minWidth:0 }}>
-              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>⚖️ Weekly Weight Log</div>
-              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"hidden" }}>
+              <div style={{ fontSize:"15px", fontWeight:"bold", color:"#1F4E79", marginBottom:"10px" }}>⚖️ Weekly Weight Log</div>
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"auto", maxHeight:"calc(100vh - 220px)" }}>
                 <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px" }}>
                   <thead>
-                    <tr style={{ background:"#1F4E79", color:"#fff" }}>
+                    <tr style={{ background:"#1F4E79", color:"#fff", position:"sticky", top:0 }}>
                       {["Wk","Date","Phase","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].map(h => (
-                        <th key={h} style={{ padding:"7px 8px", textAlign: h==="Wk"||h==="Proj (kg)"||h==="Actual (kg)"||h==="vs Proj"||h==="Cum Loss" ? "right" : "left", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
+                        <th key={h} style={{ padding:"7px 8px", textAlign:["Wk","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].includes(h)?"right":"left", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {weightLog.map((row, i) => {
                       const vsProj = row.actual != null ? (row.actual - row.projected).toFixed(1) : null;
-                      const cumLoss = row.actual != null ? (84.0 - row.actual).toFixed(1) : null;
+                      const cumLoss = row.actual != null ? (weightPlanConfig.startWeightKg - row.actual).toFixed(1) : null;
                       const isReset = row.phase === "RESET";
                       const isP3 = row.phase === "Phase 3 — Resume";
                       const rowBg = isReset ? "#FFF8E1" : isP3 ? "#F3F8FF" : i%2===0 ? "#fff" : "#F7FAFD";
-                      const today = new Date();
-                      const rowDate = new Date(row.date + " 2026");
-                      const isPast = rowDate <= today;
+                      const rowDateParts = row.date.split(" ");
+                      const rowDate = rowDateParts.length >= 3 ? new Date(`${rowDateParts[1]} ${rowDateParts[0]}, ${rowDateParts[2]}`) : null;
+                      const isPast = rowDate ? rowDate <= new Date() : false;
                       const isCurrent = row.actual != null && (i === weightLog.length-1 || weightLog[i+1]?.actual == null);
                       return (
                         <tr key={row.week} style={{ background: isCurrent ? "#E3F2FD" : rowBg }}>
@@ -1935,36 +2035,30 @@ Use realistic values per ${weight}g.` }]
                             <span style={{ fontSize:"10px", padding:"1px 6px", borderRadius:"10px", fontWeight:"bold",
                               background: isReset?"#FFF3CD":isP3?"#E3F2FD":"#E8F5E9",
                               color: isReset?"#795548":isP3?"#1F4E79":"#2E7D32" }}>
-                              {isReset ? "RESET" : isP3 ? "P3" : "P1"}
+                              {isReset?"RESET":isP3?"P3":"P1"}
                             </span>
                           </td>
                           <td style={{ padding:"5px 8px", textAlign:"right", color:"#6B8CAE" }}>{row.projected.toFixed(1)}</td>
                           <td style={{ padding:"5px 8px", textAlign:"right" }}>
-                            <input
-                              type="number" step="0.1" min="50" max="120"
+                            <input type="number" step="0.1" min="30" max="200"
                               value={row.actual ?? ""}
-                              placeholder={isPast ? "—" : ""}
+                              placeholder={isPast?"—":""}
                               onChange={async e => {
-                                const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                const updated = weightLog.map((r,j) => j===i ? {...r, actual:val} : r);
+                                const val = e.target.value===""?null:parseFloat(e.target.value);
+                                const updated = weightLog.map((r,j)=>j===i?{...r,actual:val}:r);
                                 setWeightLog(updated);
-                                // Save to Firestore
-                                const docRef = doc(db, "users", userId, "weight_log", String(row.week));
-                                await setDoc(docRef, {...row, actual:val});
+                                await setDoc(doc(db,"users",userId,"weight_log",String(row.week)),{...row,actual:val});
                               }}
-                              style={{ width:"60px", padding:"2px 4px", border:"1px solid #DDEAF6", borderRadius:"4px",
-                                fontSize:"12px", textAlign:"right",
-                                background: row.actual != null ? "#E8F5E9" : "#fff",
-                                fontWeight: row.actual != null ? "bold" : "normal",
-                                color: row.actual != null ? "#2E7D32" : "#1a2a3a" }}
-                            />
+                              style={{ width:"60px", padding:"2px 4px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", textAlign:"right",
+                                background:row.actual!=null?"#E8F5E9":"#fff", fontWeight:row.actual!=null?"bold":"normal",
+                                color:row.actual!=null?"#2E7D32":"#1a2a3a" }}/>
                           </td>
                           <td style={{ padding:"5px 8px", textAlign:"right", fontWeight:"bold",
-                            color: vsProj == null ? "#ccc" : parseFloat(vsProj) > 0 ? "#c62828" : parseFloat(vsProj) < 0 ? "#2E7D32" : "#6B8CAE" }}>
-                            {vsProj == null ? "—" : `${parseFloat(vsProj)>0?"+":""}${vsProj}`}
+                            color:vsProj==null?"#ccc":parseFloat(vsProj)>0?"#c62828":parseFloat(vsProj)<0?"#2E7D32":"#6B8CAE" }}>
+                            {vsProj==null?"—":`${parseFloat(vsProj)>0?"+":""}${vsProj}`}
                           </td>
-                          <td style={{ padding:"5px 8px", textAlign:"right", color: cumLoss ? "#2E75B6" : "#ccc", fontWeight: cumLoss ? "bold" : "normal" }}>
-                            {cumLoss == null ? "—" : `-${cumLoss} kg`}
+                          <td style={{ padding:"5px 8px", textAlign:"right", color:cumLoss?"#2E75B6":"#ccc", fontWeight:cumLoss?"bold":"normal" }}>
+                            {cumLoss==null?"—":`-${cumLoss} kg`}
                           </td>
                         </tr>
                       );
@@ -1972,107 +2066,52 @@ Use realistic values per ${weight}g.` }]
                   </tbody>
                 </table>
               </div>
-              {weightMsg && (
-                <div style={{ marginTop:"8px", padding:"7px 10px", borderRadius:"4px", fontSize:"12px",
-                  background:weightMsg.ok?"#E8F5E9":"#FFEBEE", color:weightMsg.ok?"#2E7D32":"#c62828" }}>
-                  {weightMsg.text}
-                </div>
-              )}
             </div>
 
-            {/* ── RIGHT: Chart + Specs (45%) ── */}
+            {/* ── RIGHT: Chart + Specs (43%) ── */}
             <div style={{ flex:"0 0 43%", minWidth:0 }}>
 
               {/* SVG Trajectory Chart */}
-              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>📉 Trajectory</div>
-              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px", marginBottom:"14px" }}>
+              <div style={{ fontSize:"15px", fontWeight:"bold", color:"#1F4E79", marginBottom:"10px" }}>📉 Trajectory</div>
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"12px", marginBottom:"12px" }}>
                 {(() => {
-                  const W = 380, H = 200, PAD = { top:12, right:12, bottom:32, left:38 };
-                  const cW = W - PAD.left - PAD.right;
-                  const cH = H - PAD.top - PAD.bottom;
-                  const allProj = weightLog.map(r => r.projected);
-                  const allActual = weightLog.filter(r => r.actual != null).map(r => r.actual);
-                  const minW = Math.min(...allProj, ...allActual) - 1;
-                  const maxW = Math.max(...allProj, ...allActual) + 1;
-                  const n = weightLog.length;
-                  const xScale = i => PAD.left + (i / (n-1)) * cW;
-                  const yScale = v => PAD.top + cH - ((v - minW) / (maxW - minW)) * cH;
-
-                  // Phase bands
-                  const resetStart = weightLog.findIndex(r => r.phase === "RESET");
-                  const p3Start = weightLog.findIndex(r => r.phase === "Phase 3 — Resume");
-
-                  // Projected path
-                  const projPath = weightLog.map((r,i) => `${i===0?"M":"L"}${xScale(i).toFixed(1)},${yScale(r.projected).toFixed(1)}`).join(" ");
-
-                  // Actual path (only logged points)
-                  const actualPts = weightLog.reduce((acc,r,i) => r.actual!=null ? [...acc,[i,r.actual]] : acc, []);
-                  const actualPath = actualPts.map(([i,v],j) => `${j===0?"M":"L"}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`).join(" ");
-
-                  // Target zone band (70–72 kg)
-                  const tZoneY1 = yScale(72);
-                  const tZoneY2 = yScale(70);
-
-                  // Y axis ticks
-                  const yTicks = [];
-                  for (let w = Math.ceil(minW); w <= Math.floor(maxW); w += 2) yTicks.push(w);
-
-                  // X axis ticks — months
-                  const months = [];
-                  weightLog.forEach((r,i) => {
-                    const parts = r.date.split(" ");
-                    if (parts[0] === "09" || parts[0] === "01") months.push({i, label: parts[1].slice(0,3)});
+                  const cfg = weightPlanConfig;
+                  const W=380, H=200, PAD={top:12,right:12,bottom:32,left:38};
+                  const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
+                  const allProj=weightLog.map(r=>r.projected);
+                  const allActual=weightLog.filter(r=>r.actual!=null).map(r=>r.actual);
+                  const minW=Math.min(...allProj,...allActual,cfg.targetWeightMinKg)-1;
+                  const maxW=Math.max(...allProj,...allActual)+1;
+                  const n=weightLog.length;
+                  const xS=i=>PAD.left+(i/(n-1))*cW;
+                  const yS=v=>PAD.top+cH-((v-minW)/(maxW-minW))*cH;
+                  const resetStart=weightLog.findIndex(r=>r.phase==="RESET");
+                  const p3Start=weightLog.findIndex(r=>r.phase==="Phase 3 — Resume");
+                  const projPath=weightLog.map((r,i)=>`${i===0?"M":"L"}${xS(i).toFixed(1)},${yS(r.projected).toFixed(1)}`).join(" ");
+                  const actualPts=weightLog.reduce((acc,r,i)=>r.actual!=null?[...acc,[i,r.actual]]:acc,[]);
+                  const actualPath=actualPts.map(([i,v],j)=>`${j===0?"M":"L"}${xS(i).toFixed(1)},${yS(v).toFixed(1)}`).join(" ");
+                  const tZoneY1=yS(cfg.targetWeightMaxKg), tZoneY2=yS(cfg.targetWeightMinKg);
+                  const yTicks=[]; for(let w=Math.ceil(minW);w<=Math.floor(maxW);w+=2) yTicks.push(w);
+                  const months=[];
+                  weightLog.forEach((r,i)=>{
+                    const p=r.date.split(" ");
+                    if(p[0]==="01"||p[0]==="09") months.push({i,label:p[1]?.slice(0,3)||""});
                   });
-
                   return (
-                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display:"block" }}>
-                      {/* Phase bands */}
-                      {resetStart > 0 && p3Start > resetStart && (
-                        <rect x={xScale(resetStart)} y={PAD.top} width={xScale(p3Start)-xScale(resetStart)} height={cH}
-                          fill="#FFF8E1" opacity="0.7"/>
-                      )}
-                      {p3Start > 0 && (
-                        <rect x={xScale(p3Start)} y={PAD.top} width={xScale(n-1)-xScale(p3Start)} height={cH}
-                          fill="#EBF3FB" opacity="0.5"/>
-                      )}
-                      {/* Target zone */}
-                      <rect x={PAD.left} y={tZoneY1} width={cW} height={tZoneY2-tZoneY1}
-                        fill="#C8E6C9" opacity="0.4"/>
-                      <text x={PAD.left+3} y={tZoneY1-2} fontSize="8" fill="#2E7D32">Target 70–72 kg</text>
-
-                      {/* Grid lines */}
-                      {yTicks.map(w => (
-                        <line key={w} x1={PAD.left} x2={PAD.left+cW} y1={yScale(w)} y2={yScale(w)}
-                          stroke="#DDEAF6" strokeWidth="0.5"/>
-                      ))}
-
-                      {/* Y axis labels */}
-                      {yTicks.map(w => (
-                        <text key={w} x={PAD.left-4} y={yScale(w)+3} fontSize="8" fill="#6B8CAE" textAnchor="end">{w}</text>
-                      ))}
-
-                      {/* X axis month labels */}
-                      {months.map(({i, label}) => (
-                        <text key={i} x={xScale(i)} y={H-PAD.bottom+12} fontSize="8" fill="#6B8CAE" textAnchor="middle">{label}</text>
-                      ))}
-
-                      {/* Projected line */}
+                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:"block"}}>
+                      {resetStart>0&&p3Start>resetStart&&<rect x={xS(resetStart)} y={PAD.top} width={xS(p3Start)-xS(resetStart)} height={cH} fill="#FFF8E1" opacity="0.7"/>}
+                      {p3Start>0&&<rect x={xS(p3Start)} y={PAD.top} width={xS(n-1)-xS(p3Start)} height={cH} fill="#EBF3FB" opacity="0.5"/>}
+                      <rect x={PAD.left} y={tZoneY1} width={cW} height={tZoneY2-tZoneY1} fill="#C8E6C9" opacity="0.4"/>
+                      <text x={PAD.left+3} y={tZoneY1-2} fontSize="8" fill="#2E7D32">Target {cfg.targetWeightMinKg}–{cfg.targetWeightMaxKg} kg</text>
+                      {yTicks.map(w=><line key={w} x1={PAD.left} x2={PAD.left+cW} y1={yS(w)} y2={yS(w)} stroke="#DDEAF6" strokeWidth="0.5"/>)}
+                      {yTicks.map(w=><text key={w} x={PAD.left-4} y={yS(w)+3} fontSize="8" fill="#6B8CAE" textAnchor="end">{w}</text>)}
+                      {months.map(({i,label})=><text key={i} x={xS(i)} y={H-PAD.bottom+12} fontSize="8" fill="#6B8CAE" textAnchor="middle">{label}</text>)}
                       <path d={projPath} fill="none" stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>
-
-                      {/* Actual line */}
-                      {actualPath && <path d={actualPath} fill="none" stroke="#2E75B6" strokeWidth="2.5"/>}
-
-                      {/* Actual dots */}
-                      {actualPts.map(([i,v]) => (
-                        <circle key={i} cx={xScale(i)} cy={yScale(v)} r="3" fill="#2E75B6" stroke="#fff" strokeWidth="1"/>
-                      ))}
-
-                      {/* Phase labels */}
-                      <text x={xScale(2)} y={PAD.top+10} fontSize="8" fill="#2E7D32" fontWeight="bold">Phase 1</text>
-                      {resetStart>0 && <text x={xScale(resetStart+0.5)} y={PAD.top+10} fontSize="8" fill="#795548" fontWeight="bold">RESET</text>}
-                      {p3Start>0  && <text x={xScale(p3Start+1)}  y={PAD.top+10} fontSize="8" fill="#1F4E79" fontWeight="bold">Phase 3</text>}
-
-                      {/* Legend */}
+                      {actualPath&&<path d={actualPath} fill="none" stroke="#2E75B6" strokeWidth="2.5"/>}
+                      {actualPts.map(([i,v])=><circle key={i} cx={xS(i)} cy={yS(v)} r="3" fill="#2E75B6" stroke="#fff" strokeWidth="1"/>)}
+                      <text x={xS(2)} y={PAD.top+10} fontSize="8" fill="#2E7D32" fontWeight="bold">P1</text>
+                      {resetStart>0&&<text x={xS(resetStart+0.3)} y={PAD.top+10} fontSize="8" fill="#795548" fontWeight="bold">RST</text>}
+                      {p3Start>0&&<text x={xS(p3Start+0.5)} y={PAD.top+10} fontSize="8" fill="#1F4E79" fontWeight="bold">P3</text>}
                       <line x1={W-90} y1={H-8} x2={W-75} y2={H-8} stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>
                       <text x={W-72} y={H-5} fontSize="8" fill="#6B8CAE">Projected</text>
                       <line x1={W-32} y1={H-8} x2={W-17} y2={H-8} stroke="#2E75B6" strokeWidth="2.5"/>
@@ -2082,83 +2121,193 @@ Use realistic values per ${weight}g.` }]
                 })()}
               </div>
 
-              {/* Plan Specs */}
-              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"hidden" }}>
-                <div style={{ background:"#1F4E79", color:"#fff", padding:"8px 12px", fontSize:"12px", fontWeight:"bold" }}>📋 Plan Specifications</div>
-                <div style={{ padding:"10px 12px" }}>
+              {/* Plan Specs panel */}
+              {(() => {
+                const cfg = weightPlanConfig;
+                const bmi = (cfg.startWeightKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
+                const tBmiLo = (cfg.targetWeightMinKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
+                const tBmiHi = (cfg.targetWeightMaxKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
+                const dailyDeficit = Math.round(cfg.weeklyLossKg * 7700 / 7);
+                const milestones = deriveMilestones(cfg, weightLog);
 
-                  {/* Personal Stats */}
-                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Personal Stats</div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"4px 12px", marginBottom:"10px", fontSize:"11px" }}>
-                    {[["Age","60 years"],["Sex","Male"],["Height","165 cm"],["Start Weight","84.0 kg"],["Start BMI","30.9"],["Target","70–72 kg by Dec 2026"],["Target BMI","25.7–26.4"],["VO₂ Max","33 — Fair (↑ improving)"]].map(([k,v]) => (
-                      <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
-                        <span style={{ color:"#6B8CAE" }}>{k}</span>
-                        <span style={{ color:"#1F4E79", fontWeight:"600" }}>{v}</span>
+                // Shared input style
+                const inp = (extra={}) => ({ padding:"3px 6px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"11px", color:"#1F4E79", background:"#F7FAFD", ...extra });
+                const lbl = { fontSize:"10px", color:"#6B8CAE", display:"block", marginBottom:"2px" };
+                const setE = (key, val) => setEditCfg(prev => ({ ...prev, [key]: val }));
+                const num = (key, w=60, step=1) => (
+                  <input type="number" step={step} value={editCfg[key]??""} onChange={e=>setE(key,parseFloat(e.target.value)||0)}
+                    style={inp({width:`${w}px`})} />
+                );
+
+                return (
+                  <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"hidden", marginBottom:"12px" }}>
+                    {/* Header */}
+                    <div style={{ background:"#1F4E79", color:"#fff", padding:"8px 12px", fontSize:"12px", fontWeight:"bold", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span>📋 Plan Specifications</span>
+                      <div style={{ display:"flex", gap:"6px" }}>
+                        {editingPlan ? (
+                          <>
+                            <button onClick={() => { setEditCfg(cfg); setEditingPlan(false); }}
+                              style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"4px", padding:"3px 10px", fontSize:"11px", cursor:"pointer" }}>Cancel</button>
+                            <button onClick={() => savePlanConfig(editCfg)}
+                              style={{ background:"#2E7D32", border:"none", color:"#fff", borderRadius:"4px", padding:"3px 10px", fontSize:"11px", cursor:"pointer", fontWeight:"bold" }}>💾 Save Plan</button>
+                          </>
+                        ) : (
+                          <button onClick={() => { setEditCfg(cfg); setEditingPlan(true); }}
+                            style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"4px", padding:"3px 10px", fontSize:"11px", cursor:"pointer" }}>✏ Edit</button>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                  {/* Daily Plan */}
-                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Daily Plan</div>
-                  <div style={{ fontSize:"11px", marginBottom:"10px" }}>
-                    {[
-                      ["🌅 AM Cycling","20 min · Target HR 128–140 bpm · ~180–200 kcal"],
-                      ["🌆 PM Cycling","30 min · Target HR 100–110 bpm · ~150–180 kcal"],
-                      ["🍽 Calories","1,800 kcal/day · Protein 80–100 g/day"],
-                      ["📅 Active Days","5–6 days/week · 1–2 rest days"],
-                      ["⚡ Total Deficit","~600–650 kcal/day · ~0.5–0.6 kg/week"],
-                    ].map(([k,v]) => (
-                      <div key={k} style={{ display:"flex", gap:"6px", padding:"3px 0", borderBottom:"1px solid #F0F4F8" }}>
-                        <span style={{ color:"#1F4E79", fontWeight:"600", whiteSpace:"nowrap", minWidth:"90px" }}>{k}</span>
-                        <span style={{ color:"#6B8CAE" }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
+                    <div style={{ padding:"10px 12px", fontSize:"11px" }}>
 
-                  {/* Milestones */}
-                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Milestone Roadmap</div>
-                  <div style={{ fontSize:"11px", marginBottom:"10px" }}>
-                    {[
-                      ["9 Mar 2026","84.0 kg","START — Plan begins","Phase 1"],
-                      ["End Apr 2026","~80–81 kg","Clothes noticeably looser","Phase 1"],
-                      ["End Jun 2026","~77–78 kg","Mirror change visible","Phase 1"],
-                      ["End Jul 2026","~75–76 kg","Plateau zone — prepare","Phase 1"],
-                      ["1–14 Aug 2026","~75–76 kg","Eat at maintenance 2,136 kcal","RESET"],
-                      ["Sep 2026","~75–76 kg","Recalibrated plan restarts","Phase 3"],
-                      ["End Oct 2026","~73–74 kg","+ 10 min PM / 1,700 kcal","Phase 3"],
-                      ["Dec 2026","~70–72 kg","🎯 TARGET ZONE","Phase 3"],
-                    ].map(([date,wt,note,phase]) => (
-                      <div key={date} style={{ display:"grid", gridTemplateColumns:"80px 60px 1fr 40px", gap:"4px", padding:"3px 0", borderBottom:"1px solid #F0F4F8", alignItems:"center" }}>
-                        <span style={{ color:"#6B8CAE" }}>{date}</span>
-                        <span style={{ color:"#2E75B6", fontWeight:"bold" }}>{wt}</span>
-                        <span style={{ color:"#1F4E79" }}>{note}</span>
-                        <span style={{ fontSize:"9px", padding:"1px 4px", borderRadius:"8px", textAlign:"center",
-                          background: phase==="RESET"?"#FFF3CD":phase==="Phase 3"?"#E3F2FD":"#E8F5E9",
-                          color: phase==="RESET"?"#795548":phase==="Phase 3"?"#1F4E79":"#2E7D32" }}>{phase==="Phase 1"?"P1":phase==="Phase 3"?"P3":"RST"}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Plateau Levers */}
-                  <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>Plateau Levers — pull one at a time</div>
-                  <div style={{ fontSize:"11px" }}>
-                    {[
-                      ["Lever 1","Extend PM session to 40 mins","Easiest — no intensity change needed"],
-                      ["Lever 2","Drop calories to 1,650–1,700 kcal","Recalculate at new bodyweight first"],
-                      ["Lever 3","2-week diet break at maintenance","Resets leptin & adaptive thermogenesis"],
-                    ].map(([lbl,action,note]) => (
-                      <div key={lbl} style={{ padding:"4px 0", borderBottom:"1px solid #F0F4F8" }}>
-                        <div style={{ display:"flex", gap:"6px" }}>
-                          <span style={{ fontWeight:"bold", color:"#1F4E79", minWidth:"46px" }}>{lbl}</span>
-                          <span style={{ color:"#1F4E79" }}>{action}</span>
+                      {/* ── PERSONAL STATS ── */}
+                      <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>👤 Personal Stats</div>
+                      {editingPlan ? (
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px", marginBottom:"10px" }}>
+                          <div><span style={lbl}>Age (yr)</span>{num("age",54)}</div>
+                          <div><span style={lbl}>Sex</span>
+                            <select value={editCfg.sex} onChange={e=>setE("sex",e.target.value)} style={inp({width:"70px"})}>
+                              <option value="m">Male</option><option value="f">Female</option>
+                            </select>
+                          </div>
+                          <div><span style={lbl}>Height (cm)</span>{num("heightCm",54)}</div>
+                          <div><span style={lbl}>Start Wt (kg)</span>{num("startWeightKg",54,0.1)}</div>
+                          <div><span style={lbl}>Start Date</span>
+                            <input type="date" value={editCfg.startDate} onChange={e=>setE("startDate",e.target.value)} style={inp({width:"110px"})}/>
+                          </div>
+                          <div><span style={lbl}>VO₂ Max</span>{num("vo2max",54)}</div>
+                          <div><span style={lbl}>Target Min (kg)</span>{num("targetWeightMinKg",54,0.1)}</div>
+                          <div><span style={lbl}>Target Max (kg)</span>{num("targetWeightMaxKg",54,0.1)}</div>
                         </div>
-                        <div style={{ color:"#6B8CAE", paddingLeft:"52px", marginTop:"1px" }}>{note}</div>
-                      </div>
-                    ))}
-                  </div>
+                      ) : (
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"3px 12px", marginBottom:"10px" }}>
+                          {[["Age",`${cfg.age} yr`],["Sex",cfg.sex==="m"?"Male":"Female"],["Height",`${cfg.heightCm} cm`],
+                            ["Start Weight",`${cfg.startWeightKg.toFixed(1)} kg`],["Start BMI",bmi],
+                            ["Target",`${cfg.targetWeightMinKg}–${cfg.targetWeightMaxKg} kg`],
+                            ["Target BMI",`${tBmiLo}–${tBmiHi}`],["VO₂ Max",`${cfg.vo2max} — ${cfg.vo2max<35?"Fair":cfg.vo2max<45?"Good":"Excellent"}`]].map(([k,v])=>(
+                            <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
+                              <span style={{ color:"#6B8CAE" }}>{k}</span>
+                              <span style={{ color:"#1F4E79", fontWeight:"600" }}>{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                </div>
-              </div>
+                      {/* ── DAILY EXERCISE PLAN ── */}
+                      <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>🚴 Daily Exercise Plan</div>
+                      {editingPlan ? (
+                        <div style={{ marginBottom:"10px" }}>
+                          <div style={{ marginBottom:"6px" }}>
+                            <span style={{ ...lbl, fontWeight:"bold", color:"#1F4E79" }}>🌅 AM Session</span>
+                            <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"6px" }}>
+                              <div><span style={lbl}>Dur (min)</span>{num("amDurationMin",46)}</div>
+                              <div><span style={lbl}>HR Low</span>{num("amHRMin",46)}</div>
+                              <div><span style={lbl}>HR High</span>{num("amHRMax",46)}</div>
+                              <div><span style={lbl}>kcal Min</span>{num("amKcalMin",46)}</div>
+                              <div><span style={lbl}>kcal Max</span>{num("amKcalMax",46)}</div>
+                            </div>
+                          </div>
+                          <div style={{ marginBottom:"6px" }}>
+                            <span style={{ ...lbl, fontWeight:"bold", color:"#1F4E79" }}>🌆 PM Session</span>
+                            <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"6px" }}>
+                              <div><span style={lbl}>Dur (min)</span>{num("pmDurationMin",46)}</div>
+                              <div><span style={lbl}>HR Low</span>{num("pmHRMin",46)}</div>
+                              <div><span style={lbl}>HR High</span>{num("pmHRMax",46)}</div>
+                              <div><span style={lbl}>kcal Min</span>{num("pmKcalMin",46)}</div>
+                              <div><span style={lbl}>kcal Max</span>{num("pmKcalMax",46)}</div>
+                            </div>
+                          </div>
+                          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"6px" }}>
+                            <div><span style={lbl}>Daily kcal</span>{num("dailyCaloriesKcal",56)}</div>
+                            <div><span style={lbl}>Protein Min g</span>{num("proteinMinG",56)}</div>
+                            <div><span style={lbl}>Protein Max g</span>{num("proteinMaxG",56)}</div>
+                            <div><span style={lbl}>Active days/wk</span>{num("activeDaysPerWeek",56,0.5)}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ marginBottom:"10px" }}>
+                          {[
+                            ["🌅 AM Cycling",`${cfg.amDurationMin} min · HR ${cfg.amHRMin}–${cfg.amHRMax} bpm · ~${cfg.amKcalMin}–${cfg.amKcalMax} kcal`],
+                            ["🌆 PM Cycling",`${cfg.pmDurationMin} min · HR ${cfg.pmHRMin}–${cfg.pmHRMax} bpm · ~${cfg.pmKcalMin}–${cfg.pmKcalMax} kcal`],
+                            ["🍽 Calories",`${cfg.dailyCaloriesKcal.toLocaleString()} kcal/day · Protein ${cfg.proteinMinG}–${cfg.proteinMaxG} g`],
+                            ["📅 Active Days",`${cfg.activeDaysPerWeek} days/week · ~${dailyDeficit} kcal/day deficit`],
+                          ].map(([k,v])=>(
+                            <div key={k} style={{ display:"flex", gap:"6px", padding:"3px 0", borderBottom:"1px solid #F0F4F8" }}>
+                              <span style={{ color:"#1F4E79", fontWeight:"600", whiteSpace:"nowrap", minWidth:"88px" }}>{k}</span>
+                              <span style={{ color:"#6B8CAE" }}>{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ── PLAN STRUCTURE ── */}
+                      <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>📊 Plan Structure</div>
+                      {editingPlan ? (
+                        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"6px", marginBottom:"10px" }}>
+                          <div><span style={lbl}>Phase 1 (wks)</span>{num("phase1Weeks",56)}</div>
+                          <div><span style={lbl}>Reset (wks)</span>{num("resetWeeks",56)}</div>
+                          <div><span style={lbl}>Loss (kg/wk)</span>{num("weeklyLossKg",56,0.05)}</div>
+                          <div><span style={lbl}>Maint. kcal</span>{num("maintenanceCaloriesKcal",60)}</div>
+                        </div>
+                      ) : (
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"3px 12px", marginBottom:"10px" }}>
+                          {[["Phase 1",`${cfg.phase1Weeks} weeks`],["Reset Phase",`${cfg.resetWeeks} weeks`],
+                            ["Weekly Loss",`${cfg.weeklyLossKg} kg/week`],["Maintenance",`${cfg.maintenanceCaloriesKcal.toLocaleString()} kcal`]].map(([k,v])=>(
+                            <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
+                              <span style={{ color:"#6B8CAE" }}>{k}</span>
+                              <span style={{ color:"#1F4E79", fontWeight:"600" }}>{v}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ── MILESTONES (view only, auto-derived) ── */}
+                      <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>🏁 Milestone Roadmap</div>
+                      <div style={{ marginBottom:"10px" }}>
+                        {milestones.map((m,i)=>(
+                          <div key={i} style={{ display:"grid", gridTemplateColumns:"75px 58px 1fr 34px", gap:"4px", padding:"3px 0", borderBottom:"1px solid #F0F4F8", alignItems:"center" }}>
+                            <span style={{ color:"#6B8CAE", fontSize:"10px" }}>{m.date}</span>
+                            <span style={{ color:"#2E75B6", fontWeight:"bold" }}>{m.weight}</span>
+                            <span style={{ color:"#1F4E79" }}>{m.note}</span>
+                            <span style={{ fontSize:"9px", padding:"1px 4px", borderRadius:"8px", textAlign:"center",
+                              background:m.phase==="RESET"?"#FFF3CD":m.phase==="Phase 3"?"#E3F2FD":"#E8F5E9",
+                              color:m.phase==="RESET"?"#795548":m.phase==="Phase 3"?"#1F4E79":"#2E7D32" }}>
+                              {m.phase==="Phase 1"?"P1":m.phase==="Phase 3"?"P3":"RST"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* ── PLATEAU LEVERS ── */}
+                      <div style={{ fontSize:"10px", fontWeight:"bold", color:"#2E75B6", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>⚡ Plateau Levers — pull one at a time</div>
+                      {editingPlan ? (
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px" }}>
+                          <div><span style={lbl}>Lever 1 — Extend PM to (min)</span>{num("lever1PmMin",60)}</div>
+                          <div><span style={lbl}>Lever 2 — Drop calories to (kcal)</span>{num("lever2CaloriesKcal",70)}</div>
+                        </div>
+                      ) : (
+                        <div>
+                          {[
+                            ["Lever 1",`Extend PM to ${cfg.lever1PmMin} min`,"Easiest — no intensity change needed"],
+                            ["Lever 2",`Drop to ${cfg.lever2CaloriesKcal.toLocaleString()} kcal/day`,"Recalculate at new bodyweight first"],
+                            ["Lever 3","2-week diet break at maintenance","Resets leptin & adaptive thermogenesis"],
+                          ].map(([lbl2,action,note])=>(
+                            <div key={lbl2} style={{ padding:"4px 0", borderBottom:"1px solid #F0F4F8" }}>
+                              <div style={{ display:"flex", gap:"6px" }}>
+                                <span style={{ fontWeight:"bold", color:"#1F4E79", minWidth:"46px" }}>{lbl2}</span>
+                                <span style={{ color:"#1F4E79" }}>{action}</span>
+                              </div>
+                              <div style={{ color:"#6B8CAE", paddingLeft:"52px", marginTop:"1px" }}>{note}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
