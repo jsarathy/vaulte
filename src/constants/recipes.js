@@ -1,0 +1,23 @@
+// src/constants/recipes.js
+export const INITIAL_RECIPES = [
+  { id:"r1", name:"Pinto Bean Stew", description:"A hearty, high-protein, high-fibre stew. Makes 4 portions.", source:"Home recipe", servings:4, prep_time:"10 minutes", cook_time:"30 minutes",
+    ingredients:[{amount:"606g",item:"Cooked pinto beans"},{amount:"102g",item:"Onion, chopped"},{amount:"~60g",item:"Green chillies"},{amount:"3 tbsp",item:"Gingelly (sesame) oil"},{amount:"201g",item:"Mutti Polpa chopped tomatoes"},{amount:"1 tsp",item:"Salt"},{amount:"1 pinch",item:"Asafoetida (hing)"}],
+    steps:["Heat gingelly oil over medium heat.","Add asafoetida, sizzle 10 seconds.","Add onion, saute until translucent.","Add chillies, cook 2 min.","Add tomatoes, cook until oil separates.","Add pinto beans and salt. Mix well.","Simmer 10-15 min until thickened.","Serve hot with tortillas or bread."],
+    notes:"~4 x 225g portions. Gingelly oil adds distinctive nutty flavour.", nutrition:{kcal:338,fat:11,carbs:46,fibre:15,net_carbs:31,protein:15}},
+  { id:"r2", name:"Paneer Bhurji", description:"Ranveer Brar's soft scrambled paneer with onion, tomato and spices.", source:"Ranveer Brar", servings:2, prep_time:"5 minutes", cook_time:"20 minutes",
+    ingredients:[{amount:"1L",item:"Whole milk"},{amount:"2 tsp",item:"Curd"},{amount:"2 tsp",item:"Ghee"},{amount:"1",item:"Onion"},{amount:"1",item:"Tomato"},{amount:"1",item:"Green chilli"},{amount:"1/2 tsp",item:"Turmeric"},{amount:"1/4 tsp",item:"Red chilli powder"}],
+    steps:["Boil milk, add curd to curdle.","Strain through muslin, crumble paneer.","Heat ghee, add cumin seeds.","Saute onion, add ginger garlic paste.","Add tomato and spices, cook until soft.","Add paneer, mix well.","Turn off heat, stir in beaten curd and coriander."],
+    notes:"1L milk yields ~110g paneer. Reserve whey for cooking.", nutrition:{kcal:278,fat:19.4,carbs:12.6,fibre:1.9,net_carbs:10.7,protein:13.2}},
+  { id:"r3", name:"Nimbu Pani", description:"Simple Indian lime soda - refreshing and nearly calorie-free.", source:"Home recipe", servings:1, prep_time:"2 minutes", cook_time:"0 minutes",
+    ingredients:[{amount:"330ml",item:"Chilled soda water"},{amount:"0.5",item:"Fresh lime (~30g), juiced"},{amount:"1 pinch",item:"Salt"},{amount:"optional",item:"Roasted cumin powder"}],
+    steps:["Squeeze lime into glass.","Add salt.","Pour soda water, stir gently.","Serve over ice."],
+    notes:"Add black salt (kala namak) for authentic flavour.", nutrition:{kcal:9,fat:0.1,carbs:2.6,fibre:0.7,net_carbs:1.9,protein:0.2}},
+  { id:"r4", name:"Egg White Omelet", description:"High-protein, low-fat omelet with butter and mixed vegetables.", source:"Home recipe", servings:1, prep_time:"2 minutes", cook_time:"5 minutes",
+    ingredients:[{amount:"100g",item:"Liquid egg whites"},{amount:"4g",item:"Butter"},{amount:"20g",item:"Mixed vegetables"},{amount:"to taste",item:"Salt and pepper"}],
+    steps:["Heat butter in non-stick pan.","Add veg, cook 1 min.","Pour egg whites, season.","Cook until set, fold, serve."],
+    notes:"100g egg white = ~3 large egg whites. Only 89 kcal.", nutrition:{kcal:89,fat:3.6,carbs:1.5,fibre:0.5,net_carbs:1,protein:11.5}},
+  { id:"r5", name:"Huel RTD Strawberries & Cream", description:"Huel Ready to Drink - 500ml = 400kcal complete meal shake.", source:"Huel", servings:2, prep_time:"0 minutes", cook_time:"0 minutes",
+    ingredients:[{amount:"500ml",item:"Huel RTD Strawberries & Cream"}],
+    steps:["Shake well.","Serve chilled."],
+    notes:"250ml = 200kcal. Gluten-free, no added sugar.", nutrition:{kcal:200,fat:9,carbs:17,fibre:3.6,net_carbs:13.4,protein:11}},
+];

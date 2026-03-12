@@ -8,15 +8,17 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC_L5NoFXe-WVZdy9NBqkb4YI8vmLQxe2M",
-  authDomain: "vaulte-1ea20.firebaseapp.com",
-  projectId: "vaulte-1ea20",
-  storageBucket: "vaulte-1ea20.firebasestorage.app",
-  messagingSenderId: "597290506759",
-  appId: "1:597290506759:web:a5165ff8a43627f52be8a2"
+  apiKey:            "PASTE_YOUR_API_KEY_HERE",
+  authDomain:        "PASTE_YOUR_AUTH_DOMAIN_HERE",
+  projectId:         "PASTE_YOUR_PROJECT_ID_HERE",
+  storageBucket:     "PASTE_YOUR_STORAGE_BUCKET_HERE",
+  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
+  appId:             "PASTE_YOUR_APP_ID_HERE",
 };
 
 const app    = initializeApp(firebaseConfig);
 export const auth    = getAuth(app);
 export const db      = getFirestore(app);
-export const storage = getStorage(app, "vaulte-1ea20.firebasestorage.app");
+// If photos show 404, explicitly set your bucket here:
+// export const storage = getStorage(app, "vaulte-1ea20.firebasestorage.app");
+export const storage = getStorage(app);
