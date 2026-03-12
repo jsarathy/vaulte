@@ -372,6 +372,7 @@ export default function NutritionTracker({ userId }) {
   const [exResult, setExResult] = useState(null);
   const [exMsg, setExMsg] = useState(null);
   const [showExModal, setShowExModal] = useState(false);
+  const [showRecipesModal, setShowRecipesModal] = useState(false);
   // Polar integration state
   const [polarConnected, setPolarConnected] = useState(false);
   const [polarSessions, setPolarSessions] = useState([]);
@@ -971,7 +972,7 @@ export default function NutritionTracker({ userId }) {
             <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>🥗 Add Food Entry</div>
             <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px", marginBottom:"12px" }}>
               <div style={{ fontWeight:"bold", color:"#1F4E79", marginBottom:"10px", fontSize:"13px" }}>Add Food Item</div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))", gap:"8px", marginBottom:"10px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"10px" }}>
                 <div>
                   <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>Day</div>
                   <input type="date" value={addDate} onChange={e=>setAddDate(e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>
@@ -988,10 +989,6 @@ export default function NutritionTracker({ userId }) {
                       ));
                     })()}
                   </select>
-                </div>
-                <div>
-                  <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>Or new meal</div>
-                  <input value={addMealName} onChange={e=>setAddMealName(e.target.value)} placeholder="e.g. 🍽 Dinner" style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>
                 </div>
               </div>
               <div style={{ marginBottom:"10px", position:"relative" }}>
@@ -1284,33 +1281,70 @@ Use realistic values per ${weight}g.` }]
               </div>
             )}
 
-            {/* Recipes list */}
-            <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px" }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
-                <div style={{ fontWeight:"bold", color:"#1F4E79", fontSize:"13px" }}>📖 Saved Recipes</div>
-                <button onClick={() => { setRecipeBuilder(true); setBuilderPreview(null); setBuilderInput(""); setBuilderError(""); }}
-                  style={{ background:"#2E75B6", color:"#fff", border:"none", borderRadius:"4px", padding:"5px 12px", cursor:"pointer", fontSize:"11px", fontWeight:"bold", display:"flex", alignItems:"center", gap:"5px" }}>
-                  🤖 Create with Claude
-                </button>
-              </div>
-              {userRecipes.map(r => (
-                <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderBottom:"1px solid #DDEAF6", borderRadius:"4px", transition:"background 0.15s" }}
-                  onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
-                  <div onClick={() => setRecipeModal(r)} style={{ flex:1, cursor:"pointer" }}>
-                    <div style={{ fontWeight:"bold", fontSize:"13px", color:"#1F4E79" }}>{r.name}</div>
-                    <div style={{ fontSize:"11px", color:"#6B8CAE" }}>{r.description}</div>
+            {/* Recipe action buttons */}
+            <div style={{ display:"flex", gap:"10px", marginBottom:"0" }}>
+              <button onClick={() => setShowRecipesModal(true)}
+                style={{ flex:1, background:"#2E75B6", color:"#fff", border:"none", borderRadius:"8px",
+                  padding:"10px", fontSize:"13px", fontWeight:"bold", cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+                📖 Browse Saved Recipes
+              </button>
+              <button onClick={() => { setRecipeBuilder(true); setBuilderPreview(null); setBuilderInput(""); setBuilderError(""); }}
+                style={{ flex:1, background:"#1F4E79", color:"#fff", border:"none", borderRadius:"8px",
+                  padding:"10px", fontSize:"13px", fontWeight:"bold", cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+                🤖 Create with Claude
+              </button>
+            </div>
+
+            {/* Recipes picker modal */}
+            {showRecipesModal && (
+              <div onClick={e => e.target===e.currentTarget && setShowRecipesModal(false)}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ background:"#fff", borderRadius:"12px", width:"520px", maxWidth:"95vw", maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 8px 40px rgba(0,0,0,0.25)" }}>
+                  <div style={{ background:"#1F4E79", color:"#fff", padding:"14px 18px", borderRadius:"12px 12px 0 0", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+                    <div style={{ fontWeight:"bold", fontSize:"15px" }}>📖 Saved Recipes</div>
+                    <button onClick={() => setShowRecipesModal(false)}
+                      style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
                   </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:"10px", marginLeft:"12px" }}>
-                    <div style={{ fontSize:"12px", color:"#2E75B6", fontWeight:"bold", whiteSpace:"nowrap" }}>{r.nutrition?.kcal} kcal</div>
-                    <button onClick={async () => {
-                        if (!confirm("Delete this recipe?")) return;
-                        await deleteRecipe(userId, r.id);
-                        setUserRecipes(prev => prev.filter(ur => ur.id !== r.id));
-                      }} style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"11px", opacity:0.5, padding:"0 3px" }}>✕</button>
+                  <div style={{ flex:1, overflowY:"auto", padding:"8px" }}>
+                    {userRecipes.length === 0 ? (
+                      <div style={{ textAlign:"center", padding:"30px", color:"#6B8CAE", fontSize:"13px" }}>
+                        No saved recipes yet. Use "Create with Claude" to build your first recipe.
+                      </div>
+                    ) : userRecipes.map(r => (
+                      <div key={r.id}
+                        style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                          padding:"10px 12px", borderBottom:"1px solid #DDEAF6", borderRadius:"6px", transition:"background 0.15s" }}
+                        onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"}
+                        onMouseOut={e=>e.currentTarget.style.background="transparent"}>
+                        <div style={{ flex:1, cursor:"pointer" }} onClick={() => {
+                          const n = r.nutrition || {};
+                          setAddItem({ name:r.name, kcal:n.kcal||"", fat:n.fat||"", sat_fat:n.sat_fat||"",
+                            carbs:n.carbs||"", sugar:n.sugar||"", fibre:n.fibre||"",
+                            net_carbs:n.net_carbs||"", protein:n.protein||"" });
+                          setShowRecipesModal(false);
+                        }}>
+                          <div style={{ fontWeight:"bold", fontSize:"13px", color:"#1F4E79" }}>{r.name}</div>
+                          <div style={{ fontSize:"11px", color:"#6B8CAE" }}>{r.description}</div>
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:"10px", marginLeft:"12px" }}>
+                          <div style={{ fontSize:"12px", color:"#2E75B6", fontWeight:"bold", whiteSpace:"nowrap" }}>{r.nutrition?.kcal} kcal</div>
+                          <button onClick={e => { e.stopPropagation(); setRecipeModal(r); }}
+                            style={{ background:"none", border:"none", color:"#2E75B6", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>👁</button>
+                          <button onClick={async e => {
+                              e.stopPropagation();
+                              if (!confirm("Delete this recipe?")) return;
+                              await deleteRecipe(userId, r.id);
+                              setUserRecipes(prev => prev.filter(ur => ur.id !== r.id));
+                            }} style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"11px", opacity:0.5, padding:"0 3px" }}>✕</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
             </div>{/* end left col */}
 
             {/* ── RIGHT: Exercise (35%) ── */}
