@@ -1003,17 +1003,25 @@ export default function NutritionTracker({ userId }) {
                 {[["kcal","kcal"],["fat","Fat (g)"],["sat_fat","Sat Fat (g)"],["carbs","Carbs (g)"],["sugar","Sugar (g)"],["fibre","Fibre (g)"],["net_carbs","Net Carbs (g)"],["protein","Protein (g)"]].map(([key,label]) => (
                   <div key={key}>
                     <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>{label}</div>
-                    <input type="number" value={addItem[key]} onChange={e=>setAddItem({...addItem,[key]:e.target.value})} placeholder="0" step="0.1"
-                      style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>
+                    <input type="number" value={addItem[key]}
+                      onChange={e => {
+                        const updated = {...addItem, [key]: e.target.value};
+                        if (key === "carbs" || key === "fibre") {
+                          const c = key === "carbs" ? parseFloat(e.target.value)||0 : parseFloat(addItem.carbs)||0;
+                          const f = key === "fibre" ? parseFloat(e.target.value)||0 : parseFloat(addItem.fibre)||0;
+                          updated.net_carbs = Math.max(0, c - f).toFixed(1);
+                        }
+                        setAddItem(updated);
+                      }}
+                      placeholder="0" step="0.1"
+                      style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px",
+                        background: key==="net_carbs" ? "#F0F4F8" : "#fff" }}/>
                   </div>
                 ))}
               </div>
               <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end", alignItems:"center" }}>
-                <button onClick={() => {
-                  const c = parseFloat(addItem.carbs)||0;
-                  const f = parseFloat(addItem.fibre)||0;
-                  setAddItem({...addItem, net_carbs: Math.max(0,c-f).toFixed(1)});
-                }} style={{ ...S.btn("outline"), ...S.btn("sm") }}>Auto Net Carbs</button>
+                <button onClick={() => setAddItem({ name:"", kcal:"", fat:"", sat_fat:"", carbs:"", sugar:"", fibre:"", net_carbs:"", protein:"" })}
+                  style={{ ...S.btn("outline"), ...S.btn("sm") }}>✕ Clear</button>
                 <button onClick={submitAddItem} style={{ ...S.btn("success") }}>Add Item</button>
               </div>
               {addMsg && <div style={{ marginTop:"8px", padding:"7px 10px", borderRadius:"4px", fontSize:"12px", background:addMsg.ok?"#E8F5E9":"#FFEBEE", color:addMsg.ok?"#2E7D32":"#c62828" }}>{addMsg.text}</div>}
