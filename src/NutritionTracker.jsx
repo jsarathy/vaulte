@@ -599,13 +599,17 @@ export default function NutritionTracker({ userId }) {
   const renderCalendar = () => {
     const dows = ["M","T","W","T","F","S","S"];
     let blocks = [];
-    for (let offset = 0; offset < 3; offset++) {
+    // Render 14 months: 6 before calMonth through 7 ahead
+    for (let offset = -6; offset <= 7; offset++) {
       let m = calMonth + offset, y = calYear;
-      if (m > 11) { m -= 12; y++; }
-      const label = new Date(y, m, 1).toLocaleString("default", { month:"long", year:"numeric" });
+      while (m < 0)  { m += 12; y--; }
+      while (m > 11) { m -= 12; y++; }
+      const label = new Date(y, m, 1).toLocaleString("default", { month:"short", year:"numeric" });
       const firstDow = (new Date(y,m,1).getDay()+6)%7;
       const daysInMonth = new Date(y,m+1,0).getDate();
-      let cells = dows.map((d,i) => <div key={"dow"+i} style={{ textAlign:"center", fontSize:"9px", fontWeight:"bold", color:"#6B8CAE", paddingBottom:"3px" }}>{d}</div>);
+      let cells = dows.map((d,i) => (
+        <div key={"dow"+i} style={{ textAlign:"center", fontSize:"8px", fontWeight:"bold", color:"#6B8CAE", paddingBottom:"2px" }}>{d}</div>
+      ));
       for (let i=0;i<firstDow;i++) cells.push(<div key={"bl"+i}/>);
       for (let d=1;d<=daysInMonth;d++) {
         const mm = String(m+1).padStart(2,"0"), dd = String(d).padStart(2,"0");
@@ -616,20 +620,23 @@ export default function NutritionTracker({ userId }) {
         const kcal = loggedKcal[dateStr];
         cells.push(
           <div key={dateStr} onClick={() => switchDay(dateStr)}
-            style={{ textAlign:"center", fontSize:"11px", padding:"4px 1px", borderRadius:"5px", cursor:"pointer", lineHeight:"1.2",
+            style={{ textAlign:"center", fontSize:"10px", padding:"3px 1px", borderRadius:"4px", cursor:"pointer", lineHeight:"1.2",
               background: isActive ? "#1F4E79" : isLogged ? "#2E75B6" : "transparent",
               color: isLogged||isActive ? "#fff" : isToday ? "#2E75B6" : "#1a2a3a",
               fontWeight: isLogged||isToday ? "bold" : "normal",
               outline: isActive ? "2px solid #F57F17" : "none", outlineOffset:"1px" }}>
             {d}
-            {kcal ? <span style={{ fontSize:"7px", display:"block", opacity:0.85 }}>{Math.round(kcal)}</span> : null}
+            {kcal ? <span style={{ fontSize:"6px", display:"block", opacity:0.85 }}>{Math.round(kcal)}</span> : null}
           </div>
         );
       }
       blocks.push(
-        <div key={`${y}-${m}`} style={{ padding:"8px 8px 4px" }}>
-          <div style={{ fontSize:"11px", fontWeight:"bold", color:"#1F4E79", textAlign:"center", marginBottom:"4px", paddingBottom:"4px", borderBottom:"1px solid #D6E4F0" }}>{label}</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"2px" }}>{cells}</div>
+        <div key={`${y}-${m}`} style={{ padding:"4px 6px 2px" }}>
+          <div style={{ fontSize:"10px", fontWeight:"bold", color:"#1F4E79", textAlign:"center",
+            padding:"3px 0", borderBottom:"1px solid #D6E4F0", marginBottom:"2px",
+            background: m === calMonth && y === calYear ? "#EBF3FB" : "transparent",
+            borderRadius:"3px 3px 0 0" }}>{label}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"1px" }}>{cells}</div>
         </div>
       );
     }
@@ -739,19 +746,8 @@ export default function NutritionTracker({ userId }) {
         {/* Sidebar — only for log, compare, add tabs */}
         {activeTab !== "chat" && (
           <div style={S.sidebar}>
-            <div style={S.sidebarHead}>📅 Logged Days</div>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 10px", borderBottom:"1px solid #DDEAF6", background:"#fff", position:"sticky", top:0, zIndex:1 }}>
-              <button onClick={() => { let m=calMonth-1,y=calYear; if(m<0){m=11;y--;} setCalMonth(m); setCalYear(y); }} style={{ background:"none", border:"none", color:"#1F4E79", fontSize:"16px", cursor:"pointer", padding:"2px 6px" }}>‹</button>
-              <span style={{ fontSize:"11px", fontWeight:"bold", color:"#1F4E79" }}>{new Date(calYear,calMonth,1).toLocaleString("default",{month:"short",year:"numeric"})}</span>
-              <button onClick={() => { let m=calMonth+1,y=calYear; if(m>11){m=0;y++;} setCalMonth(m); setCalYear(y); }} style={{ background:"none", border:"none", color:"#1F4E79", fontSize:"16px", cursor:"pointer", padding:"2px 6px" }}>›</button>
-            </div>
-            <div style={{ flex:1, overflowY:"auto", padding:"6px" }}>{renderCalendar()}</div>
-            <div style={{ padding:"10px", borderTop:"1px solid #DDEAF6" }}>
-              <button onClick={async () => { const d = prompt("Enter date (YYYY-MM-DD):", todayStr); if(d) await createDay(d); }}
-                style={{ ...S.btn("primary"), width:"100%", textAlign:"center" }}>
-                + New Day
-              </button>
-            </div>
+            <div style={S.sidebarHead}>📅 Calendar</div>
+            <div style={{ flex:1, overflowY:"auto", padding:"0" }}>{renderCalendar()}</div>
           </div>
         )}
 
