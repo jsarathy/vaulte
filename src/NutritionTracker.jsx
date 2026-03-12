@@ -436,7 +436,9 @@ export default function NutritionTracker({ userId }) {
   const [chatDate, setChatDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [chatLoading, setChatLoading] = useState(false);
   const [justChatHistory, setJustChatHistory] = useState([]);
+  const [chatOpen, setChatOpen] = useState(false);
   const chatBottomRef = useRef(null);
+  const CHAT_CONTEXT_LIMIT = 30;
 
   // Add entry state
   const [addDate, setAddDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -483,6 +485,24 @@ export default function NutritionTracker({ userId }) {
           const rows = wSnap.docs.map(d => d.data()).sort((a,b) => a.week - b.week);
           setWeightLog(rows);
         }
+
+        // Load persisted chat history
+        try {
+          const chatDoc = await getDoc(doc(db, "users", userId, "claude_chat", "conversation"));
+          if (chatDoc.exists()) {
+            const { history } = chatDoc.data();
+            if (Array.isArray(history) && history.length > 0) {
+              setJustChatHistory(history);
+              // Reconstruct display messages from history
+              const displayMsgs = history.map(h => ({
+                id: genId(),
+                type: h.role === "user" ? "user" : "claude",
+                text: h.content
+              }));
+              setChatMessages(displayMsgs);
+            }
+          }
+        } catch(e) { console.warn("Chat history load failed:", e); }
 
         const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
         if (polarDoc.exists()) {
@@ -569,6 +589,26 @@ export default function NutritionTracker({ userId }) {
     await persistDay(updated);
   };
 
+  // ── Save chat history to Firestore ──
+  const persistChatHistory = async (history) => {
+    if (!userId) return;
+    try {
+      await setDoc(doc(db, "users", userId, "claude_chat", "conversation"), {
+        history,
+        updatedAt: new Date().toISOString()
+      });
+    } catch(e) { console.warn("Chat save failed:", e); }
+  };
+
+  const clearChat = async () => {
+    setJustChatHistory([]);
+    setChatMessages([]);
+    if (userId) {
+      try { await setDoc(doc(db, "users", userId, "claude_chat", "conversation"), { history:[], updatedAt: new Date().toISOString() }); }
+      catch(e) {}
+    }
+  };
+
   // ── Chat ──
   const sendChat = async () => {
     const text = chatInput.trim();
@@ -582,13 +622,17 @@ export default function NutritionTracker({ userId }) {
 
     try {
       if (chatMealId === "__chat__") {
-        const history = [...justChatHistory, { role:"user", content:text }];
-        const reply = await claudeChat(history);
-        setJustChatHistory([...history, { role:"assistant", content:reply }]);
+        const newHistory = [...justChatHistory, { role:"user", content:text }];
+        // Use last 30 messages for API context
+        const contextHistory = newHistory.slice(-CHAT_CONTEXT_LIMIT);
+        const reply = await claudeChat(contextHistory);
+        const updatedHistory = [...newHistory, { role:"assistant", content:reply }].slice(-CHAT_CONTEXT_LIMIT);
+        setJustChatHistory(updatedHistory);
+        await persistChatHistory(updatedHistory);
         setChatMessages(prev => prev.map(m => m.id === thinkMsg.id ? { ...m, text:reply } : m));
       } else {
         const items = await claudeParseFood(text);
-        const mealName = currentDayData?.meals?.find(m => m.id === chatMealId)?.name || "Meal";
+        const mealName = (allDays.find(d=>d.date===chatDate)||currentDayData)?.meals?.find(m => m.id === chatMealId)?.name || "Meal";
         setChatMessages(prev => prev.map(m => m.id === thinkMsg.id
           ? { ...m, type:"preview", items, mealId:chatMealId, mealName, confirmed:false }
           : m
@@ -772,7 +816,7 @@ export default function NutritionTracker({ userId }) {
   const S = {
     wrap:{ fontFamily:"Arial,sans-serif", background:"#F0F4F8", color:"#1a2a3a", fontSize:"14px", height:"calc(100vh - 110px)", display:"flex", flexDirection:"column", borderRadius:"12px", overflow:"hidden", boxShadow:"0 4px 24px rgba(0,0,0,0.2)" },
     header:{ background:"#1F4E79", color:"#fff", padding:"0 20px", display:"flex", alignItems:"center", justifyContent:"space-between", height:"48px", flexShrink:0 },
-    body:{ display:"flex", flex:1, overflow:"hidden" },
+    body:{ display:"flex", flex:1, overflow:"hidden", position:"relative" },
     sidebar:{ width:"230px", flexShrink:0, background:"#fff", borderRight:"1px solid #DDEAF6", display:"flex", flexDirection:"column", overflow:"hidden" },
     sidebarHead:{ background:"#1F4E79", color:"#fff", padding:"10px 14px", fontWeight:"bold", fontSize:"12px" },
     main:{ flex:1, overflowY:"auto", padding:"16px", background:"#F0F4F8" },
@@ -795,7 +839,7 @@ export default function NutritionTracker({ userId }) {
       <div style={S.header}>
         <span style={{ fontSize:"16px", fontWeight:"bold" }}>🥗 Nutrition Tracker</span>
         <div style={{ display:"flex", gap:"4px" }}>
-          {[["log","Daily Log"],["compare","Compare"],["add","Add Entry"],["weight","⚖️ Weight"],["chat","🤖 Claude"]].map(([id,label]) => (
+          {[["log","Daily Log"],["compare","Compare"],["add","Add Entry"],["weight","⚖️ Weight"]].map(([id,label]) => (
             <button key={id} onClick={() => setActiveTab(id)}
               style={{ background: activeTab===id?"#2E75B6":"transparent", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", padding:"5px 12px", borderRadius:"4px", cursor:"pointer", fontSize:"12px", transition:"background 0.2s" }}>
               {label}
@@ -1735,99 +1779,126 @@ Use realistic values per ${weight}g.` }]
           </div>
         )}
 
-        {/* ── CHAT TAB ── */}
-        {activeTab === "chat" && (
-          <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", background:"#F7FAFD" }}>
-            {/* Meal bar */}
-            <div style={{ padding:"8px 12px", background:"#D6E4F0", borderBottom:"1px solid #DDEAF6", display:"flex", alignItems:"center", gap:"8px", fontSize:"12px", flexShrink:0 }}>
-              <input type="date" value={chatDate} onChange={e=>setChatDate(e.target.value)} style={{ fontSize:"12px", fontWeight:"600", color:"#1F4E79", border:"1px solid #DDEAF6", borderRadius:"6px", padding:"3px 7px", cursor:"pointer" }}/>
-              <label style={{ color:"#1F4E79", fontWeight:"bold", whiteSpace:"nowrap" }}>Log to:</label>
-              <select value={chatMealId} onChange={e=>setChatMealId(e.target.value)} style={{ flex:1, padding:"4px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", background:"#fff" }}>
-                <option value="__chat__">💬 Just Chat</option>
-                {(allDays.find(d=>d.date===chatDate) || currentDayData)?.meals?.filter(m=>!m.is_exercise).map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Messages */}
-            <div style={{ flex:1, overflowY:"auto", padding:"12px", display:"flex", flexDirection:"column", gap:"10px" }}>
-              {chatMessages.length === 0 && (
-                <div style={{ background:"#FFF8E1", color:"#5D4037", alignSelf:"center", border:"1px solid #FFE082", fontSize:"12px", borderRadius:"6px", padding:"10px 14px", textAlign:"center", maxWidth:"95%" }}>
-                  👋 Select a mode above:<br/><br/>
-                  <strong>💬 Just Chat</strong> — ask me anything about nutrition, recipes, or health<br/><br/>
-                  <strong>Meal slots</strong> — describe what you ate and I'll calculate nutrition and log it
+        {/* ── FLOATING CHAT BUTTON + POPUP ── */}
+        <div style={{ position:"absolute", bottom:"16px", right:"16px", zIndex:500 }}>
+          {/* Popup */}
+          {chatOpen && (
+            <div style={{ position:"absolute", bottom:"56px", right:0, width:"380px", height:"520px", background:"#fff", borderRadius:"12px", boxShadow:"0 8px 40px rgba(0,0,0,0.22)", border:"1px solid #DDEAF6", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              {/* Popup header */}
+              <div style={{ background:"#1F4E79", color:"#fff", padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+                <span style={{ fontWeight:"bold", fontSize:"13px" }}>🤖 Claude — Nutrition Assistant</span>
+                <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+                  {chatMessages.length > 0 && (
+                    <button onClick={clearChat} title="Clear chat history"
+                      style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"11px", cursor:"pointer" }}>
+                      🗑 Clear
+                    </button>
+                  )}
+                  <button onClick={() => setChatOpen(false)}
+                    style={{ background:"none", border:"none", color:"#fff", fontSize:"18px", cursor:"pointer", lineHeight:1, padding:"0 2px" }}>×</button>
                 </div>
-              )}
-              {chatMessages.map(msg => {
-                if (msg.type === "user") return (
-                  <div key={msg.id} style={{ background:"#2E75B6", color:"#fff", alignSelf:"flex-end", borderRadius:"10px 10px 3px 10px", padding:"9px 12px", fontSize:"13px", lineHeight:1.5, maxWidth:"80%" }}>{msg.text}</div>
-                );
-                if (msg.type === "error") return (
-                  <div key={msg.id} style={{ background:"#FFEBEE", color:"#c62828", alignSelf:"center", border:"1px solid #FFCDD2", fontSize:"12px", borderRadius:"6px", padding:"8px 12px" }}>{msg.text}</div>
-                );
-                if (msg.type === "preview" && !msg.confirmed) {
-                  const tKcal = msg.items.reduce((s,i)=>s+i.kcal,0);
-                  const tFat = msg.items.reduce((s,i)=>s+i.fat,0);
-                  const tCarbs = msg.items.reduce((s,i)=>s+i.carbs,0);
-                  const tFibre = msg.items.reduce((s,i)=>s+i.fibre,0);
-                  const tProt = msg.items.reduce((s,i)=>s+i.protein,0);
-                  return (
-                    <div key={msg.id} style={{ background:"#fff", border:"1px solid #DDEAF6", alignSelf:"flex-start", borderRadius:"10px 10px 10px 3px", padding:"10px 12px", fontSize:"13px", maxWidth:"90%", boxShadow:"0 1px 3px rgba(0,0,0,0.07)" }}>
-                      <div style={{ fontSize:"11px", color:"#6B8CAE", marginBottom:"6px" }}>Adding to <strong>{msg.mealName}</strong>:</div>
-                      <div style={{ overflowX:"auto" }}>
-                        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"11px", minWidth:"320px" }}>
-                          <thead><tr style={{ background:"#D6E4F0" }}>
-                            {["Item","kcal","Fat","Carbs","Fibre","Prot"].map(h => <th key={h} style={{ color:"#1F4E79", padding:"3px 6px", textAlign:h==="Item"?"left":"right", fontWeight:"bold" }}>{h}</th>)}
-                          </tr></thead>
-                          <tbody>
-                            {msg.items.map((item,i) => (
-                              <tr key={i} style={{ borderBottom:"1px solid #EEF4FA" }}>
-                                <td style={{ padding:"3px 6px", maxWidth:"160px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</td>
-                                {[item.kcal,item.fat,item.carbs,item.fibre,item.protein].map((v,j) => <td key={j} style={{ padding:"3px 6px", textAlign:"right" }}>{fmt(v)}{j>0?"g":""}</td>)}
-                              </tr>
-                            ))}
-                            <tr style={{ background:"#D6E4F0", fontWeight:"bold" }}>
-                              <td style={{ padding:"3px 6px" }}>Total</td>
-                              {[tKcal,tFat,tCarbs,tFibre,tProt].map((v,i) => <td key={i} style={{ padding:"3px 6px", textAlign:"right" }}>{fmt(v)}{i>0?"g":""}</td>)}
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <div style={{ display:"flex", gap:"6px", marginTop:"10px", justifyContent:"flex-end" }}>
-                        <button onClick={() => setChatMessages(prev => prev.filter(m => m.id !== msg.id))} style={{ ...S.btn("outline"), ...S.btn("sm") }}>✕ Discard</button>
-                        <button onClick={() => confirmLog(msg.id)} style={{ ...S.btn("success"), ...S.btn("sm") }}>✓ Log to {msg.mealName}</button>
-                      </div>
-                    </div>
-                  );
-                }
-                if (msg.type === "preview" && msg.confirmed) return (
-                  <div key={msg.id} style={{ alignSelf:"flex-start", fontSize:"12px", color:"#2E7D32", fontWeight:"bold" }}>✓ Logged {msg.items.length} item{msg.items.length!==1?"s":""}</div>
-                );
-                // claude text
-                return (
-                  <div key={msg.id} style={{ background:"#fff", color:"#1a2a3a", alignSelf:"flex-start", border:"1px solid #DDEAF6", borderRadius:"10px 10px 10px 3px", padding:"9px 12px", fontSize:"13px", lineHeight:1.5, maxWidth:"85%", boxShadow:"0 1px 3px rgba(0,0,0,0.07)" }}
-                    dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g,"<br/>") }} />
-                );
-              })}
-              <div ref={chatBottomRef}/>
-            </div>
+              </div>
 
-            <div style={{ fontSize:"11px", color:"#6B8CAE", textAlign:"center", padding:"4px 12px", flexShrink:0 }}>
-              {chatMealId === "__chat__" ? "General chat — ask about nutrition, recipes, or health" : "Describe food naturally — weights, quantities, brand names all work"}
+              {/* Meal bar */}
+              <div style={{ padding:"7px 10px", background:"#D6E4F0", borderBottom:"1px solid #DDEAF6", display:"flex", alignItems:"center", gap:"7px", fontSize:"12px", flexShrink:0 }}>
+                <input type="date" value={chatDate} onChange={e=>setChatDate(e.target.value)}
+                  style={{ fontSize:"11px", fontWeight:"600", color:"#1F4E79", border:"1px solid #DDEAF6", borderRadius:"5px", padding:"2px 6px", cursor:"pointer" }}/>
+                <select value={chatMealId} onChange={e=>setChatMealId(e.target.value)}
+                  style={{ flex:1, padding:"3px 6px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"11px", background:"#fff" }}>
+                  <option value="__chat__">💬 Just Chat</option>
+                  {(allDays.find(d=>d.date===chatDate)||currentDayData)?.meals?.filter(m=>!m.is_exercise).map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Messages */}
+              <div style={{ flex:1, overflowY:"auto", padding:"10px", display:"flex", flexDirection:"column", gap:"8px" }}>
+                {chatMessages.length === 0 && (
+                  <div style={{ background:"#FFF8E1", color:"#5D4037", alignSelf:"center", border:"1px solid #FFE082", fontSize:"11px", borderRadius:"6px", padding:"10px 12px", textAlign:"center", marginTop:"8px" }}>
+                    👋 <strong>Just Chat</strong> — nutrition, recipes, health questions<br/><br/>
+                    <strong>Meal slots</strong> — describe food to log it automatically
+                  </div>
+                )}
+                {chatMessages.length > 0 && (
+                  <div style={{ textAlign:"center", fontSize:"10px", color:"#A0B4C8", padding:"2px 0 4px" }}>
+                    {justChatHistory.length >= CHAT_CONTEXT_LIMIT ? `Last ${CHAT_CONTEXT_LIMIT} messages in context` : `${justChatHistory.length} messages`}
+                  </div>
+                )}
+                {chatMessages.map(msg => {
+                  if (msg.type === "user") return (
+                    <div key={msg.id} style={{ background:"#2E75B6", color:"#fff", alignSelf:"flex-end", borderRadius:"10px 10px 3px 10px", padding:"8px 11px", fontSize:"12px", lineHeight:1.5, maxWidth:"80%" }}>{msg.text}</div>
+                  );
+                  if (msg.type === "error") return (
+                    <div key={msg.id} style={{ background:"#FFEBEE", color:"#c62828", alignSelf:"center", border:"1px solid #FFCDD2", fontSize:"11px", borderRadius:"6px", padding:"7px 11px" }}>{msg.text}</div>
+                  );
+                  if (msg.type === "preview" && !msg.confirmed) {
+                    const tKcal = msg.items.reduce((s,i)=>s+i.kcal,0);
+                    const tFat  = msg.items.reduce((s,i)=>s+i.fat,0);
+                    const tCarbs= msg.items.reduce((s,i)=>s+i.carbs,0);
+                    const tFibre= msg.items.reduce((s,i)=>s+i.fibre,0);
+                    const tProt = msg.items.reduce((s,i)=>s+i.protein,0);
+                    return (
+                      <div key={msg.id} style={{ background:"#fff", border:"1px solid #DDEAF6", alignSelf:"flex-start", borderRadius:"10px 10px 10px 3px", padding:"9px 11px", fontSize:"12px", maxWidth:"95%", boxShadow:"0 1px 3px rgba(0,0,0,0.07)" }}>
+                        <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"5px" }}>Adding to <strong>{msg.mealName}</strong>:</div>
+                        <div style={{ overflowX:"auto" }}>
+                          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"10px", minWidth:"280px" }}>
+                            <thead><tr style={{ background:"#D6E4F0" }}>
+                              {["Item","kcal","Fat","Carbs","Fibre","Prot"].map(h => <th key={h} style={{ color:"#1F4E79", padding:"2px 5px", textAlign:h==="Item"?"left":"right", fontWeight:"bold" }}>{h}</th>)}
+                            </tr></thead>
+                            <tbody>
+                              {msg.items.map((item,i) => (
+                                <tr key={i} style={{ borderBottom:"1px solid #EEF4FA" }}>
+                                  <td style={{ padding:"2px 5px", maxWidth:"130px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</td>
+                                  {[item.kcal,item.fat,item.carbs,item.fibre,item.protein].map((v,j) => <td key={j} style={{ padding:"2px 5px", textAlign:"right" }}>{fmt(v)}{j>0?"g":""}</td>)}
+                                </tr>
+                              ))}
+                              <tr style={{ background:"#D6E4F0", fontWeight:"bold" }}>
+                                <td style={{ padding:"2px 5px" }}>Total</td>
+                                {[tKcal,tFat,tCarbs,tFibre,tProt].map((v,i) => <td key={i} style={{ padding:"2px 5px", textAlign:"right" }}>{fmt(v)}{i>0?"g":""}</td>)}
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div style={{ display:"flex", gap:"6px", marginTop:"8px", justifyContent:"flex-end" }}>
+                          <button onClick={() => setChatMessages(prev => prev.filter(m => m.id !== msg.id))} style={{ ...S.btn("outline"), ...S.btn("sm") }}>✕ Discard</button>
+                          <button onClick={() => confirmLog(msg.id)} style={{ ...S.btn("success"), ...S.btn("sm") }}>✓ Log to {msg.mealName}</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (msg.type === "preview" && msg.confirmed) return (
+                    <div key={msg.id} style={{ alignSelf:"flex-start", fontSize:"11px", color:"#2E7D32", fontWeight:"bold" }}>✓ Logged {msg.items.length} item{msg.items.length!==1?"s":""}</div>
+                  );
+                  return (
+                    <div key={msg.id} style={{ background:"#F7FAFD", color:"#1a2a3a", alignSelf:"flex-start", border:"1px solid #DDEAF6", borderRadius:"10px 10px 10px 3px", padding:"8px 11px", fontSize:"12px", lineHeight:1.5, maxWidth:"88%", boxShadow:"0 1px 3px rgba(0,0,0,0.05)" }}
+                      dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g,"<br/>") }} />
+                  );
+                })}
+                <div ref={chatBottomRef}/>
+              </div>
+
+              {/* Input */}
+              <div style={{ padding:"8px 10px", borderTop:"1px solid #DDEAF6", display:"flex", gap:"6px", flexShrink:0, background:"#fff" }}>
+                <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
+                  onKeyDown={e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();} }}
+                  placeholder={chatMealId==="__chat__" ? "Ask me anything…" : "Describe what you ate…"}
+                  style={{ flex:1, padding:"7px 9px", border:"1px solid #DDEAF6", borderRadius:"6px", fontSize:"12px", resize:"none", height:"48px", background:"#F0F4F8", fontFamily:"inherit" }}/>
+                <button onClick={sendChat} disabled={chatLoading}
+                  style={{ background:chatLoading?"#ccc":"#2E75B6", color:"#fff", border:"none", borderRadius:"6px", padding:"0 12px", cursor:chatLoading?"not-allowed":"pointer", fontSize:"16px", fontWeight:"bold", alignSelf:"stretch" }}>
+                  ➤
+                </button>
+              </div>
             </div>
-            <div style={{ padding:"10px", borderTop:"1px solid #DDEAF6", display:"flex", gap:"6px", flexShrink:0, background:"#fff" }}>
-              <textarea value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                onKeyDown={e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();} }}
-                placeholder={chatMealId==="__chat__" ? "Ask me anything…" : "e.g. 30g walnuts, a slice of sourdough, 200ml Huel…"}
-                style={{ flex:1, padding:"7px 10px", border:"1px solid #DDEAF6", borderRadius:"6px", fontSize:"13px", resize:"none", height:"56px", background:"#F0F4F8", fontFamily:"inherit" }}/>
-              <button onClick={sendChat} disabled={chatLoading}
-                style={{ background: chatLoading?"#ccc":"#2E75B6", color:"#fff", border:"none", borderRadius:"6px", padding:"0 14px", cursor:chatLoading?"not-allowed":"pointer", fontSize:"18px", fontWeight:"bold", transition:"opacity 0.2s", alignSelf:"stretch" }}>
-                ➤
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+
+          {/* Floating button */}
+          <button onClick={() => setChatOpen(o => !o)}
+            title="Claude Nutrition Assistant"
+            style={{ width:"48px", height:"48px", borderRadius:"50%", background:"#1F4E79", color:"#fff", border:"2px solid #2E75B6", boxShadow:"0 4px 16px rgba(0,0,0,0.25)", cursor:"pointer", fontSize:"22px", display:"flex", alignItems:"center", justifyContent:"center", transition:"transform 0.15s", transform: chatOpen?"scale(0.9)":"scale(1)" }}>
+            {chatOpen ? "×" : "🤖"}
+          </button>
+        </div>
 
         {/* ── WEIGHT TRACKER TAB ── */}
         {activeTab === "weight" && (
