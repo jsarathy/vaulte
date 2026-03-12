@@ -294,6 +294,9 @@ export default function NutritionTracker({ userId }) {
   const [builderLoading, setBuilderLoading] = useState(false);
   const [builderPreview, setBuilderPreview] = useState(null);
   const [builderError, setBuilderError] = useState("");
+  const [ingredientModal, setIngredientModal] = useState(null); // { name }
+  const [ingredientWeight, setIngredientWeight] = useState("100");
+  const [ingredientLoading, setIngredientLoading] = useState(false);
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
@@ -921,20 +924,42 @@ export default function NutritionTracker({ userId }) {
                     }
                   }}
                   onBlur={async () => {
-                    // Small delay so dropdown click fires first
                     setTimeout(async () => {
                       setShowDropdown(false);
                       const name = addItem.name.trim();
                       if (!name) return;
-                      // Check if name matches any recipe exactly (already filled)
                       const exact = userRecipes.find(r => r.name.toLowerCase() === name.toLowerCase());
                       if (exact) return;
-                      // Check if any nutrition is already filled in
                       const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
                       if (hasNutrition) return;
-                      // Unknown item — ask Claude to create a recipe
-                      const yes = window.confirm(`"${name}" is not in your recipe library. Open Claude to create and save a recipe for it?`);
-                      if (yes) {
+
+                      // Ask Claude to classify: single ingredient vs cooked dish
+                      try {
+                        const res = await fetch("/api/claude", {
+                          method:"POST",
+                          headers:{"Content-Type":"application/json"},
+                          body: JSON.stringify({
+                            model:"claude-sonnet-4-20250514", max_tokens:60,
+                            messages:[{ role:"user", content:
+                              `Is "${name}" a single whole-food ingredient (like an apple, grapes, chicken breast, milk) or a cooked/prepared dish (like baingan bharta, pasta carbonara, pinto bean stew)? Reply with exactly one word: INGREDIENT or DISH` }]
+                          })
+                        });
+                        const data = await res.json();
+                        const verdict = (data.content?.[0]?.text || "DISH").trim().toUpperCase();
+
+                        if (verdict.includes("INGREDIENT")) {
+                          // Show weight modal for single ingredient
+                          setIngredientWeight("100");
+                          setIngredientModal({ name });
+                        } else {
+                          // Cooked dish — open recipe builder
+                          setBuilderInput(name);
+                          setBuilderPreview(null);
+                          setBuilderError("");
+                          setRecipeBuilder(true);
+                        }
+                      } catch(e) {
+                        // Fallback: open recipe builder
                         setBuilderInput(name);
                         setBuilderPreview(null);
                         setBuilderError("");
@@ -993,6 +1018,71 @@ export default function NutritionTracker({ userId }) {
               </div>
               {addMsg && <div style={{ marginTop:"8px", padding:"7px 10px", borderRadius:"4px", fontSize:"12px", background:addMsg.ok?"#E8F5E9":"#FFEBEE", color:addMsg.ok?"#2E7D32":"#c62828" }}>{addMsg.text}</div>}
             </div>
+
+            {/* Ingredient Weight Modal */}
+            {ingredientModal && (
+              <div onClick={e => e.target === e.currentTarget && setIngredientModal(null)}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ background:"#fff", borderRadius:"12px", padding:"28px 32px", width:"340px", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+                  <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"6px" }}>🥗 {ingredientModal.name}</div>
+                  <div style={{ fontSize:"12px", color:"#6B8CAE", marginBottom:"18px" }}>Looks like a single ingredient. Enter the weight and Claude will fill in the nutrition.</div>
+                  <div style={{ marginBottom:"16px" }}>
+                    <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"4px" }}>Weight (grams)</div>
+                    <input
+                      type="number" min="1" value={ingredientWeight}
+                      onChange={e => setIngredientWeight(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") document.getElementById("ing-lookup-btn").click(); }}
+                      autoFocus
+                      style={{ width:"100%", padding:"8px 10px", border:"2px solid #2E75B6", borderRadius:"6px", fontSize:"14px", outline:"none" }}
+                    />
+                  </div>
+                  {ingredientLoading && <div style={{ textAlign:"center", color:"#2E75B6", fontSize:"13px", marginBottom:"10px" }}>🤖 Looking up nutrition…</div>}
+                  <div style={{ display:"flex", gap:"10px", justifyContent:"flex-end" }}>
+                    <button onClick={() => setIngredientModal(null)}
+                      style={{ background:"transparent", color:"#6B8CAE", border:"1px solid #DDEAF6", borderRadius:"6px", padding:"8px 16px", cursor:"pointer", fontSize:"13px" }}>
+                      Cancel
+                    </button>
+                    <button id="ing-lookup-btn"
+                      disabled={ingredientLoading}
+                      onClick={async () => {
+                        const weight = parseFloat(ingredientWeight) || 100;
+                        setIngredientLoading(true);
+                        try {
+                          const res = await fetch("/api/claude", {
+                            method:"POST",
+                            headers:{"Content-Type":"application/json"},
+                            body: JSON.stringify({
+                              model:"claude-sonnet-4-20250514", max_tokens:300,
+                              messages:[{ role:"user", content:
+                                `Give me the nutrition for ${weight}g of "${ingredientModal.name}". Reply with ONLY a JSON object, no markdown, no explanation:
+{"kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}
+Use realistic values per ${weight}g.` }]
+                            })
+                          });
+                          const data = await res.json();
+                          const text = (data.content?.[0]?.text || "{}").replace(/\`\`\`json|\`\`\`/g,"").trim();
+                          const n = JSON.parse(text);
+                          setAddItem({
+                            name: `${ingredientModal.name} (${weight}g)`,
+                            kcal: n.kcal ?? "", fat: n.fat ?? "", sat_fat: n.sat_fat ?? "",
+                            carbs: n.carbs ?? "", sugar: n.sugar ?? "", fibre: n.fibre ?? "",
+                            net_carbs: n.net_carbs ?? "", protein: n.protein ?? ""
+                          });
+                          setIngredientModal(null);
+                        } catch(e) {
+                          alert("Could not fetch nutrition. Please fill in manually.");
+                          setIngredientModal(null);
+                        } finally {
+                          setIngredientLoading(false);
+                        }
+                      }}
+                      style={{ background: ingredientLoading ? "#ccc" : "#2E75B6", color:"#fff", border:"none", borderRadius:"6px", padding:"8px 20px", cursor: ingredientLoading ? "not-allowed" : "pointer", fontSize:"13px", fontWeight:"bold" }}>
+                      {ingredientLoading ? "…" : "Get Nutrition"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Recipe Builder Modal */}
             {recipeBuilder && (
