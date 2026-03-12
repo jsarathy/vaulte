@@ -371,6 +371,12 @@ export default function NutritionTracker({ userId }) {
   const [exHRmax, setExHRmax] = useState("");
   const [exResult, setExResult] = useState(null);
   const [exMsg, setExMsg] = useState(null);
+  const [showExModal, setShowExModal] = useState(false);
+  // Polar integration state
+  const [polarConnected, setPolarConnected] = useState(false);
+  const [polarSessions, setPolarSessions] = useState([]);
+  const [polarLoading, setPolarLoading] = useState(false);
+  const [polarLogModal, setPolarLogModal] = useState(null); // session being logged
 
   // Chat state
   const [chatMessages, setChatMessages] = useState([]);
@@ -415,6 +421,16 @@ export default function NutritionTracker({ userId }) {
         }
         const recipes = await loadAllRecipes(userId);
         setUserRecipes(recipes);
+        // Load Polar connection status + pending sessions
+        const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
+        if (polarDoc.exists()) {
+          setPolarConnected(polarDoc.data().connected || false);
+        }
+        const polarSnap = await getDocs(collection(db, "users", userId, "polar_sessions"));
+        const sessions = polarSnap.docs.map(d => ({ id:d.id, ...d.data() }))
+          .filter(s => !s.logged)
+          .sort((a,b) => (b.start_time||"").localeCompare(a.start_time||""));
+        setPolarSessions(sessions);
         setAllDays(days);
         if (days.length > 0) {
           const first = days[0];
@@ -1303,161 +1319,328 @@ Use realistic values per ${weight}g.` }]
 
             {/* ── RIGHT: Exercise (35%) ── */}
             <div style={{ flex:"0 0 35%", minWidth:0 }}>
-              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>🏋️ Add Exercise</div>
-              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px" }}>
+              <div style={{ fontSize:"16px", fontWeight:"bold", color:"#1F4E79", marginBottom:"12px" }}>🏋️ Exercise</div>
 
-                {/* Exercise search */}
-                <div style={{ marginBottom:"10px" }}>
-                  <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"4px" }}>Search Exercise</div>
-                  <input value={exSearch} onChange={e => setExSearch(e.target.value)}
-                    placeholder="e.g. running, cycling, yoga…"
-                    style={{ width:"100%", padding:"6px 9px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", boxSizing:"border-box" }}/>
+              {/* Manual log button */}
+              <button onClick={() => { setShowExModal(true); setExSearch(""); setExSelected(null); setExResult(null); setExMsg(null); }}
+                style={{ width:"100%", background:"#2E75B6", color:"#fff", border:"none", borderRadius:"8px",
+                  padding:"10px", fontSize:"13px", fontWeight:"bold", cursor:"pointer", marginBottom:"14px",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+                🏋️ Log Manual Exercise
+              </button>
+
+              {/* ── Polar Sessions panel ── */}
+              <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", overflow:"hidden" }}>
+                <div style={{ background:"#1F4E79", padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <div style={{ color:"#fff", fontWeight:"bold", fontSize:"13px", display:"flex", alignItems:"center", gap:"6px" }}>
+                    <span style={{ fontSize:"16px" }}>📡</span> Polar Sessions
+                  </div>
+                  {polarConnected && (
+                    <div style={{ fontSize:"10px", color:"#90CAF9", display:"flex", alignItems:"center", gap:"4px" }}>
+                      <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4CAF50", display:"inline-block" }}/>
+                      Connected
+                    </div>
+                  )}
                 </div>
 
-                {/* Exercise list */}
-                <div style={{ maxHeight:"200px", overflowY:"auto", border:"1px solid #DDEAF6", borderRadius:"6px", marginBottom:"10px" }}>
-                  {EXERCISE_COMPENDIUM
-                    .filter(ex => !exSearch || ex.name.toLowerCase().includes(exSearch.toLowerCase()) || ex.cat.toLowerCase().includes(exSearch.toLowerCase()))
-                    .map(ex => (
-                      <div key={ex.name} onClick={() => { setExSelected(ex); setExResult(null); }}
-                        style={{ padding:"7px 10px", borderBottom:"1px solid #F0F4F8", cursor:"pointer", fontSize:"12px",
-                          background: exSelected?.name === ex.name ? "#D6E4F0" : "transparent" }}>
-                        <div style={{ fontWeight:"bold", color:"#1F4E79" }}>{ex.name}</div>
-                        <div style={{ fontSize:"10px", color:"#6B8CAE" }}>{ex.cat} · MET {ex.met}</div>
+                <div style={{ padding:"12px" }}>
+                  {!polarConnected ? (
+                    /* ── Not connected ── */
+                    <div style={{ textAlign:"center", padding:"16px 8px" }}>
+                      <div style={{ fontSize:"32px", marginBottom:"8px" }}>⌚</div>
+                      <div style={{ fontSize:"13px", fontWeight:"bold", color:"#1F4E79", marginBottom:"6px" }}>Connect your Polar device</div>
+                      <div style={{ fontSize:"11px", color:"#6B8CAE", marginBottom:"14px", lineHeight:1.5 }}>
+                        Sync sessions automatically once your Polar device uploads to Polar Flow. Sessions appear here ready to log.
                       </div>
-                    ))}
-                </div>
-
-                {/* Duration + HR inputs */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px", marginBottom:"10px" }}>
-                  {[
-                    ["Duration (min)", exDuration, setExDuration, "30"],
-                    ["Avg HR (bpm)", exHRavg, setExHRavg, "optional"],
-                    ["Max HR (bpm)", exHRmax, setExHRmax, `${220 - calcAge}`],
-                  ].map(([label, val, setter, ph]) => (
-                    <div key={label}>
-                      <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"2px" }}>{label}</div>
-                      <input type="number" value={val} onChange={e => { setter(e.target.value); setExResult(null); }}
-                        placeholder={String(ph)}
-                        style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", boxSizing:"border-box" }}/>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Calculate button */}
-                <button disabled={!exSelected || !exDuration}
-                  onClick={() => {
-                    const met = exSelected.met;
-                    const mins = parseFloat(exDuration) || 0;
-                    const weight = calcWeight || 80;
-                    const hrs = mins / 60;
-                    const kcal = Math.round(met * weight * hrs);
-
-                    // Fat burn % from heart rate if available
-                    const hrAvg = parseFloat(exHRavg);
-                    const hrMax = parseFloat(exHRmax) || (220 - (calcAge || 40));
-                    let fatPct = null;
-                    let zone = null;
-                    if (hrAvg && hrMax) {
-                      const pctHRmax = hrAvg / hrMax * 100;
-                      if (pctHRmax < 60) { fatPct = 82; zone = "Recovery (<60%)"; }
-                      else if (pctHRmax < 65) { fatPct = 75; zone = "Fat Burn (60–65%)"; }
-                      else if (pctHRmax < 70) { fatPct = 67; zone = "Fat Burn (65–70%)"; }
-                      else if (pctHRmax < 75) { fatPct = 55; zone = "Aerobic (70–75%)"; }
-                      else if (pctHRmax < 80) { fatPct = 43; zone = "Aerobic (75–80%)"; }
-                      else if (pctHRmax < 85) { fatPct = 30; zone = "Threshold (80–85%)"; }
-                      else if (pctHRmax < 90) { fatPct = 20; zone = "Threshold (85–90%)"; }
-                      else { fatPct = 8; zone = "VO₂ Max (>90%)"; }
-                    } else {
-                      // Estimate from MET
-                      if (met <= 3) { fatPct = 75; zone = "Light"; }
-                      else if (met <= 5) { fatPct = 60; zone = "Moderate"; }
-                      else if (met <= 8) { fatPct = 40; zone = "Vigorous"; }
-                      else { fatPct = 20; zone = "Very Vigorous"; }
-                    }
-                    const fatKcal = Math.round(kcal * fatPct / 100);
-                    const fatGrams = Math.round(fatKcal / 9);
-                    setExResult({ kcal, fatPct, fatKcal, fatGrams, zone, mins, weight, met });
-                  }}
-                  style={{ width:"100%", background: !exSelected || !exDuration ? "#ccc" : "#2E75B6",
-                    color:"#fff", border:"none", borderRadius:"6px", padding:"8px", cursor: !exSelected || !exDuration ? "not-allowed" : "pointer",
-                    fontSize:"13px", fontWeight:"bold", marginBottom:"10px" }}>
-                  Calculate
-                </button>
-
-                {/* Result card */}
-                {exResult && (
-                  <div style={{ background:"#F0F4F8", borderRadius:"8px", padding:"12px", marginBottom:"10px" }}>
-                    <div style={{ fontWeight:"bold", color:"#1F4E79", fontSize:"13px", marginBottom:"8px" }}>
-                      {exSelected.name} · {exResult.mins} min
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"8px" }}>
-                      {[
-                        ["🔥 Kcal Burned", `${exResult.kcal} kcal`],
-                        ["❤️ HR Zone", exResult.zone],
-                        ["🧈 Fat Burn %", `${exResult.fatPct}%`],
-                        ["🧈 Fat Burned", `${exResult.fatGrams}g (${exResult.fatKcal} kcal)`],
-                      ].map(([label, val]) => (
-                        <div key={label} style={{ background:"#fff", borderRadius:"6px", padding:"7px 10px", border:"1px solid #DDEAF6" }}>
-                          <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"2px" }}>{label}</div>
-                          <div style={{ fontWeight:"bold", fontSize:"12px", color:"#1F4E79" }}>{val}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"10px" }}>
-                      Based on MET {exResult.met} × {exResult.weight}kg bodyweight
-                      {exHRavg && exHRmax ? ` · HR ${exHRavg}/${exHRmax} bpm` : " · HR-based zone estimated from MET"}
-                    </div>
-                    <div style={{ display:"flex", gap:"8px" }}>
-                      <select value={addMealId} onChange={e=>setAddMealId(e.target.value)}
-                        style={{ flex:1, padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"11px" }}>
-                        <option value="">— select meal slot —</option>
-                        {(() => {
-                          const existing = allDays.find(d=>d.date===addDate);
-                          const meals = existing ? existing.meals : DEFAULT_MEAL_SLOTS;
-                          return meals.map((m,i) => (
-                            <option key={m.id||i} value={m.id || ("__slot__"+m.name)}>{m.name}</option>
-                          ));
-                        })()}
-                      </select>
-                      <button onClick={async () => {
-                        let day = allDays.find(d => d.date === addDate) || await loadDay(userId, addDate);
-                        if (!day) { day = { date:addDate, notes:"", meals:makeMeals() }; }
-                        let targetMealId = addMealId;
-                        if (targetMealId && targetMealId.startsWith("__slot__")) {
-                          const slotName = targetMealId.replace("__slot__", "");
-                          const match = day.meals.find(m => m.name === slotName);
-                          targetMealId = match ? match.id : null;
-                        }
-                        if (!targetMealId) { setExMsg({ ok:false, text:"Select a meal slot" }); return; }
-                        const item = {
-                          id:genId(), name:`${exSelected.name} (${exResult.mins} min)`,
-                          kcal: -exResult.kcal, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
-                          is_exercise:1, fat_burned_g:exResult.fatGrams, fat_burned_kcal:exResult.fatKcal
-                        };
-                        const updated = { ...day, meals: day.meals.map(m =>
-                          m.id === targetMealId ? { ...m, items:[...m.items, item] } : m
-                        )};
-                        await persistDay(updated);
-                        if (addDate === currentDate) setCurrentDayData(updated);
-                        setExMsg({ ok:true, text:"✅ Exercise logged!" });
-                        setExResult(null); setExSelected(null); setExSearch("");
-                        setExDuration("30"); setExHRavg(""); setExHRmax("");
-                        setTimeout(() => setExMsg(null), 3000);
-                      }} style={{ background:"#2E7D32", color:"#fff", border:"none", borderRadius:"4px", padding:"5px 12px", cursor:"pointer", fontSize:"12px", fontWeight:"bold", whiteSpace:"nowrap" }}>
-                        Log It
+                      <button
+                        onClick={() => alert("Polar OAuth integration coming soon! You'll be redirected to Polar Flow to authorise Vaulte.")}
+                        style={{ background:"#D94032", color:"#fff", border:"none", borderRadius:"6px",
+                          padding:"9px 18px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>
+                        Connect Polar Account
                       </button>
                     </div>
-                    {exMsg && <div style={{ marginTop:"8px", padding:"6px 10px", borderRadius:"4px", fontSize:"12px",
-                      background:exMsg.ok?"#E8F5E9":"#FFEBEE", color:exMsg.ok?"#2E7D32":"#c62828" }}>{exMsg.text}</div>}
-                  </div>
-                )}
-
-                <div style={{ fontSize:"10px", color:"#6B8CAE", lineHeight:1.6, borderTop:"1px solid #F0F4F8", paddingTop:"8px" }}>
-                  <strong>Fat burn %</strong> derived from heart rate zone (if HR provided) or MET intensity. Source: 2011 Compendium of Physical Activities (Ainsworth et al.)
+                  ) : polarSessions.length === 0 ? (
+                    /* ── Connected, no pending sessions ── */
+                    <div style={{ textAlign:"center", padding:"16px 8px", color:"#6B8CAE" }}>
+                      <div style={{ fontSize:"28px", marginBottom:"6px" }}>✅</div>
+                      <div style={{ fontSize:"12px" }}>All sessions logged. New sessions will appear here after your next workout syncs.</div>
+                    </div>
+                  ) : (
+                    /* ── Pending sessions list ── */
+                    <div>
+                      <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"8px" }}>
+                        {polarSessions.length} unlogged session{polarSessions.length > 1 ? "s" : ""}
+                      </div>
+                      {polarSessions.map(s => {
+                        const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\w/g,c=>c.toUpperCase()) : "Exercise";
+                        const d = s.start_time ? new Date(s.start_time) : null;
+                        const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : s.date || "";
+                        const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
+                        return (
+                          <div key={s.id}
+                            onClick={() => setPolarLogModal(s)}
+                            style={{ padding:"10px 12px", borderRadius:"6px", border:"1px solid #DDEAF6",
+                              marginBottom:"8px", cursor:"pointer", transition:"background 0.15s" }}
+                            onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"}
+                            onMouseOut={e=>e.currentTarget.style.background="#fff"}>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"4px" }}>
+                              <div style={{ fontWeight:"bold", fontSize:"12px", color:"#1F4E79" }}>{sport}</div>
+                              <div style={{ fontSize:"10px", color:"#6B8CAE" }}>{dateStr} {timeStr}</div>
+                            </div>
+                            <div style={{ display:"flex", gap:"10px", fontSize:"11px", color:"#2E75B6" }}>
+                              <span>⏱ {Math.round((s.duration_min||0))} min</span>
+                              <span>🔥 {s.calories} kcal</span>
+                              {s.hr_avg && <span>❤️ {s.hr_avg} bpm avg</span>}
+                              {s.fat_pct != null && <span>🧈 {s.fat_pct}% fat</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>{/* end right col */}
+
+            {/* ── Exercise Picker Modal ── */}
+            {showExModal && (
+              <div onClick={e => e.target===e.currentTarget && setShowExModal(false)}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ background:"#fff", borderRadius:"12px", width:"560px", maxWidth:"95vw", maxHeight:"90vh", overflowY:"auto", boxShadow:"0 8px 40px rgba(0,0,0,0.25)" }}>
+                  {/* Header */}
+                  <div style={{ background:"#1F4E79", color:"#fff", padding:"14px 18px", borderRadius:"12px 12px 0 0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div style={{ fontWeight:"bold", fontSize:"15px" }}>🏋️ Log Exercise</div>
+                    <button onClick={() => setShowExModal(false)}
+                      style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
+                  </div>
+                  <div style={{ padding:"18px" }}>
+                    {/* Search */}
+                    <div style={{ marginBottom:"10px" }}>
+                      <input value={exSearch} onChange={e => setExSearch(e.target.value)} autoFocus
+                        placeholder="Search exercise… e.g. cycling, yoga, running"
+                        style={{ width:"100%", padding:"8px 12px", border:"2px solid #2E75B6", borderRadius:"6px", fontSize:"13px", boxSizing:"border-box", outline:"none" }}/>
+                    </div>
+                    {/* Exercise list */}
+                    <div style={{ maxHeight:"200px", overflowY:"auto", border:"1px solid #DDEAF6", borderRadius:"6px", marginBottom:"12px" }}>
+                      {EXERCISE_COMPENDIUM
+                        .filter(ex => !exSearch || ex.name.toLowerCase().includes(exSearch.toLowerCase()) || ex.cat.toLowerCase().includes(exSearch.toLowerCase()))
+                        .map(ex => (
+                          <div key={ex.name} onClick={() => { setExSelected(ex); setExResult(null); }}
+                            style={{ padding:"8px 12px", borderBottom:"1px solid #F0F4F8", cursor:"pointer", fontSize:"12px",
+                              background: exSelected?.name === ex.name ? "#D6E4F0" : "transparent" }}>
+                            <div style={{ fontWeight:"bold", color:"#1F4E79" }}>{ex.name}</div>
+                            <div style={{ fontSize:"10px", color:"#6B8CAE" }}>{ex.cat} · MET {ex.met}</div>
+                          </div>
+                        ))}
+                    </div>
+                    {/* Inputs */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px", marginBottom:"12px" }}>
+                      {[
+                        ["Duration (min)", exDuration, setExDuration, "30"],
+                        ["Avg HR (bpm)", exHRavg, setExHRavg, "optional"],
+                        ["Max HR (bpm)", exHRmax, setExHRmax, `${220 - calcAge}`],
+                      ].map(([label, val, setter, ph]) => (
+                        <div key={label}>
+                          <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"3px" }}>{label}</div>
+                          <input type="number" value={val} onChange={e => { setter(e.target.value); setExResult(null); }}
+                            placeholder={String(ph)}
+                            style={{ width:"100%", padding:"6px 8px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px", boxSizing:"border-box" }}/>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Calculate */}
+                    <button disabled={!exSelected || !exDuration}
+                      onClick={() => {
+                        const met = exSelected.met;
+                        const mins = parseFloat(exDuration) || 0;
+                        const weight = calcWeight || 80;
+                        const kcal = Math.round(met * weight * mins / 60);
+                        const hrAvg = parseFloat(exHRavg);
+                        const hrMax = parseFloat(exHRmax) || (220 - (calcAge || 40));
+                        let fatPct, zone;
+                        if (hrAvg && hrMax) {
+                          const p = hrAvg / hrMax * 100;
+                          if (p < 60) { fatPct=82; zone="Recovery (<60%)"; }
+                          else if (p < 65) { fatPct=75; zone="Fat Burn (60–65%)"; }
+                          else if (p < 70) { fatPct=67; zone="Fat Burn (65–70%)"; }
+                          else if (p < 75) { fatPct=55; zone="Aerobic (70–75%)"; }
+                          else if (p < 80) { fatPct=43; zone="Aerobic (75–80%)"; }
+                          else if (p < 85) { fatPct=30; zone="Threshold (80–85%)"; }
+                          else if (p < 90) { fatPct=20; zone="Threshold (85–90%)"; }
+                          else { fatPct=8; zone="VO₂ Max (>90%)"; }
+                        } else {
+                          if (met<=3){fatPct=75;zone="Light";}
+                          else if (met<=5){fatPct=60;zone="Moderate";}
+                          else if (met<=8){fatPct=40;zone="Vigorous";}
+                          else {fatPct=20;zone="Very Vigorous";}
+                        }
+                        const fatKcal = Math.round(kcal * fatPct / 100);
+                        setExResult({ kcal, fatPct, fatKcal, fatGrams:Math.round(fatKcal/9), zone, mins, weight, met });
+                      }}
+                      style={{ width:"100%", background:!exSelected||!exDuration?"#ccc":"#2E75B6",
+                        color:"#fff", border:"none", borderRadius:"6px", padding:"9px",
+                        cursor:!exSelected||!exDuration?"not-allowed":"pointer", fontSize:"13px", fontWeight:"bold", marginBottom:"12px" }}>
+                      Calculate
+                    </button>
+                    {/* Result */}
+                    {exResult && (
+                      <div style={{ background:"#F0F4F8", borderRadius:"8px", padding:"12px" }}>
+                        <div style={{ fontWeight:"bold", color:"#1F4E79", fontSize:"13px", marginBottom:"8px" }}>
+                          {exSelected.name} · {exResult.mins} min
+                        </div>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"10px" }}>
+                          {[["🔥 Kcal Burned",`${exResult.kcal} kcal`],["❤️ HR Zone",exResult.zone],
+                            ["🧈 Fat Burn %",`${exResult.fatPct}%`],["🧈 Fat Burned",`${exResult.fatGrams}g (${exResult.fatKcal} kcal)`]
+                          ].map(([label,val]) => (
+                            <div key={label} style={{ background:"#fff", borderRadius:"6px", padding:"7px 10px", border:"1px solid #DDEAF6" }}>
+                              <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"2px" }}>{label}</div>
+                              <div style={{ fontWeight:"bold", fontSize:"12px", color:"#1F4E79" }}>{val}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+                          <select value={addMealId} onChange={e=>setAddMealId(e.target.value)}
+                            style={{ flex:1, padding:"6px 8px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}>
+                            <option value="">— select meal slot —</option>
+                            {(() => {
+                              const existing = allDays.find(d=>d.date===addDate);
+                              const meals = existing ? existing.meals : DEFAULT_MEAL_SLOTS;
+                              return meals.map((m,i) => (
+                                <option key={m.id||i} value={m.id||("__slot__"+m.name)}>{m.name}</option>
+                              ));
+                            })()}
+                          </select>
+                          <button onClick={async () => {
+                            let day = allDays.find(d=>d.date===addDate) || await loadDay(userId,addDate);
+                            if (!day) day = { date:addDate, notes:"", meals:makeMeals() };
+                            let targetMealId = addMealId;
+                            if (targetMealId?.startsWith("__slot__")) {
+                              const match = day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
+                              targetMealId = match?.id || null;
+                            }
+                            if (!targetMealId) { setExMsg({ok:false,text:"Select a meal slot"}); return; }
+                            const item = {
+                              id:genId(), name:`${exSelected.name} (${exResult.mins} min)`,
+                              kcal:-exResult.kcal, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
+                              is_exercise:1, fat_burned_g:exResult.fatGrams, fat_burned_kcal:exResult.fatKcal
+                            };
+                            const updated = {...day, meals:day.meals.map(m=>
+                              m.id===targetMealId?{...m,items:[...m.items,item]}:m
+                            )};
+                            await persistDay(updated);
+                            if (addDate===currentDate) setCurrentDayData(updated);
+                            setShowExModal(false);
+                            setExResult(null); setExSelected(null); setExSearch("");
+                            setExDuration("30"); setExHRavg(""); setExHRmax("");
+                          }} style={{ background:"#2E7D32", color:"#fff", border:"none", borderRadius:"6px",
+                            padding:"8px 16px", cursor:"pointer", fontSize:"13px", fontWeight:"bold", whiteSpace:"nowrap" }}>
+                            ✓ Log It
+                          </button>
+                        </div>
+                        {exMsg && <div style={{ marginTop:"8px", padding:"6px 10px", borderRadius:"4px", fontSize:"12px",
+                          background:exMsg.ok?"#E8F5E9":"#FFEBEE", color:exMsg.ok?"#2E7D32":"#c62828" }}>{exMsg.text}</div>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Polar Session Log Modal ── */}
+            {polarLogModal && (
+              <div onClick={e => e.target===e.currentTarget && setPolarLogModal(null)}
+                style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ background:"#fff", borderRadius:"12px", width:"420px", maxWidth:"95vw", boxShadow:"0 8px 40px rgba(0,0,0,0.25)" }}>
+                  <div style={{ background:"#D94032", color:"#fff", padding:"14px 18px", borderRadius:"12px 12px 0 0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div style={{ fontWeight:"bold", fontSize:"15px" }}>📡 Log Polar Session</div>
+                    <button onClick={() => setPolarLogModal(null)}
+                      style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
+                  </div>
+                  <div style={{ padding:"18px" }}>
+                    {(() => {
+                      const s = polarLogModal;
+                      const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\w/g,c=>c.toUpperCase()) : "Exercise";
+                      const d = s.start_time ? new Date(s.start_time) : null;
+                      const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}) : s.date||"";
+                      const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
+                      const sessionDate = s.start_time ? s.start_time.split("T")[0] : (s.date || addDate);
+                      return (
+                        <>
+                          <div style={{ fontWeight:"bold", fontSize:"16px", color:"#1F4E79", marginBottom:"4px" }}>{sport}</div>
+                          <div style={{ fontSize:"12px", color:"#6B8CAE", marginBottom:"14px" }}>{dateStr}{timeStr ? ` at ${timeStr}` : ""}</div>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px", marginBottom:"16px" }}>
+                            {[
+                              ["⏱ Duration", `${Math.round(s.duration_min||0)} min`],
+                              ["🔥 Calories", `${s.calories} kcal`],
+                              s.hr_avg ? ["❤️ Avg HR", `${s.hr_avg} bpm`] : null,
+                              s.hr_max ? ["❤️ Max HR", `${s.hr_max} bpm`] : null,
+                              s.fat_pct != null ? ["🧈 Fat Burn", `${s.fat_pct}%`] : null,
+                              s.fat_pct != null ? ["🧈 Fat Burned", `${Math.round(s.calories * s.fat_pct / 100 / 9)}g`] : null,
+                            ].filter(Boolean).map(([label,val]) => (
+                              <div key={label} style={{ background:"#F0F4F8", borderRadius:"6px", padding:"8px 10px", border:"1px solid #DDEAF6" }}>
+                                <div style={{ fontSize:"10px", color:"#6B8CAE", marginBottom:"2px" }}>{label}</div>
+                                <div style={{ fontWeight:"bold", fontSize:"13px", color:"#1F4E79" }}>{val}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ marginBottom:"12px" }}>
+                            <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"4px" }}>Log to meal slot</div>
+                            <select value={addMealId} onChange={e=>setAddMealId(e.target.value)}
+                              style={{ width:"100%", padding:"7px 10px", border:"1px solid #DDEAF6", borderRadius:"6px", fontSize:"12px" }}>
+                              <option value="">— select slot —</option>
+                              {(() => {
+                                const existing = allDays.find(d=>d.date===sessionDate);
+                                const meals = existing ? existing.meals : DEFAULT_MEAL_SLOTS;
+                                return meals.map((m,i) => (
+                                  <option key={m.id||i} value={m.id||("__slot__"+m.name)}>{m.name}</option>
+                                ));
+                              })()}
+                            </select>
+                          </div>
+                          <div style={{ display:"flex", gap:"10px", justifyContent:"flex-end" }}>
+                            <button onClick={() => setPolarLogModal(null)}
+                              style={{ background:"transparent", border:"1px solid #DDEAF6", color:"#6B8CAE", borderRadius:"6px", padding:"8px 16px", cursor:"pointer", fontSize:"13px" }}>
+                              Cancel
+                            </button>
+                            <button onClick={async () => {
+                              let day = allDays.find(d=>d.date===sessionDate) || await loadDay(userId,sessionDate);
+                              if (!day) day = { date:sessionDate, notes:"", meals:makeMeals() };
+                              let targetMealId = addMealId;
+                              if (targetMealId?.startsWith("__slot__")) {
+                                const match = day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
+                                targetMealId = match?.id || null;
+                              }
+                              if (!targetMealId) return;
+                              const fatGrams = s.fat_pct != null ? Math.round(s.calories * s.fat_pct / 100 / 9) : 0;
+                              const fatKcal = s.fat_pct != null ? Math.round(s.calories * s.fat_pct / 100) : 0;
+                              const item = {
+                                id:genId(),
+                                name:`${sport} (${Math.round(s.duration_min||0)} min) · Polar`,
+                                kcal:-s.calories, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
+                                is_exercise:1, fat_burned_g:fatGrams, fat_burned_kcal:fatKcal,
+                                polar_session_id:s.id
+                              };
+                              const updated = {...day, meals:day.meals.map(m=>
+                                m.id===targetMealId?{...m,items:[...m.items,item]}:m
+                              )};
+                              await persistDay(updated);
+                              if (sessionDate===currentDate) setCurrentDayData(updated);
+                              // Mark session as logged in Firestore
+                              await setDoc(doc(db,"users",userId,"polar_sessions",s.id), {...s, logged:true});
+                              setPolarSessions(prev => prev.filter(ps => ps.id !== s.id));
+                              setPolarLogModal(null);
+                            }} style={{ background:"#D94032", color:"#fff", border:"none", borderRadius:"6px",
+                              padding:"8px 20px", cursor:"pointer", fontSize:"13px", fontWeight:"bold" }}>
+                              ✓ Log Session
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
