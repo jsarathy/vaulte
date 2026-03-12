@@ -497,7 +497,10 @@ export default function NutritionTracker({ userId }) {
   const [polarConnected, setPolarConnected] = useState(false);
   const [polarSessions, setPolarSessions] = useState([]);
   const [polarLoading, setPolarLoading] = useState(false);
-  const [polarLogModal, setPolarLogModal] = useState(null); // session being logged
+  const [polarLogModal, setPolarLogModal] = useState(null);
+  const [polarSyncing, setPolarSyncing] = useState(false);
+  const [polarLastSync, setPolarLastSync] = useState(null);
+  const [polarSyncMsg, setPolarSyncMsg] = useState(null);
 
   // Weight tracker state
   const [weightLog, setWeightLog] = useState([]);
@@ -592,7 +595,9 @@ export default function NutritionTracker({ userId }) {
 
         const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
         if (polarDoc.exists()) {
-          setPolarConnected(polarDoc.data().connected || false);
+          const pd = polarDoc.data();
+          setPolarConnected(pd.connected || false);
+          setPolarLastSync(pd.last_sync_at || null);
         }
         const polarSnap = await getDocs(collection(db, "users", userId, "polar_sessions"));
         const sessions = polarSnap.docs.map(d => ({ id:d.id, ...d.data() }))
@@ -618,6 +623,66 @@ export default function NutritionTracker({ userId }) {
   }, [userId]);
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [chatMessages]);
+
+  // ── Detect ?polar=connected in URL after OAuth redirect ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const polarParam = params.get("polar");
+    if (polarParam === "connected") {
+      // Refresh polar connection status
+      (async () => {
+        const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
+        if (polarDoc.exists()) {
+          const pd = polarDoc.data();
+          setPolarConnected(pd.connected || false);
+          setPolarLastSync(pd.last_sync_at || null);
+        }
+      })();
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+      setPolarSyncMsg({ ok:true, text:"✅ Polar account connected! Click Sync to pull your sessions." });
+      setTimeout(() => setPolarSyncMsg(null), 6000);
+    } else if (polarParam === "denied") {
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (polarParam === "error") {
+      window.history.replaceState({}, "", window.location.pathname);
+      setPolarSyncMsg({ ok:false, text:"❌ Polar connection failed. Please try again." });
+      setTimeout(() => setPolarSyncMsg(null), 6000);
+    }
+  }, [userId]);
+
+  // ── Sync Polar sessions ──
+  const syncPolar = async () => {
+    if (polarSyncing) return;
+    setPolarSyncing(true);
+    setPolarSyncMsg(null);
+    try {
+      const res = await fetch("/api/polar-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+      if (data.newSessions === 0) {
+        setPolarSyncMsg({ ok:true, text:"✓ All up to date — no new sessions from Polar." });
+      } else {
+        // Merge new sessions into the list (avoid duplicates)
+        setPolarSessions(prev => {
+          const existingIds = new Set(prev.map(s => s.id));
+          const newOnes = data.sessions.filter(s => !existingIds.has(s.id) && !s.logged);
+          return [...newOnes, ...prev].sort((a,b) => (b.start_time||"").localeCompare(a.start_time||""));
+        });
+        setPolarSyncMsg({ ok:true, text:`✅ Synced ${data.newSessions} new session${data.newSessions!==1?"s":""}!` });
+      }
+      setPolarLastSync(new Date().toISOString());
+      setTimeout(() => setPolarSyncMsg(null), 5000);
+    } catch(err) {
+      setPolarSyncMsg({ ok:false, text:`❌ ${err.message}` });
+      setTimeout(() => setPolarSyncMsg(null), 6000);
+    }
+    setPolarSyncing(false);
+  };
 
   // ── Day totals ──
   const getDayTotals = (dayData) => {
@@ -1571,49 +1636,66 @@ Use realistic values per ${weight}g.` }]
                     <span style={{ fontSize:"16px" }}>📡</span> Polar Sessions
                   </div>
                   {polarConnected && (
-                    <div style={{ fontSize:"10px", color:"#90CAF9", display:"flex", alignItems:"center", gap:"4px" }}>
-                      <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4CAF50", display:"inline-block" }}/>
-                      Connected
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                      <div style={{ fontSize:"10px", color:"#90CAF9", display:"flex", alignItems:"center", gap:"4px" }}>
+                        <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4CAF50", display:"inline-block" }}/>
+                        Connected
+                      </div>
+                      <button onClick={syncPolar} disabled={polarSyncing}
+                        style={{ background:polarSyncing?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.3)",
+                          color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:polarSyncing?"not-allowed":"pointer", fontWeight:"bold" }}>
+                        {polarSyncing ? "⏳ Syncing…" : "🔄 Sync"}
+                      </button>
                     </div>
                   )}
                 </div>
 
+                {polarSyncMsg && (
+                  <div style={{ padding:"7px 12px", fontSize:"11px", fontWeight:"bold",
+                    background:polarSyncMsg.ok?"#E8F5E9":"#FFEBEE",
+                    color:polarSyncMsg.ok?"#2E7D32":"#c62828", borderBottom:"1px solid #DDEAF6" }}>
+                    {polarSyncMsg.text}
+                  </div>
+                )}
+
                 <div style={{ padding:"12px" }}>
                   {!polarConnected ? (
-                    /* ── Not connected ── */
                     <div style={{ textAlign:"center", padding:"16px 8px" }}>
                       <div style={{ fontSize:"32px", marginBottom:"8px" }}>⌚</div>
                       <div style={{ fontSize:"13px", fontWeight:"bold", color:"#1F4E79", marginBottom:"6px" }}>Connect your Polar device</div>
                       <div style={{ fontSize:"11px", color:"#6B8CAE", marginBottom:"14px", lineHeight:1.5 }}>
-                        Sync sessions automatically once your Polar device uploads to Polar Flow. Sessions appear here ready to log.
+                        Authorise Vaulte to read your training sessions from Polar Flow. After connecting, use Sync to pull sessions.
                       </div>
-                      <button
-                        onClick={() => alert("Polar OAuth integration coming soon! You'll be redirected to Polar Flow to authorise Vaulte.")}
+                      <button onClick={() => { window.location.href = `/api/polar-auth?userId=${userId}`; }}
                         style={{ background:"#D94032", color:"#fff", border:"none", borderRadius:"6px",
                           padding:"9px 18px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>
                         Connect Polar Account
                       </button>
                     </div>
                   ) : polarSessions.length === 0 ? (
-                    /* ── Connected, no pending sessions ── */
                     <div style={{ textAlign:"center", padding:"16px 8px", color:"#6B8CAE" }}>
                       <div style={{ fontSize:"28px", marginBottom:"6px" }}>✅</div>
-                      <div style={{ fontSize:"12px" }}>All sessions logged. New sessions will appear here after your next workout syncs.</div>
+                      <div style={{ fontSize:"12px", marginBottom:"8px" }}>All sessions logged.</div>
+                      {polarLastSync && (
+                        <div style={{ fontSize:"10px", color:"#A0B4C8" }}>
+                          Last sync: {new Date(polarLastSync).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+                        </div>
+                      )}
+                      <div style={{ fontSize:"11px", marginTop:"10px" }}>Sync your H10 to Polar Flow, then click 🔄 Sync above.</div>
                     </div>
                   ) : (
-                    /* ── Pending sessions list ── */
                     <div>
-                      <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"8px" }}>
-                        {polarSessions.length} unlogged session{polarSessions.length > 1 ? "s" : ""}
+                      <div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", marginBottom:"8px", display:"flex", justifyContent:"space-between" }}>
+                        <span>{polarSessions.length} unlogged session{polarSessions.length>1?"s":""}</span>
+                        {polarLastSync && <span>Synced {new Date(polarLastSync).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>}
                       </div>
                       {polarSessions.map(s => {
-                        const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\w/g,c=>c.toUpperCase()) : "Exercise";
+                        const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) : "Exercise";
                         const d = s.start_time ? new Date(s.start_time) : null;
-                        const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : s.date || "";
+                        const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}) : "";
                         const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
                         return (
-                          <div key={s.id}
-                            onClick={() => setPolarLogModal(s)}
+                          <div key={s.id} onClick={() => setPolarLogModal(s)}
                             style={{ padding:"10px 12px", borderRadius:"6px", border:"1px solid #DDEAF6",
                               marginBottom:"8px", cursor:"pointer", transition:"background 0.15s" }}
                             onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"}
@@ -1622,10 +1704,11 @@ Use realistic values per ${weight}g.` }]
                               <div style={{ fontWeight:"bold", fontSize:"12px", color:"#1F4E79" }}>{sport}</div>
                               <div style={{ fontSize:"10px", color:"#6B8CAE" }}>{dateStr} {timeStr}</div>
                             </div>
-                            <div style={{ display:"flex", gap:"10px", fontSize:"11px", color:"#2E75B6" }}>
-                              <span>⏱ {Math.round((s.duration_min||0))} min</span>
+                            <div style={{ display:"flex", gap:"10px", fontSize:"11px", color:"#2E75B6", flexWrap:"wrap" }}>
+                              <span>⏱ {Math.round(s.duration_min||0)} min</span>
                               <span>🔥 {s.calories} kcal</span>
                               {s.hr_avg && <span>❤️ {s.hr_avg} bpm avg</span>}
+                              {s.hr_max && <span>↑{s.hr_max} max</span>}
                               {s.fat_pct != null && <span>🧈 {s.fat_pct}% fat</span>}
                             </div>
                           </div>
