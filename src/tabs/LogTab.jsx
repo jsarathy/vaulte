@@ -1,5 +1,5 @@
 // src/tabs/LogTab.jsx
-import { fmt, formatDate } from "../utils";
+import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
 
 export default function LogTab({
   currentDate, currentDayData,

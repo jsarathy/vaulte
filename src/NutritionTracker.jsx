@@ -5,7 +5,7 @@ import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
 
 import { genId, makeMeals, getDayTotals } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
-import { loadAllDays, saveDay, loadDay, loadAllRecipes, saveDay as persistToFirestore } from "./api/firestore";
+import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
 
 import RecipeModal     from "./components/RecipeModal";
@@ -213,7 +213,6 @@ export default function NutritionTracker({ userId }) {
     (async () => {
       try {
         setLoading(true);
-        const { seedInitialData } = await import("./api/firestore");
         let days = await loadAllDays(userId);
         if (days.length === 0) days = await seedInitialData(userId);
         const recipes = await loadAllRecipes(userId);

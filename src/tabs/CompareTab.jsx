@@ -1,19 +1,20 @@
 // src/tabs/CompareTab.jsx
-import { fmt, formatDateShort } from "../utils";
-import { ACTIVITY_LEVELS, calcMacros } from "../constants/nutrition";
+import { fmt, formatDateShort, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
 
 export default function CompareTab({
   compareSlots, setCompareSlots,
   compareData, setCompareData,
-  allDays, getDayTotals, todayStr,
+  allDays,
   calcSex, setCalcSex,
   calcAge, setCalcAge,
   calcHeight, setCalcHeight,
   calcWeight, setCalcWeight,
   calcProtein, setCalcProtein,
   calcFatPct, setCalcFatPct,
-  BMR,
 }) {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const BMR = calcSex==="m" ? 10*calcWeight+6.25*calcHeight-5*calcAge+5 : 10*calcWeight+6.25*calcHeight-5*calcAge-161;
+
   return (
     <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* Left: day comparison */}
@@ -65,10 +66,10 @@ export default function CompareTab({
         <div style={{ fontSize:"13px", fontWeight:"bold", color:"#1F4E79", marginBottom:"10px", borderBottom:"2px solid #D6E4F0", paddingBottom:"6px" }}>🎯 Reference Diet Calculator</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"7px", marginBottom:"8px" }}>
           {[
-            ["Sex", <select value={calcSex} onChange={e=>setCalcSex(e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}><option value="m">Male</option><option value="f">Female</option></select>],
-            ["Age (yrs)", <input type="number" value={calcAge} onChange={e=>setCalcAge(+e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>],
-            ["Height (cm)", <input type="number" value={calcHeight} onChange={e=>setCalcHeight(+e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>],
-            ["Weight (kg)", <input type="number" value={calcWeight} onChange={e=>setCalcWeight(+e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>],
+            ["Sex", <select key="sex" value={calcSex} onChange={e=>setCalcSex(e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}><option value="m">Male</option><option value="f">Female</option></select>],
+            ["Age (yrs)", <input key="age" type="number" value={calcAge} onChange={e=>setCalcAge(+e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>],
+            ["Height (cm)", <input key="ht" type="number" value={calcHeight} onChange={e=>setCalcHeight(+e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>],
+            ["Weight (kg)", <input key="wt" type="number" value={calcWeight} onChange={e=>setCalcWeight(+e.target.value)} style={{ width:"100%", padding:"5px 7px", border:"1px solid #DDEAF6", borderRadius:"4px", fontSize:"12px" }}/>],
           ].map(([label, input]) => (
             <div key={label}><div style={{ fontSize:"10px", color:"#6B8CAE", textTransform:"uppercase", letterSpacing:"0.4px", marginBottom:"2px" }}>{label}</div>{input}</div>
           ))}

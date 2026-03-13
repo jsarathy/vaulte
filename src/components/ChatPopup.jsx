@@ -1,6 +1,6 @@
 // src/components/ChatPopup.jsx
 import { useRef } from "react";
-import { fmt } from "../utils";
+import { fmt } from "../constants/helpers";
 
 export default function ChatPopup({
   chatOpen, setChatOpen,
@@ -12,8 +12,7 @@ export default function ChatPopup({
   sendChat, confirmLog, clearChat, S,
 }) {
   return (
-    {/* ── FLOATING CHAT BUTTON + POPUP ── */}
-        <div style={{ position:"absolute", bottom:"16px", right:"16px", zIndex:500 }}>
+    <div style={{ position:"absolute", bottom:"16px", right:"16px", zIndex:500 }}>
           {/* Popup */}
           {chatOpen && (
             <div style={{ position:"absolute", bottom:"56px", right:0, width:"380px", height:"520px", background:"#fff", borderRadius:"12px", boxShadow:"0 8px 40px rgba(0,0,0,0.22)", border:"1px solid #DDEAF6", display:"flex", flexDirection:"column", overflow:"hidden" }}>
