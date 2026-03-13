@@ -4,11 +4,12 @@ import { genId, makeMeals, DEFAULT_MEAL_SLOTS } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe } from "../api/claude";
-import { normaliseImage, fileToBase64 } from "../utils/imageUtils";
-import { C, FONT } from "../constants/design";
+import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
+import { C, FONT } from "../constants/design.jsx";
 import { db } from "../firebase";
+import { doc, setDoc } from "firebase/firestore";
 
-// Local style shorthand (replaces old S prop)
+// Local style shorthand
 const S = {
   main: { flex:1, overflowY:"auto", padding:"14px 16px", background:"#f9fafb" },
   btn: (variant) => ({
@@ -18,7 +19,6 @@ const S = {
     sm: { padding:"4px 9px", fontSize:"11px" },
   }[variant] || {}),
 };
-import { doc, setDoc } from "firebase/firestore";
 
 export default function AddEntry({
   userId,
@@ -34,7 +34,6 @@ export default function AddEntry({
   syncPolar, setPolarLogModal,
   persistDay,
   setRecipeModal,
-  S,
 }) {
   const [exSearch, setExSearch] = useState("");
   const [exSelected, setExSelected] = useState(null);
@@ -66,10 +65,15 @@ export default function AddEntry({
     const raw = e.target.files?.[0];
     if (!raw) return;
     setPhotoLoading(true); setPhotoError(""); setPhotoItems([]);
+    // Show immediate preview from original file while processing
+    const previewURL = fileToPreviewURL(raw);
+    setPhotoPreview(previewURL);
     try {
       const file = await normaliseImage(raw);
       const b64  = await fileToBase64(file);
-      setPhotoPreview(`data:image/jpeg;base64,${b64}`);
+      // Update preview to compressed version
+      URL.revokeObjectURL(previewURL);
+      setPhotoPreview(fileToPreviewURL(file));
       const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

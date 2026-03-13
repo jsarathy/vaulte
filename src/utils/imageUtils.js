@@ -8,18 +8,21 @@ export async function normaliseImage(file) {
     file.name.toLowerCase().endsWith(".heic") ||
     file.name.toLowerCase().endsWith(".heif");
 
-  const jpeg = isHeic
-    ? await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
-    : file;
+  let jpeg = file;
+  if (isHeic) {
+    const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+    // heic2any can return a single Blob or an array of Blobs
+    const blob = Array.isArray(result) ? result[0] : result;
+    jpeg = new File([blob], "photo.jpg", { type: "image/jpeg" });
+  }
 
-  // Compress via canvas — cap at 1200px wide, 0.82 quality
-  return compressImage(jpeg instanceof File ? jpeg : new File([jpeg], "photo.jpg", { type: "image/jpeg" }));
+  return compressImage(jpeg);
 }
 
 function compressImage(file) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
     const url = URL.createObjectURL(file);
+    const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
       const MAX = 1200;
@@ -33,11 +36,12 @@ function compressImage(file) {
         resolve(new File([blob], "photo.jpg", { type: "image/jpeg" }));
       }, "image/jpeg", 0.82);
     };
-    img.onerror = reject;
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
     img.src = url;
   });
 }
 
+// Returns base64 string (no data URL prefix) for the API
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -45,4 +49,9 @@ export function fileToBase64(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// Returns a blob:// URL for <img> preview — avoids embedding huge base64 in the DOM
+export function fileToPreviewURL(file) {
+  return URL.createObjectURL(file);
 }
