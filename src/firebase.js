@@ -8,12 +8,12 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey:            "PASTE_YOUR_API_KEY_HERE",
-  authDomain:        "PASTE_YOUR_AUTH_DOMAIN_HERE",
-  projectId:         "PASTE_YOUR_PROJECT_ID_HERE",
-  storageBucket:     "PASTE_YOUR_STORAGE_BUCKET_HERE",
-  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
-  appId:             "PASTE_YOUR_APP_ID_HERE",
+  apiKey: "AIzaSyC_L5NoFXe-WVZdy9NBqkb4YI8vmLQxe2M",
+  authDomain: "vaulte-1ea20.firebaseapp.com",
+  projectId: "vaulte-1ea20",
+  storageBucket: "vaulte-1ea20.firebasestorage.app",
+  messagingSenderId: "597290506759",
+  appId: "1:597290506759:web:a5165ff8a43627f52be8a2"
 };
 
 const app    = initializeApp(firebaseConfig);
