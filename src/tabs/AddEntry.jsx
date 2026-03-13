@@ -4,6 +4,7 @@ import { genId, makeMeals, DEFAULT_MEAL_SLOTS } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe } from "../api/claude";
+import { normaliseImage, fileToBase64 } from "../utils/imageUtils";
 import { db } from "../firebase";
 import { doc, setDoc } from "firebase/firestore";
 
@@ -43,6 +44,50 @@ export default function AddEntry({
   const [nameDropdown, setNameDropdown] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const nameInputRef = useRef(null);
+  const photoInputRef = useRef(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoItems, setPhotoItems] = useState([]);
+  const [photoError, setPhotoError] = useState("");
+
+  const handlePhotoLog = async (e) => {
+    const raw = e.target.files?.[0];
+    if (!raw) return;
+    setPhotoLoading(true); setPhotoError(""); setPhotoItems([]);
+    try {
+      const file = await normaliseImage(raw);
+      const b64  = await fileToBase64(file);
+      setPhotoPreview(`data:image/jpeg;base64,${b64}`);
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+              { type: "text", text: `Identify every food item visible in this photo and estimate realistic nutrition values.
+Reply with ONLY a JSON array, no markdown, no explanation:
+[{"name":"...","kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}]
+Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal place.` }
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      let raw2 = (data.content?.[0]?.text || "[]").trim();
+      if (raw2.startsWith("```")) raw2 = raw2.split("```")[1]?.replace(/^json/,"").trim() || raw2;
+      const items = JSON.parse(raw2);
+      setPhotoItems(items);
+    } catch(err) {
+      setPhotoError("Could not analyse photo. Try a clearer image or add items manually.");
+    } finally {
+      setPhotoLoading(false);
+      e.target.value = "";
+    }
+  };
 
   const submitAddItem = async () => {
     if (!addItem.name) { setAddMsg({ ok:false, text:"Please enter a food name" }); return; }
@@ -194,6 +239,61 @@ export default function AddEntry({
             <button onClick={submitAddItem} style={S.btn("success")}>Add Item</button>
           </div>
           {addMsg && <div style={{ marginTop:"8px", padding:"7px 10px", borderRadius:"4px", fontSize:"12px", background:addMsg.ok?"#E8F5E9":"#FFEBEE", color:addMsg.ok?"#2E7D32":"#c62828" }}>{addMsg.text}</div>}
+        </div>
+
+        {/* Photo Log */}
+        <div style={{ background:"#fff", borderRadius:"8px", border:"1px solid #DDEAF6", padding:"14px", marginBottom:"12px" }}>
+          <div style={{ fontWeight:"bold", color:"#1F4E79", marginBottom:"10px", fontSize:"13px" }}>📸 Log from Photo</div>
+          <input ref={photoInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handlePhotoLog}/>
+          <button onClick={()=>photoInputRef.current?.click()} disabled={photoLoading}
+            style={{ width:"100%", background:photoLoading?"#ccc":"#2E75B6", color:"#fff", border:"none", borderRadius:"6px",
+              padding:"9px", fontSize:"13px", fontWeight:"bold", cursor:photoLoading?"not-allowed":"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+            {photoLoading ? "⏳ Analysing…" : "📷 Take / Choose Photo"}
+          </button>
+          {photoError && <div style={{ marginTop:"8px", color:"#c62828", fontSize:"12px" }}>{photoError}</div>}
+          {photoPreview && photoItems.length > 0 && (
+            <div style={{ marginTop:"12px" }}>
+              <img src={photoPreview} alt="food" style={{ width:"100%", maxHeight:"160px", objectFit:"cover", borderRadius:"6px", marginBottom:"10px" }}/>
+              <div style={{ fontSize:"11px", color:"#6B8CAE", marginBottom:"6px" }}>Claude identified {photoItems.length} item{photoItems.length!==1?"s":""}. Tap to load into the form above, or log all at once.</div>
+              {photoItems.map((item, i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                  padding:"6px 8px", borderBottom:"1px solid #F0F4F8", fontSize:"12px" }}>
+                  <div>
+                    <div style={{ fontWeight:"bold", color:"#1F4E79" }}>{item.name}</div>
+                    <div style={{ fontSize:"10px", color:"#6B8CAE" }}>{item.kcal} kcal · P:{item.protein}g F:{item.fat}g C:{item.carbs}g</div>
+                  </div>
+                  <button onClick={()=>setAddItem({ name:item.name, kcal:item.kcal, fat:item.fat,
+                    sat_fat:item.sat_fat, carbs:item.carbs, sugar:item.sugar, fibre:item.fibre,
+                    net_carbs:item.net_carbs, protein:item.protein })}
+                    style={{ background:"#D6E4F0", border:"none", color:"#1F4E79", borderRadius:"4px",
+                      padding:"3px 8px", fontSize:"11px", cursor:"pointer", whiteSpace:"nowrap" }}>
+                    ↑ Load
+                  </button>
+                </div>
+              ))}
+              <button onClick={async () => {
+                let day = allDays.find(d=>d.date===addDate) || await loadDay(userId, addDate);
+                if (!day) day = { date:addDate, notes:"", meals:makeMeals() };
+                let targetMealId = addMealId;
+                if (targetMealId?.startsWith("__slot__")) {
+                  const match = day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
+                  targetMealId = match?.id || null;
+                }
+                if (!targetMealId) { setAddMsg({ok:false,text:"Select a meal slot first"}); return; }
+                const newItems = photoItems.map(i=>({...i, id:genId()}));
+                const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,...newItems]}:m)};
+                await persistDay(updated);
+                if (addDate===currentDate) setCurrentDayData(updated);
+                setPhotoItems([]); setPhotoPreview(null);
+                setAddMsg({ok:true, text:`✅ ${newItems.length} items logged from photo!`});
+                setTimeout(()=>setAddMsg(null),3000);
+              }} style={{ marginTop:"10px", width:"100%", background:"#2E7D32", color:"#fff", border:"none",
+                borderRadius:"6px", padding:"8px", fontSize:"13px", fontWeight:"bold", cursor:"pointer" }}>
+                ✓ Log All {photoItems.length} Items
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Recipe action buttons */}
