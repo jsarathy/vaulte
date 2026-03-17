@@ -43,6 +43,7 @@ export default function AddEntry({
   const [exResult, setExResult] = useState(null);
   const [exMsg, setExMsg] = useState(null);
   const [showExModal, setShowExModal] = useState(false);
+  const [exMealId, setExMealId] = useState("");
   const [showRecipesModal, setShowRecipesModal] = useState(false);
   const [recipeBuilder, setRecipeBuilder] = useState(false);
   const [builderInput, setBuilderInput] = useState("");
@@ -658,7 +659,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                     ))}
                   </div>
                   <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
-                    <select value={addMealId} onChange={e=>setAddMealId(e.target.value)}
+                    <select value={exMealId} onChange={e=>setExMealId(e.target.value)}
                       style={{ flex:1, padding:"6px 8px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px" }}>
                       <option value="">— select meal slot —</option>
                       {(()=>{
@@ -668,22 +669,27 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                       })()}
                     </select>
                     <button onClick={async()=>{
-                      let day = allDays.find(d=>d.date===addDate)||await loadDay(userId,addDate);
-                      if (!day) day = {date:addDate,notes:"",meals:makeMeals()};
-                      let targetMealId = addMealId;
-                      if (targetMealId?.startsWith("__slot__")) {
-                        const match = day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
-                        targetMealId = match?.id||null;
+                      if (!exMealId) { setExMsg({ok:false,text:"Select a meal slot"}); return; }
+                      try {
+                        let day = allDays.find(d=>d.date===addDate)||await loadDay(userId,addDate);
+                        if (!day) day = {date:addDate,notes:"",meals:makeMeals()};
+                        let targetMealId = exMealId;
+                        if (targetMealId.startsWith("__slot__")) {
+                          const match = day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
+                          targetMealId = match?.id||null;
+                        }
+                        if (!targetMealId) { setExMsg({ok:false,text:"Meal slot not found — try again"}); return; }
+                        const item = { id:genId(), name:`${exSelected.name} (${exResult.mins} min)`,
+                          kcal:-exResult.kcal, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
+                          is_exercise:1, fat_burned_g:exResult.fatGrams, fat_burned_kcal:exResult.fatKcal };
+                        const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m)};
+                        await persistDay(updated);
+                        if (addDate===currentDate) setCurrentDayData(updated);
+                        setShowExModal(false); setExResult(null); setExSelected(null); setExSearch("");
+                        setExDuration("30"); setExHRavg(""); setExHRmax(""); setExMealId("");
+                      } catch(e) {
+                        setExMsg({ok:false,text:"Failed to log: "+e.message});
                       }
-                      if (!targetMealId) { setExMsg({ok:false,text:"Select a meal slot"}); return; }
-                      const item = { id:genId(), name:`${exSelected.name} (${exResult.mins} min)`,
-                        kcal:-exResult.kcal, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
-                        is_exercise:1, fat_burned_g:exResult.fatGrams, fat_burned_kcal:exResult.fatKcal };
-                      const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m)};
-                      await persistDay(updated);
-                      if (addDate===currentDate) setCurrentDayData(updated);
-                      setShowExModal(false); setExResult(null); setExSelected(null); setExSearch("");
-                      setExDuration("30"); setExHRavg(""); setExHRmax("");
                     }} style={{ background:"#2E7D32", color:"#fff", border:"none", borderRadius:"6px", padding:"8px 16px", cursor:"pointer", fontSize:"13px", fontWeight:"bold", whiteSpace:"nowrap" }}>
                       ✓ Log It
                     </button>

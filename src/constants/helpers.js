@@ -16,7 +16,9 @@ export const DEFAULT_MEAL_SLOTS = [
   { name:"🥤 Post-Workout",     is_exercise:0 },
   { name:"🥗 Lunch",            is_exercise:0 },
   { name:"🍎 Snack",            is_exercise:0 },
+  { name:"🚴 Afternoon Exercise", is_exercise:1 },
   { name:"🌙 Dinner",           is_exercise:0 },
+  { name:"🌆 Evening Exercise",  is_exercise:1 },
 ];
 
 export const makeMeals = () =>
