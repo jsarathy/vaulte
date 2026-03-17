@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
-import { genId, makeMeals, getDayTotals } from "./constants/helpers";
+import { genId, makeMeals, getDayTotals, ensureMealSlots } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
@@ -250,8 +250,8 @@ export default function NutritionTracker({ userId }) {
         const polarDoc=await getDoc(doc(db,"users",userId,"polar","connection"));if(polarDoc.exists()){const pd=polarDoc.data();setPolarConnected(pd.connected||false);setPolarLastSync(pd.last_sync_at||null);}
         const polarSnap=await getDocs(collection(db,"users",userId,"polar_sessions"));
         setPolarSessions(polarSnap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>!s.logged).sort((a,b)=>(b.start_time||"").localeCompare(a.start_time||"")));
-        setAllDays(days);
-        if(days.length>0){const first=days[0];setCurrentDate(first.date);setCurrentDayData(first);setChatDate(first.date);const slots=days.slice(0,5).map(d=>d.date);setCompareSlots([...slots,...Array(5-slots.length).fill(null)].slice(0,5));setCompareData(days.slice(0,5).concat(Array(5).fill(null)).slice(0,5));}
+        const mergedDays = days.map(ensureMealSlots); setAllDays(mergedDays);
+        if(mergedDays.length>0){const first=mergedDays[0];setCurrentDate(first.date);setCurrentDayData(first);setChatDate(first.date);const slots=mergedDays.slice(0,5).map(d=>d.date);setCompareSlots([...slots,...Array(5-slots.length).fill(null)].slice(0,5));setCompareData(mergedDays.slice(0,5).concat(Array(5).fill(null)).slice(0,5));}
       }catch(err){console.error("Init error:",err);}finally{setLoading(false);}
     })();
   },[userId]);
@@ -262,7 +262,7 @@ export default function NutritionTracker({ userId }) {
     else if(pp==="error"){window.history.replaceState({},"",window.location.pathname);setPolarSyncMsg({ok:false,text:"Polar connection failed."});setTimeout(()=>setPolarSyncMsg(null),6000);}
   },[userId]);
 
-  const switchDay=async(date)=>{setCurrentDate(date);let data=allDays.find(d=>d.date===date)||null;if(!data)data=await loadDay(userId,date);setCurrentDayData(data);setChatDate(date);setChatMealId("__chat__");};
+  const switchDay=async(date)=>{setCurrentDate(date);let data=allDays.find(d=>d.date===date)||null;if(!data)data=await loadDay(userId,date);setCurrentDayData(ensureMealSlots(data));setChatDate(date);setChatMealId("__chat__");};
   const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));setCurrentDayData(dayData);};
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
   const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}const proj=generateWeightProjection(cfg);const actuals={};weightLog.forEach(r=>{if(r.actual!=null)actuals[r.week]=r.actual;});setWeightLog(proj.map(r=>({...r,actual:actuals[r.week]??null})));};

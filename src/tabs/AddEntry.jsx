@@ -1,6 +1,6 @@
 // src/tabs/AddEntry.jsx
 import { useState, useRef } from "react";
-import { genId, makeMeals, DEFAULT_MEAL_SLOTS } from "../constants/helpers";
+import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe } from "../api/claude";
@@ -125,7 +125,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
       kcal:parseFloat(addItem.kcal)||0, fat:parseFloat(addItem.fat)||0, sat_fat:parseFloat(addItem.sat_fat)||0,
       carbs:parseFloat(addItem.carbs)||0, sugar:parseFloat(addItem.sugar)||0, fibre:parseFloat(addItem.fibre)||0,
       net_carbs:parseFloat(addItem.net_carbs)||0, protein:parseFloat(addItem.protein)||0 };
-    const updated = { ...day, meals: day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m) };
+    const updated = { ...day, meals: day.meals.map(m=>m.id===targetMealId?{...m,items:[...(m.items||[]),item]}:m) };
     await persistDay(updated);
     if (addDate===currentDate) setCurrentDayData(updated);
     setAddMsg({ ok:true, text:"✅ Item added!" });
@@ -299,7 +299,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 }
                 if (!targetMealId) { setAddMsg({ok:false,text:"Select a meal slot first"}); return; }
                 const newItems = photoItems.map(i=>({...i, id:genId()}));
-                const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,...newItems]}:m)};
+                const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...(m.items||[]),...newItems]}:m)};
                 await persistDay(updated);
                 if (addDate===currentDate) setCurrentDayData(updated);
                 setPhotoItems([]); setPhotoPreview(null);
@@ -664,15 +664,15 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                       <option value="">— select meal slot —</option>
                       {(()=>{
                         const existing = allDays.find(d=>d.date===addDate);
-                        const meals = existing?existing.meals:DEFAULT_MEAL_SLOTS;
+                        const meals = existing ? ensureMealSlots(existing).meals : DEFAULT_MEAL_SLOTS;
                         return meals.map((m,i)=><option key={m.id||i} value={m.id||("__slot__"+m.name)}>{m.name}</option>);
                       })()}
                     </select>
                     <button onClick={async()=>{
                       if (!exMealId) { setExMsg({ok:false,text:"Select a meal slot"}); return; }
                       try {
-                        let day = allDays.find(d=>d.date===addDate)||await loadDay(userId,addDate);
-                        if (!day) day = {date:addDate,notes:"",meals:makeMeals()};
+                        let raw = allDays.find(d=>d.date===addDate)||await loadDay(userId,addDate);
+                        let day = ensureMealSlots(raw || {date:addDate,notes:"",meals:makeMeals()});
                         let targetMealId = exMealId;
                         if (targetMealId.startsWith("__slot__")) {
                           const match = day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
@@ -682,7 +682,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                         const item = { id:genId(), name:`${exSelected.name} (${exResult.mins} min)`,
                           kcal:-exResult.kcal, fat:0, sat_fat:0, carbs:0, sugar:0, fibre:0, net_carbs:0, protein:0,
                           is_exercise:1, fat_burned_g:exResult.fatGrams, fat_burned_kcal:exResult.fatKcal };
-                        const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m)};
+                        const updated = {...day, meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...(m.items||[]),item]}:m)};
                         await persistDay(updated);
                         if (addDate===currentDate) setCurrentDayData(updated);
                         setShowExModal(false); setExResult(null); setExSelected(null); setExSearch("");

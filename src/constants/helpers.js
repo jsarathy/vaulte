@@ -52,3 +52,26 @@ export function getDayTotals(dayData) {
   });
   return { kcal, fat, carbs, sugar, fibre, net_carbs, protein, foodKcal, exerciseBurned };
 }
+
+// Merge any missing DEFAULT_MEAL_SLOTS into an existing day without changing existing meal IDs.
+// Safe to call on any day loaded from Firestore — only adds, never removes.
+export function ensureMealSlots(day) {
+  if (!day) return day;
+  const existing = day.meals || [];
+  const existingNames = new Set(existing.map(m => m.name));
+  const missing = DEFAULT_MEAL_SLOTS
+    .filter(s => !existingNames.has(s.name))
+    .map(s => ({ id:genId(), name:s.name, is_exercise:s.is_exercise, items:[] }));
+  if (missing.length === 0) return { ...day, meals: existing.map(m => ({ ...m, items: m.items || [] })) };
+  // Insert new slots in DEFAULT order, interleaved with existing ones
+  const allNames = DEFAULT_MEAL_SLOTS.map(s => s.name);
+  const merged = [...existing.map(m => ({ ...m, items: m.items || [] })), ...missing]
+    .sort((a, b) => {
+      const ai = allNames.indexOf(a.name), bi = allNames.indexOf(b.name);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  return { ...day, meals: merged };
+}
