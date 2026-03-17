@@ -6,7 +6,7 @@ import { genId, makeMeals, getDayTotals } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
-import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design";
+import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
 
 import RecipeModal   from "./components/RecipeModal";
 import ChatPopup     from "./components/ChatPopup";
@@ -62,7 +62,11 @@ function CalendarSidebar({ allDays, currentDate, calYear, calMonth, setCalYear, 
 }
 
 // ── Polar Log Modal ──────────────────────────────────────────────────────────
-function PolarLogModal({ session, userId, allDays, addMealId, setAddMealId, persistDay, setCurrentDayData, currentDate, setPolarSessions, onClose }) {
+function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData, currentDate, setPolarSessions, onClose }) {
+  const [localMealId, setLocalMealId] = useState("");
+  const [logging, setLogging] = useState(false);
+  const [err, setErr] = useState("");
+
   if (!session) return null;
   const s = session;
   const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\w/g,c=>c.toUpperCase()) : "Exercise";
@@ -71,10 +75,88 @@ function PolarLogModal({ session, userId, allDays, addMealId, setAddMealId, pers
   const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
   const sessionDate = s.start_time ? s.start_time.split("T")[0] : (s.date||new Date().toISOString().split("T")[0]);
   const SLOTS = [{name:"Breakfast"},{name:"Morning Exercise"},{name:"Post-Workout"},{name:"Lunch"},{name:"Snack"},{name:"Dinner"}];
-  const stats = [[" Duration",`${Math.round(s.duration_min||0)} min`],["Calories",`${s.calories} kcal`],s.hr_avg?["Avg HR",`${s.hr_avg} bpm`]:null,s.hr_max?["Max HR",`${s.hr_max} bpm`]:null,s.fat_pct!=null?["Fat burn",`${s.fat_pct}%`]:null,s.fat_pct!=null?["Fat burned",`${Math.round(s.calories*s.fat_pct/100/9)}g`]:null].filter(Boolean);
+  const stats = [["Duration",`${Math.round(s.duration_min||0)} min`],["Calories",`${s.calories} kcal`],s.hr_avg?["Avg HR",`${s.hr_avg} bpm`]:null,s.hr_max?["Max HR",`${s.hr_max} bpm`]:null,s.fat_pct!=null?["Fat burn",`${s.fat_pct}%`]:null,s.fat_pct!=null?["Fat burned",`${Math.round(s.calories*s.fat_pct/100/9)}g`]:null].filter(Boolean);
+  const existing = allDays.find(d=>d.date===sessionDate);
+  const mealOptions = existing ? existing.meals : SLOTS;
+
+  // Build SVG sparkline from hr_samples
+  const HRChart = () => {
+    const samples = s.hr_samples;
+    if (!samples || samples.length < 2) return null;
+    const W = 368, H = 80, PAD = 4;
+    const valid = samples.filter(v => v != null);
+    const minHR = Math.min(...valid) - 5;
+    const maxHR = Math.max(...valid) + 5;
+    // Downsample to max 200 points for rendering
+    const step = Math.max(1, Math.floor(samples.length / 200));
+    const pts = [];
+    for (let i = 0; i < samples.length; i += step) {
+      const v = samples[i];
+      if (v == null) continue;
+      const x = PAD + ((i / (samples.length - 1)) * (W - PAD * 2));
+      const y = PAD + ((1 - (v - minHR) / (maxHR - minHR)) * (H - PAD * 2));
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    const polyline = pts.join(" ");
+    // HR zones (rough): <60% = blue, 60-70% = green, 70-80% = yellow, 80-90% = orange, >90% = red
+    const totalMin = Math.round(s.duration_min || 0);
+    const rateS = s.recording_rate_s || 5;
+    const zones = { z1:0, z2:0, z3:0, z4:0, z5:0 };
+    const hrMax = s.hr_max || 180;
+    samples.forEach(v => {
+      if (v == null) return;
+      const pct = v / hrMax;
+      if (pct < 0.6) zones.z1 += rateS;
+      else if (pct < 0.7) zones.z2 += rateS;
+      else if (pct < 0.8) zones.z3 += rateS;
+      else if (pct < 0.9) zones.z4 += rateS;
+      else zones.z5 += rateS;
+    });
+    const totalS = Object.values(zones).reduce((a,b)=>a+b,0) || 1;
+    const zoneColors = ["#B5D4F4","#C0DD97","#FAC775","#F0997B","#E24B4A"];
+    const zoneLabels = ["Z1","Z2","Z3","Z4","Z5"];
+    const zoneSecs = [zones.z1,zones.z2,zones.z3,zones.z4,zones.z5];
+
+    return (
+      <div style={{ marginBottom:"14px" }}>
+        <div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"6px",display:"flex",justifyContent:"space-between",alignItems:"baseline" }}>
+          <span>Heart rate · {samples.length * rateS / 60 | 0} min recorded</span>
+          <span style={{ fontFamily:FONT.mono }}>{Math.min(...valid)}–{Math.max(...valid)} bpm</span>
+        </div>
+        <div style={{ background:C.bg,borderRadius:"6px",border:`0.5px solid ${C.border}`,padding:"6px 8px" }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%",height:"70px",display:"block" }}>
+            {/* zero-line at avg */}
+            {s.hr_avg && (() => {
+              const y = PAD + ((1 - (s.hr_avg - minHR) / (maxHR - minHR)) * (H - PAD*2));
+              return <line x1={PAD} y1={y} x2={W-PAD} y2={y} stroke={C.blueMid} strokeWidth="0.5" strokeDasharray="3,3"/>;
+            })()}
+            <polyline points={polyline} fill="none" stroke={C.blue} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+            {/* min/max labels */}
+            <text x={PAD+2} y={PAD+8} fontSize="8" fill={C.hint} fontFamily="DM Mono, monospace">{Math.round(maxHR)} bpm</text>
+            <text x={PAD+2} y={H-PAD-2} fontSize="8" fill={C.hint} fontFamily="DM Mono, monospace">{Math.round(minHR)} bpm</text>
+          </svg>
+          {/* Zone bar */}
+          <div style={{ display:"flex",height:"6px",borderRadius:"3px",overflow:"hidden",marginTop:"4px" }}>
+            {zoneSecs.map((sec,i) => (
+              <div key={i} style={{ flex:sec/totalS,background:zoneColors[i],minWidth:sec>0?"1px":"0" }}/>
+            ))}
+          </div>
+          <div style={{ display:"flex",gap:"8px",marginTop:"5px" }}>
+            {zoneSecs.map((sec,i) => sec > 0 && (
+              <div key={i} style={{ display:"flex",alignItems:"center",gap:"3px",fontSize:"9px",color:C.muted }}>
+                <div style={{ width:"7px",height:"7px",borderRadius:"1px",background:zoneColors[i],flexShrink:0 }}/>
+                <span>{zoneLabels[i]} {Math.round(sec/60)}m</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center" }}>
-      <div style={{ background:"#fff",borderRadius:"10px",width:"400px",maxWidth:"95vw",border:`0.5px solid ${C.border}`,fontFamily:FONT.sans }}>
+      <div style={{ background:"#fff",borderRadius:"10px",width:"440px",maxWidth:"95vw",border:`0.5px solid ${C.border}`,fontFamily:FONT.sans }}>
         <div style={{ padding:"14px 16px",borderBottom:border,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <div><div style={{ fontWeight:"500",fontSize:"13px",color:C.text }}>{sport}</div><div style={{ fontSize:"11px",color:C.muted,marginTop:"2px" }}>{dateStr}{timeStr?` · ${timeStr}`:""}</div></div>
           <button onClick={onClose} style={{ background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:"18px",lineHeight:1 }}>×</button>
@@ -83,32 +165,45 @@ function PolarLogModal({ session, userId, allDays, addMealId, setAddMealId, pers
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px",marginBottom:"14px" }}>
             {stats.map(([lbl,val])=>(<div key={lbl} style={{ background:C.bg,borderRadius:"6px",padding:"8px 10px",border:`0.5px solid ${C.border}` }}><div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"2px" }}>{lbl}</div><div style={{ fontWeight:"500",fontSize:"13px",color:C.text,fontFamily:FONT.mono }}>{val}</div></div>))}
           </div>
+          <HRChart />
           <div style={{ marginBottom:"14px" }}>
             <div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"5px" }}>Log to meal slot</div>
-            <select value={addMealId} onChange={e=>setAddMealId(e.target.value)} style={{ width:"100%",padding:"7px 10px",border:`0.5px solid ${C.borderMid}`,borderRadius:"6px",fontSize:"12px",fontFamily:FONT.sans }}>
+            <select value={localMealId} onChange={e=>{ setLocalMealId(e.target.value); setErr(""); }}
+              style={{ width:"100%",padding:"7px 10px",border:`0.5px solid ${localMealId?"#d1d5db":C.danger}`,borderRadius:"6px",fontSize:"12px",fontFamily:FONT.sans }}>
               <option value="">— select slot —</option>
-              {(()=>{ const existing=allDays.find(d=>d.date===sessionDate); const meals=existing?existing.meals:SLOTS; return meals.map((m,i)=><option key={m.id||i} value={m.id||("__slot__"+m.name)}>{m.name}</option>); })()}
+              {mealOptions.map((m,i)=><option key={m.id||i} value={m.id||("__slot__"+m.name)}>{m.name}</option>)}
             </select>
+            {err && <div style={{ fontSize:"11px",color:C.danger,marginTop:"4px" }}>{err}</div>}
           </div>
           <div style={{ display:"flex",gap:"8px",justifyContent:"flex-end" }}>
             <button onClick={onClose} style={{ background:"transparent",border:`0.5px solid ${C.borderMid}`,color:C.muted,borderRadius:"6px",padding:"7px 14px",cursor:"pointer",fontSize:"12px",fontFamily:FONT.sans }}>Cancel</button>
-            <button onClick={async()=>{
-              let day=allDays.find(d=>d.date===sessionDate)||await loadDay(userId,sessionDate);
-              if(!day) day={date:sessionDate,notes:"",meals:makeMeals()};
-              let targetMealId=addMealId;
-              if(targetMealId?.startsWith("__slot__")){const match=day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));targetMealId=match?.id||null;}
-              if(!targetMealId) return;
-              const fatGrams=s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100/9):0;
-              const fatKcal=s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100):0;
-              const item={id:genId(),name:`${sport} (${Math.round(s.duration_min||0)} min) · Polar`,kcal:-s.calories,fat:0,sat_fat:0,carbs:0,sugar:0,fibre:0,net_carbs:0,protein:0,is_exercise:1,fat_burned_g:fatGrams,fat_burned_kcal:fatKcal,polar_session_id:s.id};
-              const updated={...day,meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m)};
-              await persistDay(updated);
-              if(sessionDate===currentDate) setCurrentDayData(updated);
-              await setDoc(doc(db,"users",userId,"polar_sessions",s.id),{...s,logged:true});
-              setPolarSessions(prev=>prev.filter(ps=>ps.id!==s.id));
-              onClose();
-            }} style={{ background:C.blue,color:"#fff",border:"none",borderRadius:"6px",padding:"7px 16px",cursor:"pointer",fontSize:"12px",fontWeight:"500",fontFamily:FONT.sans }}>
-              Log session
+            <button disabled={logging} onClick={async()=>{
+              if (!localMealId) { setErr("Please select a meal slot"); return; }
+              setLogging(true);
+              try {
+                let day=allDays.find(d=>d.date===sessionDate)||await loadDay(userId,sessionDate);
+                if(!day) day={date:sessionDate,notes:"",meals:makeMeals()};
+                let targetMealId=localMealId;
+                if(targetMealId.startsWith("__slot__")){
+                  const match=day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
+                  targetMealId=match?.id||null;
+                }
+                if(!targetMealId) { setErr("Meal slot not found — try again"); setLogging(false); return; }
+                const fatGrams=s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100/9):0;
+                const fatKcal=s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100):0;
+                const item={id:genId(),name:`${sport} (${Math.round(s.duration_min||0)} min) · Polar`,kcal:-s.calories,fat:0,sat_fat:0,carbs:0,sugar:0,fibre:0,net_carbs:0,protein:0,is_exercise:1,fat_burned_g:fatGrams,fat_burned_kcal:fatKcal,polar_session_id:s.id};
+                const updated={...day,meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m)};
+                await persistDay(updated);
+                if(sessionDate===currentDate) setCurrentDayData(updated);
+                await setDoc(doc(db,"users",userId,"polar_sessions",s.id),{...s,logged:true});
+                setPolarSessions(prev=>prev.filter(ps=>ps.id!==s.id));
+                onClose();
+              } catch(e) {
+                setErr("Failed to log session: "+e.message);
+                setLogging(false);
+              }
+            }} style={{ background:logging?C.muted:C.blue,color:"#fff",border:"none",borderRadius:"6px",padding:"7px 16px",cursor:logging?"not-allowed":"pointer",fontSize:"12px",fontWeight:"500",fontFamily:FONT.sans }}>
+              {logging ? "Logging…" : "Log session"}
             </button>
           </div>
         </div>
@@ -184,7 +279,7 @@ export default function NutritionTracker({ userId }) {
   return (
     <div className="nt-root" style={{ background:C.bg,color:C.text,height:"calc(100vh - 110px)",display:"flex",flexDirection:"column",borderRadius:"10px",overflow:"hidden",border:`0.5px solid ${C.border}` }}>
       <RecipeModal recipe={recipeModal} onClose={()=>setRecipeModal(null)}/>
-      <PolarLogModal session={polarLogModal} userId={userId} allDays={allDays} addMealId={addMealId} setAddMealId={setAddMealId} persistDay={persistDay} setCurrentDayData={setCurrentDayData} currentDate={currentDate} setPolarSessions={setPolarSessions} onClose={()=>setPolarLogModal(null)}/>
+      <PolarLogModal session={polarLogModal} userId={userId} allDays={allDays} persistDay={persistDay} setCurrentDayData={setCurrentDayData} currentDate={currentDate} setPolarSessions={setPolarSessions} onClose={()=>setPolarLogModal(null)}/>
 
       {/* Header */}
       <div style={{ background:C.surface,borderBottom:`0.5px solid ${C.border}`,padding:"0 16px",height:"44px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
