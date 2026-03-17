@@ -24,6 +24,7 @@ const TASKS = [
   { id:"session4",     name:"Session 4: Project + Tea",    time:"16:30" },
   { id:"walk_bike",    name:"Walk / Bike",                 time:"17:30" },
   { id:"dinner_prep",  name:"Dinner prep",                 time:"18:30" },
+  { id:"pregastar",    name:"Pregastar",                   time:"19:00" },
   { id:"dinner",       name:"Dinner",                      time:"19:15" },
   { id:"art_reading",  name:"Art / Reading",               time:"19:45" },
   { id:"statin",       name:"Statin / Allergy Med",        time:"21:45" },
