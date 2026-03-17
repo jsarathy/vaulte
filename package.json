@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/constants/helpers.test.mjs"
   },
   "dependencies": {
     "firebase": "^10.8.0",
     "firebase-admin": "^12.0.0",
-    "heic2any": "^0.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

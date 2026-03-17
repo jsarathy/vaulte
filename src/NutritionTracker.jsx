@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
-import { genId, makeMeals, getDayTotals, ensureMealSlots } from "./constants/helpers";
+import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
@@ -77,7 +77,7 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
   const SLOTS = DEFAULT_MEAL_SLOTS;
   const stats = [["Duration",`${Math.round(s.duration_min||0)} min`],["Calories",`${s.calories} kcal`],s.hr_avg?["Avg HR",`${s.hr_avg} bpm`]:null,s.hr_max?["Max HR",`${s.hr_max} bpm`]:null,s.fat_pct!=null?["Fat burn",`${s.fat_pct}%`]:null,s.fat_pct!=null?["Fat burned",`${Math.round(s.calories*s.fat_pct/100/9)}g`]:null].filter(Boolean);
   const existing = allDays.find(d=>d.date===sessionDate);
-  const mealOptions = existing ? existing.meals : SLOTS;
+  const mealOptions = existing ? ensureMealSlots(existing).meals : DEFAULT_MEAL_SLOTS;
 
   // Build SVG sparkline from hr_samples
   const HRChart = () => {
@@ -181,8 +181,7 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
               if (!localMealId) { setErr("Please select a meal slot"); return; }
               setLogging(true);
               try {
-                let day=allDays.find(d=>d.date===sessionDate)||await loadDay(userId,sessionDate);
-                if(!day) day={date:sessionDate,notes:"",meals:makeMeals()};
+                let day=ensureMealSlots(allDays.find(d=>d.date===sessionDate)||await loadDay(userId,sessionDate)||{date:sessionDate,notes:"",meals:makeMeals()});
                 let targetMealId=localMealId;
                 if(targetMealId.startsWith("__slot__")){
                   const match=day.meals.find(m=>m.name===targetMealId.replace("__slot__",""));
@@ -192,7 +191,7 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
                 const fatGrams=s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100/9):0;
                 const fatKcal=s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100):0;
                 const item={id:genId(),name:`${sport} (${Math.round(s.duration_min||0)} min) · Polar`,kcal:-s.calories,fat:0,sat_fat:0,carbs:0,sugar:0,fibre:0,net_carbs:0,protein:0,is_exercise:1,fat_burned_g:fatGrams,fat_burned_kcal:fatKcal,polar_session_id:s.id};
-                const updated={...day,meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...m.items,item]}:m)};
+                const updated={...day,meals:day.meals.map(m=>m.id===targetMealId?{...m,items:[...(m.items||[]),item]}:m)};
                 await persistDay(updated);
                 if(sessionDate===currentDate) setCurrentDayData(updated);
                 await setDoc(doc(db,"users",userId,"polar_sessions",s.id),{...s,logged:true});
