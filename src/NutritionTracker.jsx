@@ -74,7 +74,7 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
   const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}) : (s.date||"");
   const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
   const sessionDate = s.start_time ? s.start_time.split("T")[0] : (s.date||new Date().toISOString().split("T")[0]);
-  const SLOTS = [{name:"Breakfast"},{name:"Morning Exercise"},{name:"Post-Workout"},{name:"Lunch"},{name:"Snack"},{name:"Dinner"}];
+  const SLOTS = DEFAULT_MEAL_SLOTS;
   const stats = [["Duration",`${Math.round(s.duration_min||0)} min`],["Calories",`${s.calories} kcal`],s.hr_avg?["Avg HR",`${s.hr_avg} bpm`]:null,s.hr_max?["Max HR",`${s.hr_max} bpm`]:null,s.fat_pct!=null?["Fat burn",`${s.fat_pct}%`]:null,s.fat_pct!=null?["Fat burned",`${Math.round(s.calories*s.fat_pct/100/9)}g`]:null].filter(Boolean);
   const existing = allDays.find(d=>d.date===sessionDate);
   const mealOptions = existing ? existing.meals : SLOTS;
