@@ -147,6 +147,9 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
   const macroTgt = calcMacros(tdee, calcWeight, calcProtein, calcFatPct/100);
   const pct = Math.min(100, Math.round((totals.foodKcal/tdee)*100));
   const remaining = tdee - totals.foodKcal;
+  const netKcal = totals.foodKcal - totals.exerciseBurned;
+  const netRemaining = tdee - netKcal;
+  const netPct = Math.min(100, Math.round((netKcal/tdee)*100));
   const macros = [["P",totals.protein,macroTgt.protein_g,"blue"],["F",totals.fat,macroTgt.fat_g,"amber"],["C",totals.carbs,macroTgt.carbs_g,"amber"]];
 
   const toggle = (id) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
@@ -180,8 +183,8 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
       <div style={{ background:"#fff",border:`0.5px solid ${C.border}`,borderRadius:"8px",padding:"12px 14px",marginBottom:"10px" }}>
         <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"8px" }}>
           <div style={{ display:"flex",alignItems:"baseline",gap:"6px" }}>
-            <span style={{ fontFamily:FONT.mono,fontSize:"20px",fontWeight:"500",color:C.text,letterSpacing:"-0.5px" }}>{Math.round(totals.foodKcal).toLocaleString()}</span>
-            <span style={{ fontSize:"11px",color:C.muted }}>of {tdee.toLocaleString()} kcal · {activeTier.label}</span>
+            <span style={{ fontFamily:FONT.mono,fontSize:"20px",fontWeight:"500",color:C.text,letterSpacing:"-0.5px" }}>{Math.round(netKcal).toLocaleString()}</span>
+            <span style={{ fontSize:"11px",color:C.muted }}>net kcal of {tdee.toLocaleString()} · {activeTier.label}</span>
           </div>
           <div style={{ display:"flex",gap:"5px",alignItems:"center" }}>
             {macros.map(([k,v,t,c])=>{
@@ -190,20 +193,20 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
               const col=over?C.danger:(c==="blue"?C.blueText:c==="amber"?C.amberText:C.greenText);
               return <span key={k} style={{ fontSize:"10px",fontWeight:"500",fontFamily:FONT.mono,padding:"2px 7px",borderRadius:"20px",background:bg,color:col,whiteSpace:"nowrap" }}>{k} {fmt(v)}g</span>;
             })}
-            <span style={{ fontSize:"10px",fontFamily:FONT.mono,fontWeight:"500",padding:"2px 7px",borderRadius:"20px",background:remaining<0?C.dangerBg:C.greenBg,color:remaining<0?C.danger:C.greenText }}>
-              {remaining>=0?"-":"+"}‎{Math.abs(Math.round(remaining)).toLocaleString()}
+            <span style={{ fontSize:"10px",fontFamily:FONT.mono,fontWeight:"500",padding:"2px 7px",borderRadius:"20px",background:netRemaining<0?C.dangerBg:C.greenBg,color:netRemaining<0?C.danger:C.greenText }}>
+              {netRemaining>=0?"-":"+"}‎{Math.abs(Math.round(netRemaining)).toLocaleString()}
             </span>
           </div>
         </div>
         <div style={{ height:"4px",background:C.bg,borderRadius:"2px",overflow:"hidden" }}>
-          <div style={{ height:"100%",width:`${pct}%`,background:pct>100?C.danger:C.blue,borderRadius:"2px",transition:"width 0.3s" }}/>
+          <div style={{ height:"100%",width:`${netPct}%`,background:netPct>100?C.danger:C.blue,borderRadius:"2px",transition:"width 0.3s" }}/>
         </div>
       </div>
 
       {/* Summary metric row */}
       <div style={{ display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:"7px",marginBottom:"12px" }}>
         {[
-          ["Calories",Math.round(totals.foodKcal).toLocaleString(),`target ${tdee.toLocaleString()}`,""],
+          ["Consumed",Math.round(totals.foodKcal).toLocaleString(),`${Math.round(totals.exerciseBurned)} kcal exercise burned`,""],
           ["Protein",`${fmt(totals.protein)}g`,`target ${macroTgt.protein_g}g`,""],
           ["Net carbs",`${fmt(totals.net_carbs)}g`,totals.net_carbs>macroTgt.carbs_g?`+${fmt(totals.net_carbs-macroTgt.carbs_g)}g over`:`${fmt(macroTgt.carbs_g-totals.net_carbs)}g left`,"warn"],
           ["Fat burned",`${fmt(totals.fatBurnedG||0)}g`,totals.exerciseBurned?`${Math.round(totals.exerciseBurned)} kcal exercise`:"no exercise logged",""],
