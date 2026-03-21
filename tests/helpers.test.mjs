@@ -16,7 +16,7 @@ import {
   ensureMealSlots,
   makeMeals,
   DEFAULT_MEAL_SLOTS,
-} from "./helpers.js";
+} from "../src/constants/helpers.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -232,6 +232,9 @@ describe("ensureMealSlots", () => {
     const names = result.meals.map(m => m.name);
     const expectedOrder = DEFAULT_MEAL_SLOTS.map(s => s.name);
     assert.deepEqual(names, expectedOrder);
+    assert.ok(names.includes("🚴 Afternoon Exercise"), "Afternoon Exercise slot present");
+    assert.ok(names.includes("🌆 Evening Exercise"),  "Evening Exercise slot present");
+    assert.equal(result.meals.length, 8, "total slot count is 8");
   });
 
   test("calling twice is idempotent", () => {
