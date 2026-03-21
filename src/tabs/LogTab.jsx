@@ -16,7 +16,10 @@ function saveCollapsed(state) {
 }
 
 // ── Polar Detail Modal ────────────────────────────────────────────────────────
-function PolarDetailModal({ session, onClose }) {
+function PolarDetailModal({ session, onClose, userId, onHRLoaded }) {
+  const [fetchingHR, setFetchingHR] = useState(false);
+  const [hrError, setHrError] = useState("");
+
   if (!session) return null;
   const s = session;
   const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) : "Exercise";
@@ -24,15 +27,40 @@ function PolarDetailModal({ session, onClose }) {
   const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) : "";
   const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
 
+  // Compute fat burned from session data
+  const fatBurnedKcal = s.fat_pct != null ? Math.round(s.calories * s.fat_pct / 100) : null;
+  const fatBurnedG    = fatBurnedKcal != null ? Math.round(fatBurnedKcal / 9) : null;
+
   const stats = [
-    ["Duration", `${Math.round(s.duration_min||0)} min`],
-    ["Calories",  `${s.calories} kcal`],
-    s.hr_avg ? ["Avg HR",    `${s.hr_avg} bpm`]  : null,
-    s.hr_max ? ["Max HR",    `${s.hr_max} bpm`]  : null,
-    s.fat_pct != null ? ["Fat burn %", `${s.fat_pct}%`] : null,
-    s.fat_pct != null ? ["Fat burned", `${Math.round(s.calories*(s.fat_pct/100)/9)}g`] : null,
-    s.device  ? ["Device",   s.device]  : null,
+    ["Duration",    `${Math.round(s.duration_min||0)} min`],
+    ["Calories",    `${s.calories} kcal`],
+    s.hr_avg      ? ["Avg HR",       `${s.hr_avg} bpm`]         : null,
+    s.hr_max      ? ["Max HR",       `${s.hr_max} bpm`]         : null,
+    s.fat_pct != null ? ["Fat burn %", `${s.fat_pct}%`]         : null,
+    fatBurnedKcal != null ? ["Fat burned", `${fatBurnedG}g · ${fatBurnedKcal} kcal`] : null,
+    s.device      ? ["Device",       s.device]                   : null,
   ].filter(Boolean);
+
+  const fetchHR = async () => {
+    setFetchingHR(true); setHrError("");
+    try {
+      const res = await fetch("/api/polar-fetch-hr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, sessionId: s.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setHrError(data.message || data.error || "Failed to fetch HR data.");
+      } else {
+        onHRLoaded({ ...s, hr_samples: data.hr_samples, recording_rate_s: data.recording_rate_s });
+      }
+    } catch (e) {
+      setHrError("Network error — try again.");
+    } finally {
+      setFetchingHR(false);
+    }
+  };
 
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()}
@@ -59,14 +87,29 @@ function PolarDetailModal({ session, onClose }) {
             ))}
           </div>
 
-          {/* HR chart */}
-          {s.hr_samples?.length > 1
-            ? <HRChart session={s}/>
-            : <div style={{ background:C.bg,borderRadius:"6px",border:`0.5px solid ${C.border}`,padding:"16px",textAlign:"center",fontSize:"12px",color:C.hint }}>
-                No heart rate time series available for this session.
-                {!s.hr_samples && " Sync again after updating to the latest version to capture HR data."}
+          {/* HR chart or fetch button */}
+          {s.hr_samples?.length > 1 ? (
+            <HRChart session={s}/>
+          ) : (
+            <div style={{ background:C.bg,borderRadius:"6px",border:`0.5px solid ${C.border}`,padding:"16px",textAlign:"center" }}>
+              <div style={{ fontSize:"12px",color:C.muted,marginBottom:"12px" }}>
+                {s.exercise_url
+                  ? "Heart rate data wasn't captured at sync time."
+                  : "This session was synced before HR capture was available."}
               </div>
-          }
+              {s.exercise_url && (
+                <>
+                  <button onClick={fetchHR} disabled={fetchingHR}
+                    style={{ background:fetchingHR?C.hint:C.blue,color:"#fff",border:"none",borderRadius:"6px",
+                      padding:"8px 18px",cursor:fetchingHR?"not-allowed":"pointer",fontSize:"12px",
+                      fontWeight:"500",fontFamily:FONT.sans }}>
+                    {fetchingHR ? "Fetching…" : "Fetch HR data"}
+                  </button>
+                  {hrError && <div style={{ fontSize:"11px",color:C.danger,marginTop:"8px" }}>{hrError}</div>}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -115,7 +158,12 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
 
   return (
     <>
-      <PolarDetailModal session={polarDetail} onClose={()=>setPolarDetail(null)}/>
+      <PolarDetailModal
+        session={polarDetail}
+        onClose={()=>setPolarDetail(null)}
+        userId={userId}
+        onHRLoaded={(updated)=>setPolarDetail(updated)}
+      />
       {/* Day header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px" }}>
         <div style={{ fontSize:"14px", fontWeight:"500", color:C.text }}>{formatDate(currentDate)}</div>

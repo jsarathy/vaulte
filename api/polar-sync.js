@@ -103,6 +103,7 @@ export default async function handler(req, res) {
           device:           ex.device || null,
           hr_samples,         // int[] bpm at recording_rate_s intervals, null if unavailable
           recording_rate_s,   // seconds between samples, typically 5
+          exercise_url:     url,  // stored so HR can be re-fetched on demand
           polar_user_id,
           fetched_at:       new Date().toISOString(),
           logged:           false,
