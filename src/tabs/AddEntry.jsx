@@ -50,12 +50,16 @@ export default function AddEntry({
   const [builderLoading, setBuilderLoading] = useState(false);
   const [builderPreview, setBuilderPreview] = useState(null);
   const [builderError, setBuilderError] = useState("");
-  const [ingredientModal, setIngredientModal] = useState(null);
-  const [ingredientWeight, setIngredientWeight] = useState("100");
-  const [ingredientLoading, setIngredientLoading] = useState(false);
+  // Unified quantity modal — replaces old ingredientModal
+  const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
+  const [qtyValue, setQtyValue] = useState("1");
+  const [qtyUnit, setQtyUnit] = useState("portion");
+  const [qtyLoading, setQtyLoading] = useState(false);
+  const [qtyError, setQtyError] = useState("");
   const [nameDropdown, setNameDropdown] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const nameInputRef = useRef(null);
+  const qtyInputRef = useRef(null);
   const photoInputRef = useRef(null);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -182,27 +186,25 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   setShowDropdown(false);
                   const name = addItem.name.trim();
                   if (!name) return;
-                  const exact = userRecipes.find(r=>r.name.toLowerCase()===name.toLowerCase());
-                  if (exact) return;
-                  const hasNutrition = addItem.kcal||addItem.fat||addItem.carbs||addItem.protein;
+                  // If already has nutrition (filled from recipe dropdown), skip
+                  const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
                   if (hasNutrition) return;
+                  // Classify to pick default unit: ingredient → grams, dish → portion
+                  let defaultUnit = "portion";
                   try {
                     const res = await fetch("/api/claude", {
                       method:"POST", headers:{"Content-Type":"application/json"},
-                      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:60,
-                        messages:[{role:"user", content:`Is "${name}" a single whole-food ingredient (like an apple, grapes, chicken breast, milk) or a cooked/prepared dish (like baingan bharta, pasta carbonara, pinto bean stew)? Reply with exactly one word: INGREDIENT or DISH`}] })
+                      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:10,
+                        messages:[{role:"user", content:`Is "${name}" a single whole-food ingredient (apple, milk, chicken breast) or a cooked/prepared dish (stew, curry, pasta)? Reply with exactly one word: INGREDIENT or DISH`}] })
                     });
                     const data = await res.json();
-                    const verdict = (data.content?.[0]?.text||"DISH").trim().toUpperCase();
-                    if (verdict.includes("INGREDIENT")) {
-                      setIngredientWeight("100");
-                      setIngredientModal({ name });
-                    } else {
-                      setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
-                    }
-                  } catch {
-                    setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
-                  }
+                    if ((data.content?.[0]?.text||"").trim().toUpperCase().includes("INGREDIENT")) defaultUnit = "g";
+                  } catch {}
+                  setQtyValue(defaultUnit === "g" ? "100" : "1");
+                  setQtyUnit(defaultUnit);
+                  setQtyError("");
+                  setQtyModal({ name });
+                  setTimeout(() => qtyInputRef.current?.focus(), 50);
                 }, 150);
               }}
               onFocus={() => { if (nameDropdown.length>0) setShowDropdown(true); }}
@@ -416,46 +418,80 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
         </div>
       </div>
 
-      {/* ── Ingredient Weight Modal ── */}
-      {ingredientModal && (
-        <div onClick={e=>e.target===e.currentTarget&&setIngredientModal(null)}
-          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <div style={{ background:"#fff", borderRadius:"12px", padding:"28px 32px", width:"340px", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
-            <div style={{ fontSize:"16px", fontWeight:"bold", color:"#185FA5", marginBottom:"6px" }}>🥗 {ingredientModal.name}</div>
-            <div style={{ fontSize:"12px", color:"#6b7280", marginBottom:"18px" }}>Looks like a single ingredient. Enter the weight and Claude will fill in the nutrition.</div>
-            <div style={{ marginBottom:"16px" }}>
-              <div style={{ fontSize:"10px", color:"#6b7280", textTransform:"uppercase", marginBottom:"4px" }}>Weight (grams)</div>
-              <input type="number" min="1" value={ingredientWeight}
-                onChange={e=>setIngredientWeight(e.target.value)}
-                onKeyDown={e=>{ if(e.key==="Enter") document.getElementById("ing-lookup-btn").click(); }}
-                autoFocus
-                style={{ width:"100%", padding:"8px 10px", border:"2px solid #378ADD", borderRadius:"6px", fontSize:"14px", outline:"none" }}/>
+      {/* ── Quantity Modal ── */}
+      {qtyModal && (
+        <div onClick={e=>e.target===e.currentTarget&&setQtyModal(null)}
+          style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center" }}>
+          <div style={{ background:"#fff",borderRadius:"12px",padding:"24px 28px",width:"380px",maxWidth:"95vw",border:`0.5px solid ${C.border}`,fontFamily:FONT.sans }}>
+            <div style={{ fontSize:"14px",fontWeight:"500",color:C.text,marginBottom:"4px" }}>{qtyModal.name}</div>
+            <div style={{ fontSize:"11px",color:C.muted,marginBottom:"20px" }}>How much? Claude will calculate the nutrition.</div>
+
+            {/* Quantity + unit row */}
+            <div style={{ display:"flex",gap:"8px",marginBottom:"16px",alignItems:"flex-end" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:"10px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.4px",color:C.hint,marginBottom:"4px" }}>Quantity</div>
+                <input ref={qtyInputRef} type="number" min="0.1" step="0.1" value={qtyValue}
+                  onChange={e=>setQtyValue(e.target.value)}
+                  onKeyDown={e=>{ if(e.key==="Enter") document.getElementById("qty-confirm-btn").click(); }}
+                  style={{ width:"100%",padding:"9px 10px",border:`1.5px solid ${C.blue}`,borderRadius:"6px",fontSize:"16px",fontFamily:FONT.mono,fontWeight:"500",outline:"none",textAlign:"center" }}/>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:"10px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.4px",color:C.hint,marginBottom:"4px" }}>Unit</div>
+                <select value={qtyUnit} onChange={e=>setQtyUnit(e.target.value)}
+                  style={{ width:"100%",padding:"9px 8px",border:`0.5px solid ${C.borderMid}`,borderRadius:"6px",fontSize:"13px",fontFamily:FONT.sans,outline:"none",background:"#fff",height:"40px" }}>
+                  <option value="portion">portion(s)</option>
+                  <option value="g">grams (g)</option>
+                  <option value="ml">millilitres (ml)</option>
+                  <option value="oz">ounces (oz)</option>
+                  <option value="cup">cup(s)</option>
+                  <option value="tbsp">tablespoon(s)</option>
+                  <option value="tsp">teaspoon(s)</option>
+                </select>
+              </div>
             </div>
-            {ingredientLoading && <div style={{ textAlign:"center", color:"#378ADD", fontSize:"13px", marginBottom:"10px" }}>🤖 Looking up nutrition…</div>}
-            <div style={{ display:"flex", gap:"10px", justifyContent:"flex-end" }}>
-              <button onClick={()=>setIngredientModal(null)}
-                style={{ background:"transparent", color:"#6b7280", border:"0.5px solid #e5e7eb", borderRadius:"6px", padding:"8px 16px", cursor:"pointer", fontSize:"13px" }}>Cancel</button>
-              <button id="ing-lookup-btn" disabled={ingredientLoading}
+
+            {qtyError && <div style={{ fontSize:"11px",color:C.danger,marginBottom:"10px" }}>{qtyError}</div>}
+            {qtyLoading && <div style={{ fontSize:"11px",color:C.muted,marginBottom:"10px",textAlign:"center" }}>Looking up nutrition…</div>}
+
+            <div style={{ display:"flex",gap:"8px",justifyContent:"flex-end" }}>
+              <button onClick={()=>setQtyModal(null)}
+                style={{ background:"transparent",border:`0.5px solid ${C.borderMid}`,color:C.muted,borderRadius:"6px",padding:"8px 16px",cursor:"pointer",fontSize:"12px",fontFamily:FONT.sans }}>
+                Cancel
+              </button>
+              <button id="qty-confirm-btn" disabled={qtyLoading}
                 onClick={async()=>{
-                  const weight = parseFloat(ingredientWeight)||100;
-                  setIngredientLoading(true);
+                  const qty = parseFloat(qtyValue) || 1;
+                  const unit = qtyUnit;
+                  const name = qtyModal.name;
+                  setQtyLoading(true); setQtyError("");
                   try {
+                    const prompt = `Give me the nutrition for ${qty} ${unit === "portion" ? `portion${qty !== 1 ? "s" : ""}` : unit} of "${name}".
+Reply with ONLY a JSON object, no markdown, no explanation:
+{"display_name":"${name} (${qty} ${unit === "portion" ? "portion" : unit})","kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}
+Use realistic values. For portions use a typical serving size.`;
                     const res = await fetch("/api/claude", {
                       method:"POST", headers:{"Content-Type":"application/json"},
-                      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:300,
-                        messages:[{role:"user", content:`Give me the nutrition for ${weight}g of "${ingredientModal.name}". Reply with ONLY a JSON object, no markdown, no explanation:\n{"kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}\nUse realistic values per ${weight}g.`}] })
+                      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:200,
+                        messages:[{role:"user", content:prompt}] })
                     });
                     const data = await res.json();
-                    const text = (data.content?.[0]?.text||"{}").replace(/\`\`\`json|\`\`\`/g,"").trim();
+                    const text = (data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
                     const n = JSON.parse(text);
-                    setAddItem({ name:`${ingredientModal.name} (${weight}g)`, kcal:n.kcal??"", fat:n.fat??"", sat_fat:n.sat_fat??"",
-                      carbs:n.carbs??"", sugar:n.sugar??"", fibre:n.fibre??"", net_carbs:n.net_carbs??"", protein:n.protein??""});
-                    setIngredientModal(null);
-                  } catch { alert("Could not fetch nutrition. Please fill in manually."); setIngredientModal(null); }
-                  finally { setIngredientLoading(false); }
+                    setAddItem({
+                      name: n.display_name || `${name} (${qty} ${unit})`,
+                      kcal: n.kcal ?? "", fat: n.fat ?? "", sat_fat: n.sat_fat ?? "",
+                      carbs: n.carbs ?? "", sugar: n.sugar ?? "", fibre: n.fibre ?? "",
+                      net_carbs: n.net_carbs ?? "", protein: n.protein ?? ""
+                    });
+                    setQtyModal(null);
+                  } catch(e) {
+                    setQtyError("Could not fetch nutrition — fill in manually or try again.");
+                  } finally {
+                    setQtyLoading(false);
+                  }
                 }}
-                style={{ background:ingredientLoading?"#ccc":"#378ADD", color:"#fff", border:"none", borderRadius:"6px", padding:"8px 20px", cursor:ingredientLoading?"not-allowed":"pointer", fontSize:"13px", fontWeight:"bold" }}>
-                {ingredientLoading?"…":"Get Nutrition"}
+                style={{ background:qtyLoading?C.hint:C.blue,color:"#fff",border:"none",borderRadius:"6px",padding:"8px 20px",cursor:qtyLoading?"not-allowed":"pointer",fontSize:"12px",fontWeight:"500",fontFamily:FONT.sans }}>
+                {qtyLoading ? "…" : "Get Nutrition"}
               </button>
             </div>
           </div>
