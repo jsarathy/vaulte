@@ -280,3 +280,97 @@ describe("ensureMealSlots", () => {
     });
   });
 });
+
+
+// ── parseDurationMin ──────────────────────────────────────────────────────────
+
+import { parseDurationMin, calcFatBurned } from "../src/constants/helpers.js";
+
+describe("parseDurationMin", () => {
+  test("null/empty returns 0", () => {
+    assert.equal(parseDurationMin(null), 0);
+    assert.equal(parseDurationMin(""), 0);
+    assert.equal(parseDurationMin(undefined), 0);
+  });
+
+  test("hours only", () => {
+    assert.equal(parseDurationMin("PT1H"), 60);
+    assert.equal(parseDurationMin("PT2H"), 120);
+  });
+
+  test("minutes only", () => {
+    assert.equal(parseDurationMin("PT30M"), 30);
+    assert.equal(parseDurationMin("PT45M"), 45);
+  });
+
+  test("seconds only", () => {
+    assert.equal(parseDurationMin("PT30S"), 0.5);
+    assert.equal(parseDurationMin("PT90S"), 1.5);
+  });
+
+  test("hours + minutes", () => {
+    assert.equal(parseDurationMin("PT1H30M"), 90);
+  });
+
+  test("hours + minutes + seconds", () => {
+    assert.equal(parseDurationMin("PT1H30M45S"), 90.75);
+  });
+
+  test("typical cycling session", () => {
+    // 45 min session as Polar emits it
+    assert.equal(parseDurationMin("PT45M0S"), 45);
+  });
+
+  test("unrecognised string returns 0", () => {
+    assert.equal(parseDurationMin("garbage"), 0);
+  });
+});
+
+
+// ── calcFatBurned ─────────────────────────────────────────────────────────────
+
+describe("calcFatBurned", () => {
+  test("returns null when fat_pct is null", () => {
+    assert.equal(calcFatBurned(400, null), null);
+  });
+
+  test("returns null when calories is null", () => {
+    assert.equal(calcFatBurned(null, 60), null);
+  });
+
+  test("both null returns null", () => {
+    assert.equal(calcFatBurned(null, null), null);
+  });
+
+  test("correct kcal calculation", () => {
+    // 400 kcal, 60% fat burn → 240 kcal from fat
+    const r = calcFatBurned(400, 60);
+    assert.equal(r.fatKcal, 240);
+  });
+
+  test("correct grams calculation", () => {
+    // 240 kcal / 9 = 26.67 → 27g
+    const r = calcFatBurned(400, 60);
+    assert.equal(r.fatGrams, 27);
+  });
+
+  test("realistic Polar session values", () => {
+    // 350 kcal, 55% fat → 192.5 kcal → 193 kcal, 21g
+    const r = calcFatBurned(350, 55);
+    assert.equal(r.fatKcal, 193);
+    assert.equal(r.fatGrams, 21);
+  });
+
+  test("zero fat_pct returns zeros not null", () => {
+    const r = calcFatBurned(400, 0);
+    assert.ok(r !== null);
+    assert.equal(r.fatKcal, 0);
+    assert.equal(r.fatGrams, 0);
+  });
+
+  test("returns integer values", () => {
+    const r = calcFatBurned(333, 47);
+    assert.equal(r.fatKcal, Math.round(r.fatKcal));
+    assert.equal(r.fatGrams, Math.round(r.fatGrams));
+  });
+});

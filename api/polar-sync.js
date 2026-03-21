@@ -1,6 +1,7 @@
 // api/polar-sync.js
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { parseDurationMin } from "../src/constants/helpers.js";
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -8,13 +9,6 @@ function getAdminDb() {
     initializeApp({ credential: cert(serviceAccount) });
   }
   return getFirestore();
-}
-
-function parseDurationMin(iso) {
-  if (!iso) return 0;
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
-  if (!m) return 0;
-  return (parseFloat(m[1] || 0) * 60) + parseFloat(m[2] || 0) + (parseFloat(m[3] || 0) / 60);
 }
 
 export default async function handler(req, res) {

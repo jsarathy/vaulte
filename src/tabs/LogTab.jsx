@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
-import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
+import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals, calcFatBurned } from "../constants/helpers";
 import { C, FONT, border, IconX, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
 import HRChart from "../components/HRChart.jsx";
 
@@ -28,8 +28,9 @@ function PolarDetailModal({ session, onClose, userId, onHRLoaded }) {
   const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
 
   // Compute fat burned from session data
-  const fatBurnedKcal = s.fat_pct != null ? Math.round(s.calories * s.fat_pct / 100) : null;
-  const fatBurnedG    = fatBurnedKcal != null ? Math.round(fatBurnedKcal / 9) : null;
+  const fatBurned = calcFatBurned(s.calories, s.fat_pct);
+  const fatBurnedKcal = fatBurned?.fatKcal ?? null;
+  const fatBurnedG    = fatBurned?.fatGrams ?? null;
 
   const stats = [
     ["Duration",    `${Math.round(s.duration_min||0)} min`],

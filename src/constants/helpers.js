@@ -75,3 +75,21 @@ export function ensureMealSlots(day) {
     });
   return { ...day, meals: merged };
 }
+
+// Parse ISO 8601 duration → minutes e.g. "PT1H30M45S" → 90.75
+// Shared between polar-sync (server) and any client code that needs it.
+export function parseDurationMin(iso) {
+  if (!iso) return 0;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+  if (!m) return 0;
+  return (parseFloat(m[1] || 0) * 60) + parseFloat(m[2] || 0) + (parseFloat(m[3] || 0) / 60);
+}
+
+// Compute fat burned from a Polar session's calories and fat_pct.
+// Returns { fatKcal, fatGrams } or null if fat_pct is not available.
+export function calcFatBurned(calories, fat_pct) {
+  if (fat_pct == null || calories == null) return null;
+  const fatKcal  = Math.round(calories * fat_pct / 100);
+  const fatGrams = Math.round(fatKcal / 9);
+  return { fatKcal, fatGrams };
+}
