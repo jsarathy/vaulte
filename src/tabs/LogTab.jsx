@@ -186,16 +186,23 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
             <span style={{ fontFamily:FONT.mono,fontSize:"20px",fontWeight:"500",color:C.text,letterSpacing:"-0.5px" }}>{Math.round(netKcal).toLocaleString()}</span>
             <span style={{ fontSize:"11px",color:C.muted }}>net kcal of {tdee.toLocaleString()} · {activeTier.label}</span>
           </div>
-          <div style={{ display:"flex",gap:"5px",alignItems:"center" }}>
+          <div style={{ display:"flex",gap:"6px",alignItems:"center" }}>
             {macros.map(([k,v,t,c])=>{
               const over=v>t;
               const bg=over?C.dangerBg:(c==="blue"?C.blueBg:c==="amber"?C.amberBg:C.greenBg);
               const col=over?C.danger:(c==="blue"?C.blueText:c==="amber"?C.amberText:C.greenText);
-              return <span key={k} style={{ fontSize:"10px",fontWeight:"500",fontFamily:FONT.mono,padding:"2px 7px",borderRadius:"20px",background:bg,color:col,whiteSpace:"nowrap" }}>{k} {fmt(v)}g</span>;
+              const border=over?`1px solid ${C.danger}`:(c==="blue"?`1px solid ${C.blueMid}`:`1px solid ${C.amberBg}`);
+              return (
+                <div key={k} style={{ display:"flex",flexDirection:"column",alignItems:"center",background:bg,border:border,borderRadius:"8px",padding:"5px 10px",minWidth:"52px" }}>
+                  <span style={{ fontSize:"9px",fontWeight:"500",color:col,textTransform:"uppercase",letterSpacing:"0.5px",opacity:0.8 }}>{k==="P"?"Protein":k==="F"?"Fat":"Carbs"}</span>
+                  <span style={{ fontFamily:FONT.mono,fontSize:"14px",fontWeight:"500",color:col,letterSpacing:"-0.3px",lineHeight:1.2 }}>{fmt(v)}g</span>
+                </div>
+              );
             })}
-            <span style={{ fontSize:"10px",fontFamily:FONT.mono,fontWeight:"500",padding:"2px 7px",borderRadius:"20px",background:netRemaining<0?C.dangerBg:C.greenBg,color:netRemaining<0?C.danger:C.greenText }}>
-              {netRemaining>=0?"-":"+"}‎{Math.abs(Math.round(netRemaining)).toLocaleString()}
-            </span>
+            <div style={{ display:"flex",flexDirection:"column",alignItems:"center",background:netRemaining<0?C.dangerBg:C.greenBg,border:netRemaining<0?`1px solid ${C.danger}`:`1px solid ${C.greenBg}`,borderRadius:"8px",padding:"5px 10px",minWidth:"52px" }}>
+              <span style={{ fontSize:"9px",fontWeight:"500",color:netRemaining<0?C.danger:C.greenText,textTransform:"uppercase",letterSpacing:"0.5px",opacity:0.8 }}>Left</span>
+              <span style={{ fontFamily:FONT.mono,fontSize:"14px",fontWeight:"500",color:netRemaining<0?C.danger:C.greenText,letterSpacing:"-0.3px",lineHeight:1.2 }}>{netRemaining>=0?"-":"+"}‎{Math.abs(Math.round(netRemaining)).toLocaleString()}</span>
+            </div>
           </div>
         </div>
         <div style={{ height:"4px",background:C.bg,borderRadius:"2px",overflow:"hidden" }}>
