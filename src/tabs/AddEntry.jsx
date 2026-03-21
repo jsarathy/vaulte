@@ -112,6 +112,18 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
 
   const submitAddItem = async () => {
     if (!addItem.name) { setAddMsg({ ok:false, text:"Please enter a food name" }); return; }
+    // If no nutrition data yet, open the quantity modal first instead of logging zeros
+    const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
+    if (!hasNutrition) {
+      setQtyValue("1"); setQtyUnit("portion"); setQtyError("");
+      setQtyModal({ name: addItem.name, autoSubmit: true });
+      setTimeout(() => qtyInputRef.current?.focus(), 50);
+      return;
+    }
+    await doSubmit(addItem);
+  };
+
+  const doSubmit = async (item) => {
     let day = allDays.find(d=>d.date===addDate) || await loadDay(userId, addDate);
     if (!day) { day = { date:addDate, notes:"", meals:makeMeals() }; }
     let targetMealId = addMealId;
@@ -125,11 +137,11 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
       targetMealId = newMeal.id;
     }
     if (!targetMealId) { setAddMsg({ ok:false, text:"Please select or create a meal" }); return; }
-    const item = { id:genId(), name:addItem.name,
-      kcal:parseFloat(addItem.kcal)||0, fat:parseFloat(addItem.fat)||0, sat_fat:parseFloat(addItem.sat_fat)||0,
-      carbs:parseFloat(addItem.carbs)||0, sugar:parseFloat(addItem.sugar)||0, fibre:parseFloat(addItem.fibre)||0,
-      net_carbs:parseFloat(addItem.net_carbs)||0, protein:parseFloat(addItem.protein)||0 };
-    const updated = { ...day, meals: day.meals.map(m=>m.id===targetMealId?{...m,items:[...(m.items||[]),item]}:m) };
+    const newItem = { id:genId(), name:item.name,
+      kcal:parseFloat(item.kcal)||0, fat:parseFloat(item.fat)||0, sat_fat:parseFloat(item.sat_fat)||0,
+      carbs:parseFloat(item.carbs)||0, sugar:parseFloat(item.sugar)||0, fibre:parseFloat(item.fibre)||0,
+      net_carbs:parseFloat(item.net_carbs)||0, protein:parseFloat(item.protein)||0 };
+    const updated = { ...day, meals: day.meals.map(m=>m.id===targetMealId?{...m,items:[...(m.items||[]),newItem]}:m) };
     await persistDay(updated);
     if (addDate===currentDate) setCurrentDayData(updated);
     setAddMsg({ ok:true, text:"✅ Item added!" });
@@ -184,6 +196,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
               onBlur={async () => {
                 setTimeout(async () => {
                   setShowDropdown(false);
+                  if (qtyModal) return; // already open, skip
                   const name = addItem.name.trim();
                   if (!name) return;
                   // If already has nutrition (filled from recipe dropdown), skip
@@ -477,13 +490,16 @@ Use realistic values. For portions use a typical serving size.`;
                     const data = await res.json();
                     const text = (data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
                     const n = JSON.parse(text);
-                    setAddItem({
+                    const filledItem = {
                       name: n.display_name || `${name} (${qty} ${unit})`,
                       kcal: n.kcal ?? "", fat: n.fat ?? "", sat_fat: n.sat_fat ?? "",
                       carbs: n.carbs ?? "", sugar: n.sugar ?? "", fibre: n.fibre ?? "",
                       net_carbs: n.net_carbs ?? "", protein: n.protein ?? ""
-                    });
+                    };
+                    const wasAutoSubmit = qtyModal.autoSubmit;
+                    setAddItem(filledItem);
                     setQtyModal(null);
+                    if (wasAutoSubmit) await doSubmit(filledItem);
                   } catch(e) {
                     setQtyError("Could not fetch nutrition — fill in manually or try again.");
                   } finally {
