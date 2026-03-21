@@ -1,7 +1,10 @@
 // src/tabs/LogTab.jsx
 import { useState, useEffect } from "react";
+import { getDoc, doc } from "firebase/firestore";
+import { db } from "../firebase";
 import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
 import { C, FONT, border, IconX, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
+import HRChart from "../components/HRChart.jsx";
 
 const LS_KEY = "vaulte_collapsed_meals";
 
@@ -12,11 +15,80 @@ function saveCollapsed(state) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
 }
 
-export default function LogTab({ currentDate, currentDayData, allDays, switchDay, userRecipes, setRecipeModal, deleteItem, calcSex, calcAge, calcHeight, calcWeight, calcProtein, calcFatPct }) {
-  const [collapsed, setCollapsed] = useState(loadCollapsed);
+// ── Polar Detail Modal ────────────────────────────────────────────────────────
+function PolarDetailModal({ session, onClose }) {
+  if (!session) return null;
+  const s = session;
+  const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) : "Exercise";
+  const d = s.start_time ? new Date(s.start_time) : null;
+  const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) : "";
+  const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
 
-  // Persist on every change
+  const stats = [
+    ["Duration", `${Math.round(s.duration_min||0)} min`],
+    ["Calories",  `${s.calories} kcal`],
+    s.hr_avg ? ["Avg HR",    `${s.hr_avg} bpm`]  : null,
+    s.hr_max ? ["Max HR",    `${s.hr_max} bpm`]  : null,
+    s.fat_pct != null ? ["Fat burn %", `${s.fat_pct}%`] : null,
+    s.fat_pct != null ? ["Fat burned", `${Math.round(s.calories*(s.fat_pct/100)/9)}g`] : null,
+    s.device  ? ["Device",   s.device]  : null,
+  ].filter(Boolean);
+
+  return (
+    <div onClick={e=>e.target===e.currentTarget&&onClose()}
+      style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px" }}>
+      <div style={{ background:"#fff",borderRadius:"10px",width:"520px",maxWidth:"100%",maxHeight:"90vh",overflowY:"auto",border:`0.5px solid ${C.border}`,fontFamily:FONT.sans }}>
+
+        {/* Header */}
+        <div style={{ padding:"14px 18px",borderBottom:border,display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"sticky",top:0,background:"#fff",zIndex:1 }}>
+          <div>
+            <div style={{ fontSize:"14px",fontWeight:"500",color:C.text }}>{sport}</div>
+            <div style={{ fontSize:"11px",color:C.muted,marginTop:"2px" }}>{dateStr}{timeStr?` · ${timeStr}`:""}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:"18px",lineHeight:1,marginLeft:"12px" }}>×</button>
+        </div>
+
+        <div style={{ padding:"16px 18px" }}>
+          {/* Stats grid */}
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px",marginBottom:"16px" }}>
+            {stats.map(([lbl,val])=>(
+              <div key={lbl} style={{ background:C.bg,borderRadius:"6px",padding:"9px 11px",border:`0.5px solid ${C.border}` }}>
+                <div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"3px" }}>{lbl}</div>
+                <div style={{ fontFamily:FONT.mono,fontWeight:"500",fontSize:"14px",color:C.text }}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* HR chart */}
+          {s.hr_samples?.length > 1
+            ? <HRChart session={s}/>
+            : <div style={{ background:C.bg,borderRadius:"6px",border:`0.5px solid ${C.border}`,padding:"16px",textAlign:"center",fontSize:"12px",color:C.hint }}>
+                No heart rate time series available for this session.
+                {!s.hr_samples && " Sync again after updating to the latest version to capture HR data."}
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function LogTab({ userId, currentDate, currentDayData, allDays, switchDay, userRecipes, setRecipeModal, deleteItem, calcSex, calcAge, calcHeight, calcWeight, calcProtein, calcFatPct }) {
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [polarDetail, setPolarDetail] = useState(null); // loaded session object
+  const [polarLoading, setPolarLoading] = useState(null); // item id being loaded
+
   useEffect(() => { saveCollapsed(collapsed); }, [collapsed]);
+
+  const openPolarDetail = async (item) => {
+    if (!item.polar_session_id || !userId) return;
+    setPolarLoading(item.id);
+    try {
+      const snap = await getDoc(doc(db, "users", userId, "polar_sessions", item.polar_session_id));
+      if (snap.exists()) setPolarDetail(snap.data());
+    } catch (e) { console.error("Failed to load polar session:", e); }
+    finally { setPolarLoading(null); }
+  };
 
   if (!currentDayData) return <div style={{ padding:"40px", textAlign:"center", color:C.muted }}>Select a day to get started</div>;
 
@@ -43,6 +115,7 @@ export default function LogTab({ currentDate, currentDayData, allDays, switchDay
 
   return (
     <>
+      <PolarDetailModal session={polarDetail} onClose={()=>setPolarDetail(null)}/>
       {/* Day header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px" }}>
         <div style={{ fontSize:"14px", fontWeight:"500", color:C.text }}>{formatDate(currentDate)}</div>
@@ -173,9 +246,17 @@ export default function LogTab({ currentDate, currentDayData, allDays, switchDay
                     return (
                       <tr key={item.id} style={{ borderBottom:`0.5px solid ${C.border}` }}>
                         <td style={{ padding:"7px 8px",fontSize:"12px",color:item.is_exercise?C.blueText:C.text }}>
-                          {recipe
-                            ? <span onClick={()=>setRecipeModal(recipe)} style={{ color:C.blue,cursor:"pointer",borderBottom:`1px dashed ${C.blueMid}` }}>{item.name}</span>
-                            : item.name}
+                          {item.is_exercise && item.polar_session_id ? (
+                            <span onClick={()=>openPolarDetail(item)}
+                              style={{ cursor:"pointer",borderBottom:`1px dashed ${C.blueMid}`,display:"inline-flex",alignItems:"center",gap:"4px" }}>
+                              {polarLoading===item.id ? "…" : item.name}
+                              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke={C.blue} strokeWidth="1.5" strokeLinecap="round">
+                                <path d="M4 8h8M9 5l3 3-3 3"/>
+                              </svg>
+                            </span>
+                          ) : recipe ? (
+                            <span onClick={()=>setRecipeModal(recipe)} style={{ color:C.blue,cursor:"pointer",borderBottom:`1px dashed ${C.blueMid}` }}>{item.name}</span>
+                          ) : item.name}
                         </td>
                         {[item.kcal,item.fat,item.carbs,item.sugar,item.fibre,item.net_carbs,item.protein].map((v,i)=>(
                           <td key={i} style={{ padding:"7px 8px",textAlign:"right",fontSize:"11px",color:item.is_exercise?C.blueText:C.muted,fontFamily:FONT.mono }}>{fmt(v||0)}{i>0?"g":""}</td>
