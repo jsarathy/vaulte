@@ -23,6 +23,7 @@ export default function handler(req, res) {
     response_type: "code",
     client_id:     clientId,
     redirect_uri:  redirectUri,
+    scope:         "accesslink.read_all training_data",
     state,
   });
 
