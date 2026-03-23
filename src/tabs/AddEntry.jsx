@@ -373,17 +373,6 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   style={{ background:polarSyncing?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:polarSyncing?"not-allowed":"pointer", fontWeight:"bold" }}>
                   {polarSyncing?"⏳ Syncing…":"🔄 Sync"}
                 </button>
-                <button onClick={async()=>{
-                  setShowBrowseModal(true); setBrowseSearch(""); setBrowseLoading(true);
-                  try {
-                    const q = query(collection(db,"users",userId,"polar_sessions"), orderBy("start_time","desc"));
-                    const snap = await getDocs(q);
-                    setBrowseAll(snap.docs.map(d=>({id:d.id,...d.data()})));
-                  } catch(e) { console.error(e); }
-                  finally { setBrowseLoading(false); }
-                }} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:"pointer" }}>
-                  Browse all
-                </button>
                 <button onClick={()=>{ window.location.href=`/api/polar-auth?userId=${userId}`; }}
                   title="Reconnect to update permissions"
                   style={{ background:"transparent", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.6)", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:"pointer" }}>
@@ -411,15 +400,85 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 </button>
               </div>
             ) : polarSessions.length===0 ? (
-              <div style={{ textAlign:"center", padding:"16px 8px", color:"#6b7280" }}>
-                <div style={{ fontSize:"28px", marginBottom:"6px" }}>✅</div>
-                <div style={{ fontSize:"12px", marginBottom:"8px" }}>All sessions logged.</div>
-                {polarLastSync && (
-                  <div style={{ fontSize:"10px", color:"#A0B4C8" }}>
-                    Last sync: {new Date(polarLastSync).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
-                  </div>
-                )}
-                <div style={{ fontSize:"11px", marginTop:"10px" }}>Sync your H10 to Polar Flow, then click 🔄 Sync above.</div>
+              <div style={{ color:"#6b7280" }}>
+                {/* Header */}
+                <div style={{ textAlign:"center", padding:"12px 8px 8px" }}>
+                  <div style={{ fontSize:"28px", marginBottom:"4px" }}>✅</div>
+                  <div style={{ fontSize:"12px", marginBottom:"4px" }}>All sessions logged.</div>
+                  {polarLastSync && (
+                    <div style={{ fontSize:"10px", color:"#A0B4C8", marginBottom:"8px" }}>
+                      Last sync: {new Date(polarLastSync).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+                    </div>
+                  )}
+                  <div style={{ fontSize:"11px", marginBottom:"10px" }}>Sync your H10 to Polar Flow, then click 🔄 Sync above.</div>
+                  <button onClick={async()=>{
+                    setShowBrowseModal(true); setBrowseSearch(""); setBrowseLoading(true);
+                    try {
+                      const q = query(collection(db,"users",userId,"polar_sessions"), orderBy("start_time","desc"));
+                      const snap = await getDocs(q);
+                      setBrowseAll(snap.docs.map(d=>({id:d.id,...d.data()})));
+                    } catch(e) { console.error(e); }
+                    finally { setBrowseLoading(false); }
+                  }} style={{ background:C.blueBg, color:C.blueText, border:`0.5px solid ${C.blueMid}`, borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:"500", cursor:"pointer", fontFamily:FONT.sans }}>
+                    Browse all sessions
+                  </button>
+                </div>
+                {/* Last 10 logged sessions inline */}
+                {(() => {
+                  if (browseLoading) return null;
+                  // Eagerly load last 10 if not already loaded
+                  const recent = browseAll.length > 0
+                    ? browseAll.filter(s=>s.logged).slice(0,10)
+                    : null;
+                  if (!recent) return (
+                    <div style={{ borderTop:`0.5px solid ${C.border}`,marginTop:"8px",paddingTop:"8px" }}>
+                      <button onClick={async()=>{
+                        setBrowseLoading(true);
+                        try {
+                          const q = query(collection(db,"users",userId,"polar_sessions"), orderBy("start_time","desc"));
+                          const snap = await getDocs(q);
+                          setBrowseAll(snap.docs.map(d=>({id:d.id,...d.data()})));
+                        } catch(e) { console.error(e); }
+                        finally { setBrowseLoading(false); }
+                      }} style={{ width:"100%", background:"transparent", border:"none", color:C.hint, fontSize:"11px", cursor:"pointer", padding:"4px" }}>
+                        Load recent sessions ↓
+                      </button>
+                    </div>
+                  );
+                  if (recent.length === 0) return null;
+                  return (
+                    <div style={{ borderTop:`0.5px solid ${C.border}`,marginTop:"8px" }}>
+                      <div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",padding:"8px 12px 4px" }}>
+                        Recent sessions
+                      </div>
+                      {recent.map(s => {
+                        const sport = s.sport?s.sport.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()):"Exercise";
+                        const d = s.start_time?new Date(s.start_time):null;
+                        const fatBurned = s.fat_pct!=null?Math.round(s.calories*s.fat_pct/100/9):null;
+                        return (
+                          <div key={s.id} onClick={()=>setPolarLogModal(s)}
+                            style={{ padding:"8px 12px", borderBottom:`0.5px solid ${C.border}`, cursor:"pointer", fontSize:"11px" }}
+                            onMouseEnter={e=>e.currentTarget.style.background=C.blueBg}
+                            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"3px" }}>
+                              <span style={{ fontWeight:"500", color:C.blueText, fontSize:"12px" }}>{sport}</span>
+                              <span style={{ color:C.muted, fontFamily:FONT.mono, fontSize:"10px" }}>
+                                {d?d.toLocaleDateString("en-GB",{day:"numeric",month:"short"}):""}
+                              </span>
+                            </div>
+                            <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", color:C.muted }}>
+                              <span>{Math.round(s.duration_min||0)} min</span>
+                              <span>{s.calories} kcal</span>
+                              {s.hr_avg&&<span>❤ {s.hr_avg} bpm</span>}
+                              {fatBurned!=null&&<span>🧈 {fatBurned}g fat</span>}
+                              {s.hr_samples&&<span style={{ color:C.greenText }}>HR ✓</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div>
