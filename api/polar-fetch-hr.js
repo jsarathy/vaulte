@@ -27,8 +27,8 @@ export default async function handler(req, res) {
     if (!sessionDoc.exists) return res.status(404).json({ error: "Session not found" });
 
     const session = sessionDoc.data();
-    if (!session.exercise_url) {
-      return res.status(422).json({ error: "no_url", message: "This session was synced before the exercise URL was stored. Re-sync a new session to capture HR data." });
+    if (!session.polar_user_id && !session.exercise_url) {
+      return res.status(422).json({ error: "no_url", message: "Cannot fetch HR for this session — missing Polar identifiers." });
     }
 
     // Load access token
@@ -38,14 +38,35 @@ export default async function handler(req, res) {
     const { access_token } = connDoc.data();
     const AUTH = { "Authorization": `Bearer ${access_token}`, "Accept": "application/json" };
 
-    // Fetch samples directly from the stored URL
-    const samplesRes = await fetch(`${session.exercise_url}/samples`, { headers: AUTH });
-    if (!samplesRes.ok) {
-      const body = await samplesRes.text();
-      return res.status(502).json({ error: "Polar samples fetch failed", detail: body });
+    // Fetch samples via the permanent training data API (works after transaction commit)
+    // Falls back to stored exercise_url if polar_user_id not available
+    const baseUrl = session.polar_user_id
+      ? `https://www.polaraccesslink.com/v3/users/${session.polar_user_id}/exercises/${sessionId}`
+      : session.exercise_url;
+
+    if (!baseUrl) {
+      return res.status(422).json({ error: "no_url", message: "No exercise URL available. Re-sync a new session to capture HR data." });
     }
 
-    const samplesData = await samplesRes.json();
+    // Try permanent training data endpoint first, fall back to transaction URL
+    let samplesData = null;
+    const urlsToTry = [
+      `https://www.polaraccesslink.com/v3/users/${session.polar_user_id}/exercises/${sessionId}/samples`,
+      session.exercise_url ? `${session.exercise_url}/samples` : null,
+    ].filter(Boolean);
+
+    for (const url of urlsToTry) {
+      const samplesRes = await fetch(url, { headers: AUTH });
+      if (samplesRes.ok) {
+        samplesData = await samplesRes.json();
+        break;
+      }
+      console.warn("Samples fetch failed at:", url, samplesRes.status);
+    }
+
+    if (!samplesData) {
+      return res.status(502).json({ error: "Polar samples fetch failed on all URLs" });
+    }
     const sampleSets = samplesData["samples"] || [];
     const hrSet = sampleSets.find(s => String(s["sample-type"]) === "0");
 

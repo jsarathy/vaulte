@@ -94,11 +94,9 @@ function PolarDetailModal({ session, onClose, userId, onHRLoaded }) {
           ) : (
             <div style={{ background:C.bg,borderRadius:"6px",border:`0.5px solid ${C.border}`,padding:"16px",textAlign:"center" }}>
               <div style={{ fontSize:"12px",color:C.muted,marginBottom:"12px" }}>
-                {s.exercise_url
-                  ? "Heart rate data wasn't captured at sync time."
-                  : "This session was synced before HR capture was available."}
+                Heart rate data wasn't captured at sync time.
               </div>
-              {s.exercise_url && (
+              {(s.exercise_url || s.polar_user_id) && (
                 <>
                   <button onClick={fetchHR} disabled={fetchingHR}
                     style={{ background:fetchingHR?C.hint:C.blue,color:"#fff",border:"none",borderRadius:"6px",

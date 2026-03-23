@@ -112,9 +112,9 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
 
   const submitAddItem = async () => {
     if (!addItem.name) { setAddMsg({ ok:false, text:"Please enter a food name" }); return; }
-    // If no nutrition data yet, open the quantity modal first instead of logging zeros
     const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
     if (!hasNutrition) {
+      // Open qty modal (user can switch to recipe builder from there if needed)
       setQtyValue("1"); setQtyUnit("portion"); setQtyError("");
       setQtyModal({ name: addItem.name, autoSubmit: true });
       setTimeout(() => qtyInputRef.current?.focus(), 50);
@@ -202,8 +202,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   // If already has nutrition (filled from recipe dropdown), skip
                   const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
                   if (hasNutrition) return;
-                  // Classify to pick default unit: ingredient → grams, dish → portion
-                  let defaultUnit = "portion";
+                  // Classify: ingredient → qty modal (grams), dish → recipe builder
                   try {
                     const res = await fetch("/api/claude", {
                       method:"POST", headers:{"Content-Type":"application/json"},
@@ -211,13 +210,18 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                         messages:[{role:"user", content:`Is "${name}" a single whole-food ingredient (apple, milk, chicken breast) or a cooked/prepared dish (stew, curry, pasta)? Reply with exactly one word: INGREDIENT or DISH`}] })
                     });
                     const data = await res.json();
-                    if ((data.content?.[0]?.text||"").trim().toUpperCase().includes("INGREDIENT")) defaultUnit = "g";
-                  } catch {}
-                  setQtyValue(defaultUnit === "g" ? "100" : "1");
-                  setQtyUnit(defaultUnit);
-                  setQtyError("");
-                  setQtyModal({ name });
-                  setTimeout(() => qtyInputRef.current?.focus(), 50);
+                    const verdict = (data.content?.[0]?.text||"DISH").trim().toUpperCase();
+                    if (verdict.includes("INGREDIENT")) {
+                      setQtyValue("100"); setQtyUnit("g"); setQtyError("");
+                      setQtyModal({ name });
+                      setTimeout(() => qtyInputRef.current?.focus(), 50);
+                    } else {
+                      setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
+                    }
+                  } catch {
+                    // On error, fall back to recipe builder for dishes
+                    setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
+                  }
                 }, 150);
               }}
               onFocus={() => { if (nameDropdown.length>0) setShowDropdown(true); }}
