@@ -1,7 +1,4 @@
 // api/polar-fetch-hr.js
-// Fetches HR samples for a specific already-synced session using the stored exercise URL.
-// Called from the frontend when a session has no hr_samples (synced before HR feature).
-
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -13,6 +10,19 @@ function getAdminDb() {
   return getFirestore();
 }
 
+async function safeFetchJSON(url, headers) {
+  const r = await fetch(url, { headers });
+  const text = await r.text();
+  console.log(`polar-fetch-hr: GET ${url} → ${r.status}, body length ${text.length}`);
+  if (!r.ok) return { ok: false, status: r.status, body: text };
+  if (!text.trim()) return { ok: false, status: r.status, body: "(empty body)" };
+  try {
+    return { ok: true, status: r.status, data: JSON.parse(text) };
+  } catch (e) {
+    return { ok: false, status: r.status, body: text.slice(0, 200) };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -22,56 +32,55 @@ export default async function handler(req, res) {
   try {
     const db = getAdminDb();
 
-    // Load the session doc
     const sessionDoc = await db.doc(`users/${userId}/polar_sessions/${sessionId}`).get();
     if (!sessionDoc.exists) return res.status(404).json({ error: "Session not found" });
-
     const session = sessionDoc.data();
-    if (!session.polar_user_id && !session.exercise_url) {
-      return res.status(422).json({ error: "no_url", message: "Cannot fetch HR for this session — missing Polar identifiers." });
-    }
 
-    // Load access token
     const connDoc = await db.doc(`users/${userId}/polar/connection`).get();
     if (!connDoc.exists) return res.status(401).json({ error: "Polar not connected" });
+    const { access_token, polar_user_id: connPolarUserId } = connDoc.data();
 
-    const { access_token } = connDoc.data();
     const AUTH = { "Authorization": `Bearer ${access_token}`, "Accept": "application/json" };
 
-    // Fetch samples via the permanent training data API (works after transaction commit)
-    // Falls back to stored exercise_url if polar_user_id not available
-    const baseUrl = session.polar_user_id
-      ? `https://www.polaraccesslink.com/v3/users/${session.polar_user_id}/exercises/${sessionId}`
-      : session.exercise_url;
-
-    if (!baseUrl) {
-      return res.status(422).json({ error: "no_url", message: "No exercise URL available. Re-sync a new session to capture HR data." });
-    }
-
-    // Try permanent training data endpoint first, fall back to transaction URL
-    let samplesData = null;
+    // Build candidate URLs — permanent training data API is primary
+    const polarUserId = session.polar_user_id || connPolarUserId;
     const urlsToTry = [
-      `https://www.polaraccesslink.com/v3/users/${session.polar_user_id}/exercises/${sessionId}/samples`,
+      polarUserId
+        ? `https://www.polaraccesslink.com/v3/users/${polarUserId}/exercises/${sessionId}/samples`
+        : null,
       session.exercise_url ? `${session.exercise_url}/samples` : null,
     ].filter(Boolean);
 
+    if (urlsToTry.length === 0) {
+      return res.status(422).json({ error: "no_url", message: "No Polar identifiers found for this session. Re-sync a fresh session." });
+    }
+
+    // Try each URL, collect diagnostic info
+    let samplesData = null;
+    const attempts = [];
     for (const url of urlsToTry) {
-      const samplesRes = await fetch(url, { headers: AUTH });
-      if (samplesRes.ok) {
-        samplesData = await samplesRes.json();
-        break;
-      }
-      console.warn("Samples fetch failed at:", url, samplesRes.status);
+      const result = await safeFetchJSON(url, AUTH);
+      attempts.push({ url, status: result.status, ok: result.ok });
+      if (result.ok) { samplesData = result.data; break; }
     }
 
     if (!samplesData) {
-      return res.status(502).json({ error: "Polar samples fetch failed on all URLs" });
+      return res.status(502).json({
+        error: "samples_unavailable",
+        message: "Polar returned no HR sample data. Check that HR recording was enabled on your watch and that you have re-authorised Vaulte with the Reconnect button.",
+        attempts,
+      });
     }
+
+    // Parse HR samples (sample-type "0" = heart rate)
     const sampleSets = samplesData["samples"] || [];
     const hrSet = sampleSets.find(s => String(s["sample-type"]) === "0");
 
     if (!hrSet?.data) {
-      return res.status(404).json({ error: "no_hr", message: "No heart rate data available for this session." });
+      return res.status(404).json({
+        error: "no_hr",
+        message: `No heart rate channel in samples. Available types: [${sampleSets.map(s=>s["sample-type"]).join(", ")}]`,
+      });
     }
 
     const raw = hrSet.data.split(",").map(v => parseInt(v.trim(), 10));
@@ -82,10 +91,10 @@ export default async function handler(req, res) {
     const recording_rate_s = hrSet["recording-rate"] || 5;
 
     if (!hr_samples) {
-      return res.status(404).json({ error: "no_hr", message: "No valid heart rate readings in this session." });
+      return res.status(404).json({ error: "no_hr", message: "All HR values were zero — watch may not have had a lock." });
     }
 
-    // Save back to Firestore
+    // Persist back to Firestore so next open shows chart immediately
     await db.doc(`users/${userId}/polar_sessions/${sessionId}`).update({
       hr_samples,
       recording_rate_s,

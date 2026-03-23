@@ -7,7 +7,7 @@ import { claudeCreateRecipe } from "../api/claude";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import { db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDocs, collection, orderBy, query } from "firebase/firestore";
 
 // Local style shorthand
 const S = {
@@ -44,6 +44,10 @@ export default function AddEntry({
   const [exMsg, setExMsg] = useState(null);
   const [showExModal, setShowExModal] = useState(false);
   const [exMealId, setExMealId] = useState("");
+  const [showBrowseModal, setShowBrowseModal] = useState(false);
+  const [browseAll, setBrowseAll] = useState([]);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseSearch, setBrowseSearch] = useState("");
   const [showRecipesModal, setShowRecipesModal] = useState(false);
   const [recipeBuilder, setRecipeBuilder] = useState(false);
   const [builderInput, setBuilderInput] = useState("");
@@ -369,6 +373,17 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   style={{ background:polarSyncing?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:polarSyncing?"not-allowed":"pointer", fontWeight:"bold" }}>
                   {polarSyncing?"⏳ Syncing…":"🔄 Sync"}
                 </button>
+                <button onClick={async()=>{
+                  setShowBrowseModal(true); setBrowseSearch(""); setBrowseLoading(true);
+                  try {
+                    const q = query(collection(db,"users",userId,"polar_sessions"), orderBy("start_time","desc"));
+                    const snap = await getDocs(q);
+                    setBrowseAll(snap.docs.map(d=>({id:d.id,...d.data()})));
+                  } catch(e) { console.error(e); }
+                  finally { setBrowseLoading(false); }
+                }} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:"pointer" }}>
+                  Browse all
+                </button>
                 <button onClick={()=>{ window.location.href=`/api/polar-auth?userId=${userId}`; }}
                   title="Reconnect to update permissions"
                   style={{ background:"transparent", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.6)", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:"pointer" }}>
@@ -439,6 +454,95 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
           </div>
         </div>
       </div>
+
+      {/* ── Browse All Polar Sessions Modal ── */}
+      {showBrowseModal && (
+        <div onClick={e=>e.target===e.currentTarget&&setShowBrowseModal(false)}
+          style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px" }}>
+          <div style={{ background:"#fff",borderRadius:"10px",width:"580px",maxWidth:"100%",maxHeight:"88vh",display:"flex",flexDirection:"column",border:`0.5px solid ${C.border}`,fontFamily:FONT.sans }}>
+
+            {/* Header */}
+            <div style={{ padding:"14px 18px",borderBottom:`0.5px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
+              <div style={{ fontSize:"13px",fontWeight:"500",color:C.text }}>All Polar sessions</div>
+              <button onClick={()=>setShowBrowseModal(false)} style={{ background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:"18px",lineHeight:1 }}>×</button>
+            </div>
+
+            {/* Search bar */}
+            <div style={{ padding:"10px 18px",borderBottom:`0.5px solid ${C.border}`,flexShrink:0 }}>
+              <input
+                type="text"
+                value={browseSearch}
+                onChange={e=>setBrowseSearch(e.target.value)}
+                placeholder="Filter by date (e.g. 17 Mar, 2026-03) or activity (cycling, running…)"
+                autoFocus
+                style={{ width:"100%",padding:"7px 10px",border:`0.5px solid ${C.borderMid}`,borderRadius:"6px",fontSize:"12px",fontFamily:FONT.sans,outline:"none",boxSizing:"border-box" }}
+              />
+            </div>
+
+            {/* Session list */}
+            <div style={{ flex:1,overflowY:"auto",padding:"8px 18px" }}>
+              {browseLoading && <div style={{ textAlign:"center",padding:"32px",color:C.muted,fontSize:"12px" }}>Loading sessions…</div>}
+              {!browseLoading && (() => {
+                const q = browseSearch.toLowerCase();
+                const filtered = browseAll.filter(s => {
+                  if (!q) return true;
+                  const sport = (s.sport||"").replace(/_/g," ").toLowerCase();
+                  const dateStr = s.start_time ? new Date(s.start_time).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}).toLowerCase() : "";
+                  const isoDate = (s.start_time||"").slice(0,10);
+                  return sport.includes(q) || dateStr.includes(q) || isoDate.includes(q);
+                });
+                if (filtered.length === 0) return <div style={{ textAlign:"center",padding:"32px",color:C.hint,fontSize:"12px" }}>No sessions match</div>;
+                return filtered.map(s => {
+                  const sport = s.sport ? s.sport.replace(/_/g," ").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()) : "Exercise";
+                  const d = s.start_time ? new Date(s.start_time) : null;
+                  const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric"}) : (s.date||"");
+                  const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
+                  const fatBurned = s.fat_pct != null ? Math.round(s.calories * s.fat_pct / 100 / 9) : null;
+                  return (
+                    <div key={s.id}
+                      onClick={()=>{ setShowBrowseModal(false); setPolarLogModal(s); }}
+                      style={{ padding:"10px 12px",borderRadius:"7px",border:`0.5px solid ${C.border}`,marginBottom:"7px",cursor:s.logged?"default":"pointer",
+                        background:s.logged?"#fafafa":"#fff",opacity:s.logged?0.7:1,transition:"background 0.12s" }}
+                      onMouseEnter={e=>{ if(!s.logged) e.currentTarget.style.background=C.blueBg; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.background=s.logged?"#fafafa":"#fff"; }}>
+                      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"5px" }}>
+                        <div style={{ display:"flex",alignItems:"center",gap:"7px" }}>
+                          <span style={{ fontSize:"12px",fontWeight:"500",color:s.logged?C.muted:C.blueText }}>{sport}</span>
+                          {s.logged && <span style={{ fontSize:"9px",background:C.greenBg,color:C.greenText,borderRadius:"20px",padding:"1px 6px",fontWeight:"500" }}>logged</span>}
+                        </div>
+                        <span style={{ fontSize:"11px",color:C.muted,fontFamily:FONT.mono }}>{dateStr}{timeStr?` · ${timeStr}`:""}</span>
+                      </div>
+                      <div style={{ display:"flex",gap:"12px",flexWrap:"wrap" }}>
+                        {[
+                          ["Duration", `${Math.round(s.duration_min||0)} min`],
+                          ["Calories",  `${s.calories} kcal`],
+                          s.hr_avg ? ["Avg HR", `${s.hr_avg} bpm`] : null,
+                          s.hr_max ? ["Max HR", `${s.hr_max} bpm`] : null,
+                          fatBurned != null ? ["Fat burned", `${fatBurned}g`] : null,
+                          s.hr_samples ? ["HR data", "✓"] : null,
+                        ].filter(Boolean).map(([lbl,val])=>(
+                          <div key={lbl} style={{ fontSize:"10px",color:C.muted }}>
+                            <span style={{ color:C.hint }}>{lbl} </span>
+                            <span style={{ fontFamily:FONT.mono,fontWeight:"500",color:lbl==="HR data"?C.greenText:C.text }}>{val}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Footer */}
+            {!browseLoading && (
+              <div style={{ padding:"10px 18px",borderTop:`0.5px solid ${C.border}`,fontSize:"11px",color:C.hint,flexShrink:0,display:"flex",justifyContent:"space-between" }}>
+                <span>{browseAll.length} total · {browseAll.filter(s=>s.logged).length} logged · {browseAll.filter(s=>!s.logged).length} pending</span>
+                <span>Click any unlogged session to log it</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Quantity Modal ── */}
       {qtyModal && (
