@@ -374,13 +374,18 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   {polarSyncing?"⏳ Syncing…":"🔄 Sync"}
                 </button>
                 <button onClick={async()=>{
-                  if (!confirm("This will disconnect and re-authorise your Polar account with updated permissions. Continue?")) return;
+                  if (!confirm("This will re-authorise your Polar account with updated permissions (needed for HR data). Continue?")) return;
+                  const btn = document.getElementById("polar-reconnect-btn");
+                  if (btn) btn.textContent = "Working…";
                   try {
-                    await fetch("/api/polar-disconnect", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({userId}) });
-                  } catch(e) { console.warn("Disconnect call failed, continuing to auth:", e); }
+                    const r = await fetch("/api/polar-disconnect", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({userId}) });
+                    const d = await r.json();
+                    console.log("Disconnect result:", d);
+                  } catch(e) { console.warn("Disconnect failed, continuing:", e); }
                   window.location.href=`/api/polar-auth?userId=${userId}`;
                 }}
-                  title="Disconnect and re-authorise with updated permissions"
+                  id="polar-reconnect-btn"
+                  title="Re-authorise with updated permissions for HR data"
                   style={{ background:"transparent", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.6)", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:"pointer" }}>
                   Reconnect
                 </button>
