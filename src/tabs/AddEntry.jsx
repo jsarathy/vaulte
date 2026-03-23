@@ -373,8 +373,14 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   style={{ background:polarSyncing?"rgba(255,255,255,0.1)":"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.3)", color:"#fff", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:polarSyncing?"not-allowed":"pointer", fontWeight:"bold" }}>
                   {polarSyncing?"⏳ Syncing…":"🔄 Sync"}
                 </button>
-                <button onClick={()=>{ window.location.href=`/api/polar-auth?userId=${userId}`; }}
-                  title="Reconnect to update permissions"
+                <button onClick={async()=>{
+                  if (!confirm("This will disconnect and re-authorise your Polar account with updated permissions. Continue?")) return;
+                  try {
+                    await fetch("/api/polar-disconnect", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({userId}) });
+                  } catch(e) { console.warn("Disconnect call failed, continuing to auth:", e); }
+                  window.location.href=`/api/polar-auth?userId=${userId}`;
+                }}
+                  title="Disconnect and re-authorise with updated permissions"
                   style={{ background:"transparent", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.6)", borderRadius:"4px", padding:"2px 8px", fontSize:"10px", cursor:"pointer" }}>
                   Reconnect
                 </button>
