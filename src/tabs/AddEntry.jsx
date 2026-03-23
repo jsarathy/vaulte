@@ -374,6 +374,8 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   {polarSyncing?"⏳ Syncing…":"🔄 Sync"}
                 </button>
                 <button onClick={async()=>{
+                  console.log("Reconnect clicked, userId:", userId);
+                  if (!userId) { alert("Not logged in — please refresh and try again."); return; }
                   if (!confirm("This will re-authorise your Polar account with updated permissions (needed for HR data). Continue?")) return;
                   const btn = document.getElementById("polar-reconnect-btn");
                   if (btn) btn.textContent = "Working…";
@@ -405,7 +407,10 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 <div style={{ fontSize:"11px", color:"#6b7280", marginBottom:"14px", lineHeight:1.5 }}>
                   Authorise Vaulte to read your training sessions from Polar Flow. After connecting, use Sync to pull sessions.
                 </div>
-                <button onClick={()=>{ window.location.href=`/api/polar-auth?userId=${userId}`; }}
+                <button onClick={()=>{
+                  if (!userId) { alert("Not logged in — please refresh and try again."); return; }
+                  window.location.href=`/api/polar-auth?userId=${userId}`;
+                }}
                   style={{ background:"#D94032", color:"#fff", border:"none", borderRadius:"6px", padding:"9px 18px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>
                   Connect Polar Account
                 </button>
