@@ -69,7 +69,8 @@ export default async function handler(req, res) {
     const { access_token, x_user_id: polarUserId } = tokenData;
 
     // ── Step 2: Register user with AccessLink ──────────────────────────────────
-    // This will 409 if already registered — that's fine, just continue
+    // 200 = new registration, 409 = already registered — both are fine.
+    // We always continue because we have a valid new access_token regardless.
     const regRes = await fetch("https://www.polaraccesslink.com/v3/users", {
       method: "POST",
       headers: {
@@ -80,10 +81,12 @@ export default async function handler(req, res) {
       body: JSON.stringify({ "member-id": firebaseUid }),
     });
 
-    // 200 = new registration, 409 = already registered, both are fine
-    if (!regRes.ok && regRes.status !== 409) {
-      console.error("Polar user registration failed:", regRes.status, await regRes.text());
-      // Continue anyway — some Polar plans auto-register
+    const regStatus = regRes.status;
+    console.log("Polar registration status:", regStatus);
+    if (!regRes.ok && regStatus !== 409) {
+      const regBody = await regRes.text();
+      console.warn("Polar registration non-fatal error:", regStatus, regBody);
+      // Continue anyway — we still have a valid token
     }
 
     // ── Step 3: Save to Firestore ──────────────────────────────────────────────
