@@ -614,11 +614,11 @@ export default function App() {
           </div>
 
           {/* Main Content */}
-          <div style={{ flex:1, padding:"48px", overflowY:"auto" }}>
+          <div style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}>
 
             {/* HOME panel */}
             {activePanel === "home" && (
-              <div className="fade-up" style={{ margin:"-48px", position:"relative", height:"calc(100vh - 65px)", overflow:"hidden" }}>
+              <div className="fade-up" style={{ position:"absolute", inset:0, overflow:"hidden" }}>
 
                 {/* Full-bleed background photo or dark fallback */}
                 {profile.photoURL
@@ -639,7 +639,7 @@ export default function App() {
                 }} />
 
                 {/* Content */}
-                <div style={{ position:"relative", zIndex:1, padding:"56px 56px 48px", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"calc(100vh - 65px)" }}>
+                <div style={{ position:"relative", zIndex:1, padding:"56px 56px 48px", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%" }}>
 
                   {/* Date */}
                   <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"4px", marginBottom:"20px", textTransform:"uppercase" }}>
