@@ -72,6 +72,17 @@ const globalStyle = `
   ::-webkit-scrollbar { width:4px; }
   ::-webkit-scrollbar-track { background:transparent; }
   ::-webkit-scrollbar-thumb { background:rgba(212,175,55,0.3); border-radius:2px; }
+
+  @media (max-width: 768px) {
+    .app-sidebar { width:100% !important; height:56px !important; flex-direction:row !important; padding:0 !important; border-right:none !important; border-top:1px solid rgba(212,175,55,0.15) !important; order:2; gap:0 !important; }
+    .app-sidebar .sidebar-label { display:none; }
+    .app-sidebar .sidebar-nav-section { display:none; }
+    .app-sidebar .sidebar-delete { display:none; }
+    .app-body { flex-direction:column !important; }
+    .app-main { order:1; }
+    .app-topbar { padding:12px 16px !important; }
+    .app-topbar-name { display:none; }
+  }
 `;
 
 const inp = { width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(212,175,55,0.3)", borderRadius:"4px", color:"#f0ead6", fontSize:"14px", fontFamily:"'Cormorant Garamond',serif", letterSpacing:"0.5px", outline:"none", transition:"border-color 0.3s, box-shadow 0.3s" };
@@ -547,12 +558,12 @@ export default function App() {
         fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
         cursor:"pointer", transition:"all 0.25s", textTransform:"uppercase", textAlign:"left",
       }}>
-        <span style={{ fontSize:"16px" }}>{icon}</span>{label}
+        <span style={{ fontSize:"16px" }}>{icon}</span><span className="sidebar-label">{label}</span>
       </button>
     );
 
     return (
-      <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'Cormorant Garamond',serif" }}>
+      <div style={{ height:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'Cormorant Garamond',serif", overflow:"hidden" }}>
         <style>{globalStyle}</style>
         {toast && <div className="toast">✦ {toast}</div>}
 
@@ -588,10 +599,10 @@ export default function App() {
         )}
 
         {/* Top bar */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 32px", borderBottom:"1px solid rgba(212,175,55,0.1)", background:"rgba(0,0,0,0.2)" }}>
+        <div className="app-topbar" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 32px", borderBottom:"1px solid rgba(212,175,55,0.1)", background:"rgba(0,0,0,0.2)", flexShrink:0 }}>
           <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"20px", letterSpacing:"6px" }}>VAULTE</div>
           <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
-            <div style={{ fontFamily:"'Cinzel',serif", color:"rgba(212,175,55,0.5)", fontSize:"10px", letterSpacing:"2px" }}>
+            <div className="app-topbar-name" style={{ fontFamily:"'Cinzel',serif", color:"rgba(212,175,55,0.5)", fontSize:"10px", letterSpacing:"2px" }}>
               {profile.firstName} {profile.lastName}
             </div>
             <button className="btn-ghost" style={{ padding:"8px 20px", fontSize:"10px" }} onClick={handleLogout}>Sign Out</button>
@@ -599,22 +610,22 @@ export default function App() {
         </div>
 
         {/* Body */}
-        <div style={{ display:"flex", flex:1 }}>
+        <div className="app-body" style={{ display:"flex", flex:1, minHeight:0, overflow:"hidden" }}>
 
           {/* Left Sidebar */}
-          <div style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
-            <div style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
-            {navItem("home",    "Home",            "⌂")}
-            {navItem("account", "My Account",      "◈")}
-            {navItem("nutrition", "Nutrition",     "🥗")}
-            {navItem("routine",   "Routine",       "📋")}
-            <div style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
+          <div className="app-sidebar" style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
+            <div className="sidebar-nav-section" style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
+            {navItem("home",      "Home",       "⌂")}
+            {navItem("account",   "My Account", "◈")}
+            {navItem("nutrition", "Nutrition",  "🥗")}
+            {navItem("routine",   "Routine",    "📋")}
+            <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
           </div>
 
           {/* Main Content */}
-          <div style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}>
+          <div className="app-main" style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}>
 
             {/* HOME panel */}
             {activePanel === "home" && (
