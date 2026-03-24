@@ -618,36 +618,43 @@ export default function App() {
 
             {/* HOME panel */}
             {activePanel === "home" && (
-              <div className="fade-up" style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                {/* Left: welcome text */}
-                <div>
-                  <div style={{ color:"rgba(212,175,55,0.4)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"16px" }}>
+              <div className="fade-up" style={{ margin:"-48px", position:"relative", minHeight:"calc(100vh - 80px)", overflow:"hidden" }}>
+
+                {/* Full-bleed background photo or dark fallback */}
+                {profile.photoURL
+                  ? <div style={{
+                      position:"absolute", inset:0,
+                      backgroundImage:`url(${profile.photoURL})`,
+                      backgroundSize:"cover",
+                      backgroundPosition:"center top",
+                      filter:"brightness(0.45) saturate(0.8)",
+                    }} />
+                  : <div style={{ position:"absolute", inset:0, background:"linear-gradient(160deg,#0d0d0f 60%,#1a1408)" }} />
+                }
+
+                {/* Gradient overlay — bottom fade to dark */}
+                <div style={{
+                  position:"absolute", inset:0,
+                  background:"linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(10,10,12,0.7) 60%, rgba(10,10,12,0.95) 100%)",
+                }} />
+
+                {/* Content */}
+                <div style={{ position:"relative", zIndex:1, padding:"56px 56px 48px", display:"flex", flexDirection:"column", justifyContent:"flex-end", minHeight:"calc(100vh - 80px)" }}>
+
+                  {/* Date */}
+                  <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"4px", marginBottom:"20px", textTransform:"uppercase" }}>
                     {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
                   </div>
-                  <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"42px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.2", marginBottom:"16px" }}>
-                    Welcome,<br />{profile.firstName}.
+
+                  {/* Welcome + Name on same line */}
+                  <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"52px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.1", marginBottom:"16px", textShadow:"0 4px 24px rgba(0,0,0,0.8)" }}>
+                    Welcome, {profile.firstName}.
                   </h1>
-                  <p style={{ color:"rgba(240,234,214,0.35)", fontSize:"16px", fontStyle:"italic", letterSpacing:"0.5px" }}>
+
+                  <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"15px", fontStyle:"italic", letterSpacing:"1px", textShadow:"0 2px 8px rgba(0,0,0,0.8)" }}>
                     Good to have you back.
                   </p>
-                </div>
-                {/* Right: profile photo */}
-                <div style={{ flexShrink:0, marginLeft:"40px" }}>
-                  {profile.photoURL
-                    ? <div style={{
-                        width:"200px", height:"200px", flexShrink:0,
-                        borderRadius:"12px",
-                        backgroundImage:`url(${profile.photoURL})`,
-                        backgroundSize:"cover",
-                        backgroundPosition:"center",
-                        border:"2px solid rgba(212,175,55,0.4)",
-                        boxShadow:"0 8px 32px rgba(0,0,0,0.5)"
-                      }} />
-                    : <div style={{ width:"200px", height:"200px", borderRadius:"12px", border:"2px dashed rgba(212,175,55,0.25)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"12px", background:"rgba(212,175,55,0.03)" }}>
-                        <span style={{ fontSize:"48px", opacity:0.3 }}>👤</span>
-                        <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"2px", color:"rgba(212,175,55,0.3)", textAlign:"center" }}>NO PHOTO YET</span>
-                      </div>
-                  }
+
                 </div>
               </div>
             )}
