@@ -236,6 +236,25 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   }
                 }, 150);
               }}
+              onKeyDown={e => {
+                if (e.key !== "Enter") return;
+                const name = addItem.name.trim();
+                if (!name) return;
+                // Exact or best match in saved recipes → open portion modal
+                const q = name.toLowerCase();
+                const exact = userRecipes.find(r => r.name.toLowerCase() === q)
+                           || userRecipes.find(r => r.name.toLowerCase().includes(q));
+                if (exact) {
+                  e.preventDefault();
+                  setShowDropdown(false);
+                  setRecipePortionModal({ recipe: exact });
+                  setRecipePortionQty("1");
+                  setRecipePortionUnit("portion");
+                  setRecipePortionScaled(null);
+                  setRecipePortionError("");
+                }
+                // If no match, let onBlur handle ingredient/dish classification as before
+              }}
               onFocus={() => { if (nameDropdown.length>0) setShowDropdown(true); }}
               placeholder="e.g. Pinto bean stew (1 portion)"
               style={{ width:"100%", padding:"5px 9px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px" }}
@@ -245,16 +264,18 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 {nameDropdown.map(r => (
                   <div key={r.id}
                     onMouseDown={() => {
-                      const n = r.nutrition||{};
-                      setAddItem({ name:r.name, kcal:n.kcal||"", fat:n.fat||"", sat_fat:n.sat_fat||"",
-                        carbs:n.carbs||"", sugar:n.sugar||"", fibre:n.fibre||"", net_carbs:n.net_carbs||"", protein:n.protein||"" });
                       setShowDropdown(false);
+                      setRecipePortionModal({ recipe: r });
+                      setRecipePortionQty("1");
+                      setRecipePortionUnit("portion");
+                      setRecipePortionScaled(null);
+                      setRecipePortionError("");
                     }}
                     style={{ padding:"8px 12px", cursor:"pointer", borderBottom:"1px solid #F0F4F8", fontSize:"12px" }}
                     onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"}
                     onMouseOut={e=>e.currentTarget.style.background="#fff"}>
                     <div style={{ fontWeight:"bold", color:"#185FA5" }}>{r.name}</div>
-                    <div style={{ fontSize:"11px", color:"#6b7280" }}>{r.nutrition?.kcal} kcal · P:{r.nutrition?.protein}g F:{r.nutrition?.fat}g C:{r.nutrition?.carbs}g · per serving</div>
+                    <div style={{ fontSize:"11px", color:"#6b7280" }}>{r.nutrition?.kcal} kcal · P:{r.nutrition?.protein}g F:{r.nutrition?.fat}g C:{r.nutrition?.carbs}g · tap to set portions</div>
                   </div>
                 ))}
               </div>
