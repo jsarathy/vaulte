@@ -512,16 +512,30 @@ async function hashPassword(password) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-export default function RealEstateLifecycle({ userId }) {
-  const [step, setStep]     = useState("persona"); // persona | re_login | re_register | checklist
-  const [persona, setPersona] = useState(null);
-  const [txId, setTxId]     = useState("");
+export default function RealEstateLifecycle({ userId, rmPersona, rmTxId, onRmBack }) {
+  const [step, setStep]     = useState(rmPersona ? "checklist" : "persona");
+  const [persona, setPersona] = useState(rmPersona || null);
+  const [txId, setTxId]     = useState(rmTxId || "");
   const [itemStates, setItemStates] = useState({});
   const [loading, setLoading] = useState(false);
   const [commentsModal, setCommentsModal] = useState(null);
   const [saving, setSaving] = useState(false);
   const saveTimer = useRef(null);
   const [txStatus, setTxStatus] = useState("active");
+
+  // ── RM mode: load tx data on mount ──
+  useEffect(() => {
+    if (!rmPersona || !rmTxId) return;
+    (async () => {
+      const snap = await getDoc(txDocRef(userId, rmTxId, rmPersona));
+      const data = snap.exists() ? snap.data() : {};
+      setItemStates(data.items || {});
+      setTxStatus(data.status || "active");
+      if (data.myContact) setMyContact(data.myContact);
+      if (data.rmContact) setRmContact(data.rmContact);
+    })();
+  }, [rmPersona, rmTxId]);
+
 
   const [myContact, setMyContact] = useState({ name:"", phone:"", whatsapp:"" });
   const [rmContact, setRmContact] = useState({ name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" });
@@ -1326,14 +1340,19 @@ export default function RealEstateLifecycle({ userId }) {
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, padding:"clamp(10px,1.5vw,16px) clamp(16px,4vw,56px)", flexWrap:"wrap" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button className="re-back-welcome" onClick={() => setStep("persona")}>⌂ Welcome</button>
-          {persona === "lender" && (
+          {onRmBack && (
+            <button className="re-back-welcome" onClick={onRmBack}>← Deal Board</button>
+          )}
+          {persona === "lender" && !onRmBack && (
             <button className="re-back-welcome" onClick={() => { setLenderViewAs(null); setStep("lender_dashboard"); }}>
               ← Dashboard
             </button>
           )}
             <div>
               <div style={{ fontSize:"clamp(10px,1vw,12px)", color:"rgba(255,255,255,0.5)", letterSpacing:"0.06em", textTransform:"uppercase" }}>
-                {persona === "lender" && lenderViewAs
+                {onRmBack
+                  ? `👔 RM View · ${effectivePersona} · ${txId}`
+                  : persona === "lender" && lenderViewAs
                   ? `🏦 Lender · Viewing ${lenderViewAs} · ${txId}`
                   : `${p.icon} ${p.label}`}
               </div>
