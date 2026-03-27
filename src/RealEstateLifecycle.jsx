@@ -429,7 +429,7 @@ function PhaseSection({ phase, items, itemStates, onUpdate, onOpenComments }) {
 
 // ── ContactCard ───────────────────────────────────────────────────────────────
 
-function ContactCard({ label, data, setData, onSave }) {
+function ContactCard({ label, data, setData, onSave, readOnly = false }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data);
 
@@ -448,11 +448,14 @@ function ContactCard({ label, data, setData, onSave }) {
     }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
         <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.07em" }}>{label}</div>
-        <button
-          onClick={() => { setDraft(data); setEditing(v => !v); }}
-          style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.hint, borderRadius:5, padding:"3px 10px", cursor:"pointer", fontSize:"clamp(10px,1vw,12px)", fontFamily:"inherit" }}>
-          {editing ? "Cancel" : "✎ Edit"}
-        </button>
+        {readOnly
+          ? <span style={{ fontSize:"clamp(9px,0.9vw,11px)", color:C.hint, display:"flex", alignItems:"center", gap:4 }}>🔒 Read only</span>
+          : <button
+              onClick={() => { setDraft(data); setEditing(v => !v); }}
+              style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.hint, borderRadius:5, padding:"3px 10px", cursor:"pointer", fontSize:"clamp(10px,1vw,12px)", fontFamily:"inherit" }}>
+              {editing ? "Cancel" : "✎ Edit"}
+            </button>
+        }
       </div>
 
       {editing ? (
@@ -503,7 +506,7 @@ function ContactCard({ label, data, setData, onSave }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function RealEstateLifecycle({ userId }) {
-  const [step, setStep]         = useState("persona"); // persona | txid | checklist
+  const [step, setStep]         = useState("persona"); // persona | txid | register | checklist
   const [persona, setPersona]   = useState(null);
   const [txId, setTxId]         = useState("");
   const [txInput, setTxInput]   = useState("");
@@ -513,9 +516,53 @@ export default function RealEstateLifecycle({ userId }) {
   const [saving, setSaving]     = useState(false);
   const saveTimer = useRef(null);
 
-  const EMPTY_CONTACT = { name:"", phone:"", whatsapp:"" };
   const [myContact, setMyContact] = useState({ name:"Jiten Sarathy", phone:"+91 98400 00001", whatsapp:"+91 98400 00001" });
   const [rmContact, setRmContact] = useState({ name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" });
+
+  // Registration form state (seller only)
+  const EMPTY_REG = { name:"", phone:"", whatsapp:"", address:"", propertyAddress:"" };
+  const [reg, setReg]           = useState(EMPTY_REG);
+  const [regError, setRegError] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
+  const [generatedTxId, setGeneratedTxId] = useState("");
+
+  const generateTxId = () => {
+    const year = new Date().getFullYear();
+    const rand = Math.random().toString(36).substring(2,6).toUpperCase();
+    return `TXN-${year}-CHN-${rand}`;
+  };
+
+  const handleRegister = async () => {
+    if (!reg.name.trim() || !reg.phone.trim() || !reg.propertyAddress.trim()) {
+      setRegError("Name, phone and property address are required."); return;
+    }
+    setRegLoading(true); setRegError("");
+    const newTxId = generateTxId();
+    const sellerData = {
+      txId: newTxId,
+      persona: "seller",
+      createdAt: new Date().toISOString(),
+      myContact: { name: reg.name, phone: reg.phone, whatsapp: reg.whatsapp },
+      rmContact: { name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" },
+      sellerProfile: { address: reg.address, propertyAddress: reg.propertyAddress },
+      items: {},
+    };
+    try {
+      // Save under user's own subcollection AND a shared lookup doc
+      await setDoc(txDocRef(userId, newTxId, "seller"), sellerData);
+      await setDoc(doc(db, "re_registrations", newTxId), {
+        txId: newTxId, sellerUserId: userId,
+        sellerName: reg.name, propertyAddress: reg.propertyAddress,
+        createdAt: sellerData.createdAt,
+      });
+      setGeneratedTxId(newTxId);
+      setMyContact(sellerData.myContact);
+      setTxId(newTxId);
+    } catch(e) {
+      setRegError("Registration failed. Please try again.");
+    }
+    setRegLoading(false);
+  };
 
   const p = persona ? PERSONAS[persona] : null;
 
@@ -541,7 +588,6 @@ export default function RealEstateLifecycle({ userId }) {
     setItemStates(data.items || {});
     if (data.myContact) setMyContact(data.myContact);
     if (data.rmContact) setRmContact(data.rmContact);
-    // Save any freshly entered contact details
     await setDoc(txDocRef(userId, id, persona), { myContact, rmContact }, { merge:true });
     setLoading(false);
     setStep("checklist");
@@ -712,6 +758,143 @@ export default function RealEstateLifecycle({ userId }) {
           >
             {loading ? "Loading…" : `Open ${p.label} Checklist →`}
           </button>
+
+          {/* New seller registration link */}
+          {persona === "seller" && (
+            <div style={{ marginTop:24, padding:"16px 20px", background:"#fff", borderRadius:10, border:`1px solid ${C.border}`, textAlign:"center" }}>
+              <div style={{ fontSize:"clamp(13px,1.3vw,15px)", color:C.navy, fontWeight:500, marginBottom:8 }}>
+                New seller? Don't have a Transaction ID yet?
+              </div>
+              <button
+                onClick={() => { setReg(EMPTY_REG); setRegError(""); setGeneratedTxId(""); setStep("register"); }}
+                style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:C.blue, background:"none", border:`1.5px solid ${C.blue}`, borderRadius:8, padding:"10px 24px", cursor:"pointer", fontFamily:"inherit" }}>
+                Register as a new Seller →
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Seller Registration ───────────────────────────────────────
+  if (step === "register") {
+    return (
+      <div style={{ minHeight:"100%", background:C.mist, overflowY:"auto" }}>
+        <style>{`
+          .re-reg-wrap { padding: clamp(28px,5vw,64px) clamp(24px,8vw,120px); max-width:680px; margin:0 auto; }
+          .re-reg-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+          @media(max-width:560px){ .re-reg-grid { grid-template-columns:1fr; } }
+          .re-reg-field { margin-bottom:18px; }
+          .re-reg-label { display:block; font-size:clamp(10px,1vw,12px); font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+          .re-reg-input { width:100%; padding:clamp(10px,1.2vw,13px) 14px; font-size:clamp(13px,1.3vw,15px); border-radius:8px; outline:none; font-family:inherit; box-sizing:border-box; transition:border-color 0.2s, background 0.2s; }
+        `}</style>
+
+        <div className="re-reg-wrap">
+          <button onClick={() => setStep("txid")}
+            style={{ fontSize:"clamp(12px,1.2vw,14px)", color:C.blue, background:"none", border:"none", cursor:"pointer", marginBottom:28, display:"flex", alignItems:"center", gap:6, fontFamily:"inherit", padding:0, fontWeight:500 }}>
+            ← Back
+          </button>
+
+          {/* Header */}
+          <div style={{ marginBottom:28 }}>
+            <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.hint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>
+              🏠 New Seller Registration
+            </div>
+            <h2 style={{ fontSize:"clamp(22px,3vw,32px)", fontWeight:700, color:C.navy, marginBottom:8 }}>
+              Register your property
+            </h2>
+            <p style={{ fontSize:"clamp(13px,1.3vw,15px)", color:C.slate, lineHeight:1.7 }}>
+              Complete the form below. You'll receive a unique Transaction ID to track your sale from listing to registration.
+            </p>
+          </div>
+
+          {/* If registration succeeded — show TX ID */}
+          {generatedTxId ? (
+            <div style={{ background:"#F0FDF4", border:"2px solid #22C55E", borderRadius:12, padding:"28px 32px", textAlign:"center" }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>🎉</div>
+              <div style={{ fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700, color:"#15803D", marginBottom:6 }}>
+                Registration successful!
+              </div>
+              <div style={{ fontSize:"clamp(12px,1.2vw,14px)", color:"#166534", marginBottom:20 }}>
+                Your Transaction ID is:
+              </div>
+              <div style={{
+                fontFamily:"'DM Mono',monospace", fontSize:"clamp(20px,3vw,32px)", fontWeight:700,
+                color:C.navy, background:"#fff", border:`2px solid #22C55E`,
+                borderRadius:10, padding:"14px 24px", letterSpacing:"0.08em",
+                display:"inline-block", marginBottom:20, userSelect:"all",
+              }}>
+                {generatedTxId}
+              </div>
+              <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#166534", marginBottom:24, lineHeight:1.6 }}>
+                Save this ID — you'll need it every time you log in to your checklist.<br/>
+                Share it with your buyer and lender so all parties see live progress.
+              </div>
+              <button
+                onClick={() => { setItemStates({}); setStep("checklist"); }}
+                style={{ fontSize:"clamp(14px,1.4vw,16px)", fontWeight:700, color:"#fff", background:"#15803D", border:"none", borderRadius:8, padding:"12px 32px", cursor:"pointer", fontFamily:"inherit" }}>
+                Open My Checklist →
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="re-reg-grid">
+                {/* Full Name */}
+                <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
+                  <label className="re-reg-label">Full Name *</label>
+                  <input className="re-reg-input" type="text" value={reg.name} placeholder="e.g. Rajesh Venkataraman"
+                    onChange={e => setReg(p => ({...p, name:e.target.value}))}
+                    style={{ border:`1.5px solid ${reg.name ? C.blue : C.border}`, background: reg.name ? C.pale : "#fff", color:C.navy }} />
+                </div>
+                {/* Phone */}
+                <div className="re-reg-field">
+                  <label className="re-reg-label">Phone Number *</label>
+                  <input className="re-reg-input" type="tel" value={reg.phone} placeholder="+91 98400 XXXXX"
+                    onChange={e => setReg(p => ({...p, phone:e.target.value}))}
+                    style={{ border:`1.5px solid ${reg.phone ? C.blue : C.border}`, background: reg.phone ? C.pale : "#fff", color:C.navy }} />
+                </div>
+                {/* WhatsApp */}
+                <div className="re-reg-field">
+                  <label className="re-reg-label">WhatsApp Handle</label>
+                  <input className="re-reg-input" type="tel" value={reg.whatsapp} placeholder="+91 98400 XXXXX"
+                    onChange={e => setReg(p => ({...p, whatsapp:e.target.value}))}
+                    style={{ border:`1.5px solid ${reg.whatsapp ? C.blue : C.border}`, background: reg.whatsapp ? C.pale : "#fff", color:C.navy }} />
+                </div>
+                {/* Home Address */}
+                <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
+                  <label className="re-reg-label">Your Address</label>
+                  <input className="re-reg-input" type="text" value={reg.address} placeholder="Flat 4B, Prestige Towers, Anna Nagar, Chennai 600040"
+                    onChange={e => setReg(p => ({...p, address:e.target.value}))}
+                    style={{ border:`1.5px solid ${reg.address ? C.blue : C.border}`, background: reg.address ? C.pale : "#fff", color:C.navy }} />
+                </div>
+                {/* Property for Sale */}
+                <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
+                  <label className="re-reg-label">Property Address for Sale *</label>
+                  <input className="re-reg-input" type="text" value={reg.propertyAddress} placeholder="12/3, Boat Club Road, R.A. Puram, Chennai 600028"
+                    onChange={e => setReg(p => ({...p, propertyAddress:e.target.value}))}
+                    style={{ border:`1.5px solid ${reg.propertyAddress ? C.blue : C.border}`, background: reg.propertyAddress ? C.pale : "#fff", color:C.navy }} />
+                </div>
+              </div>
+
+              {regError && (
+                <div style={{ padding:"10px 14px", background:"#FEF2F2", border:"1px solid #FCA5A5", borderRadius:7, fontSize:"clamp(12px,1.2vw,14px)", color:"#991B1B", marginBottom:16 }}>
+                  {regError}
+                </div>
+              )}
+
+              <button disabled={regLoading} onClick={handleRegister}
+                style={{ width:"100%", padding:"clamp(13px,1.5vw,16px)", fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700,
+                  color:"#fff", background: regLoading ? C.hint : C.blue, border:"none", borderRadius:10,
+                  cursor: regLoading ? "not-allowed" : "pointer", fontFamily:"inherit", transition:"background 0.2s" }}>
+                {regLoading ? "Registering…" : "Register & Get Transaction ID →"}
+              </button>
+
+              <div style={{ marginTop:12, fontSize:"clamp(10px,1vw,12px)", color:C.hint, textAlign:"center" }}>
+                * Required fields
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -788,8 +971,8 @@ export default function RealEstateLifecycle({ userId }) {
       {/* ── Contact cards ── */}
       {(() => {
         const cards = [
-          { label:`${p.icon} ${p.label}`, roleKey:"my", data:myContact, setData:setMyContact },
-          { label:"👤 Relationship Manager", roleKey:"rm", data:rmContact, setData:setRmContact },
+          { label:`${p.icon} ${p.label}`, roleKey:"my", data:myContact, setData:setMyContact, readOnly:false },
+          { label:"👤 Relationship Manager", roleKey:"rm", data:rmContact, setData:setRmContact, readOnly: persona === "seller" },
         ];
         return (
           <div style={{
@@ -797,8 +980,8 @@ export default function RealEstateLifecycle({ userId }) {
             padding:"clamp(10px,1.2vw,14px) clamp(16px,4vw,56px)",
             display:"flex", gap:16, flexWrap:"wrap", flexShrink:0,
           }}>
-            {cards.map(({ label, roleKey, data, setData }) => (
-              <ContactCard key={roleKey} label={label} data={data} setData={setData}
+            {cards.map(({ label, roleKey, data, setData, readOnly }) => (
+              <ContactCard key={roleKey} label={label} data={data} setData={setData} readOnly={readOnly}
                 onSave={(updated) => {
                   const newMy = roleKey === "my" ? updated : myContact;
                   const newRm = roleKey === "rm" ? updated : rmContact;
