@@ -1236,22 +1236,29 @@ export default function RealEstateLifecycle({ userId }) {
 
               {/* Navigation buttons */}
               <div style={{ fontSize:"clamp(11px,1.1vw,13px)", fontWeight:700, color:C.hint, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:12 }}>View Checklist As</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:16 }}>
                 <button onClick={() => goToChecklist("seller")}
-                  style={{ padding:"clamp(12px,1.5vw,16px)", borderRadius:10, border:`2px solid ${C.blue}`, background:C.pale, color:C.blue, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(13px,1.3vw,15px)", display:"flex", flexDirection:"column", alignItems:"center", gap:6, transition:"all 0.15s" }}
+                  style={{ padding:"clamp(10px,1.2vw,14px) 8px", borderRadius:10, border:`2px solid ${C.blue}`, background:C.pale, color:C.blue, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(12px,1.2vw,14px)", display:"flex", flexDirection:"column", alignItems:"center", gap:5, transition:"all 0.15s" }}
                   onMouseEnter={e => { e.currentTarget.style.background=C.blue; e.currentTarget.style.color="#fff"; }}
                   onMouseLeave={e => { e.currentTarget.style.background=C.pale; e.currentTarget.style.color=C.blue; }}>
-                  <span style={{ fontSize:24 }}>🏠</span>
-                  Seller Checklist
-                  {lenderDetailPopup.sellerContact?.name && <span style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:400, opacity:0.8 }}>{lenderDetailPopup.sellerContact.name}</span>}
+                  <span style={{ fontSize:22 }}>🏠</span>
+                  Seller
+                  {lenderDetailPopup.sellerContact?.name && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", fontWeight:400, opacity:0.8, textAlign:"center" }}>{lenderDetailPopup.sellerContact.name}</span>}
                 </button>
                 <button onClick={() => goToChecklist("buyer")}
-                  style={{ padding:"clamp(12px,1.5vw,16px)", borderRadius:10, border:"2px solid #7C3AED", background:"#F5F3FF", color:"#7C3AED", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(13px,1.3vw,15px)", display:"flex", flexDirection:"column", alignItems:"center", gap:6, transition:"all 0.15s" }}
+                  style={{ padding:"clamp(10px,1.2vw,14px) 8px", borderRadius:10, border:"2px solid #7C3AED", background:"#F5F3FF", color:"#7C3AED", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(12px,1.2vw,14px)", display:"flex", flexDirection:"column", alignItems:"center", gap:5, transition:"all 0.15s" }}
                   onMouseEnter={e => { e.currentTarget.style.background="#7C3AED"; e.currentTarget.style.color="#fff"; }}
                   onMouseLeave={e => { e.currentTarget.style.background="#F5F3FF"; e.currentTarget.style.color="#7C3AED"; }}>
-                  <span style={{ fontSize:24 }}>🔑</span>
-                  Buyer Checklist
-                  {lenderDetailPopup.buyerContact?.name && <span style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:400, opacity:0.8 }}>{lenderDetailPopup.buyerContact.name}</span>}
+                  <span style={{ fontSize:22 }}>🔑</span>
+                  Buyer
+                  {lenderDetailPopup.buyerContact?.name && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", fontWeight:400, opacity:0.8, textAlign:"center" }}>{lenderDetailPopup.buyerContact.name}</span>}
+                </button>
+                <button onClick={() => goToChecklist("lender")}
+                  style={{ padding:"clamp(10px,1.2vw,14px) 8px", borderRadius:10, border:"2px solid #1E6B35", background:"#F0FDF4", color:"#1E6B35", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(12px,1.2vw,14px)", display:"flex", flexDirection:"column", alignItems:"center", gap:5, transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.background="#1E6B35"; e.currentTarget.style.color="#fff"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background="#F0FDF4"; e.currentTarget.style.color="#1E6B35"; }}>
+                  <span style={{ fontSize:22 }}>🏦</span>
+                  Lender
                 </button>
               </div>
               <button onClick={() => setLenderDetailPopup(null)}
