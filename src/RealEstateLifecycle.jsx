@@ -720,7 +720,9 @@ export default function RealEstateLifecycle({ userId }) {
     setTxAddLoading(false);
   };
 
-  const p = persona ? PERSONAS[persona] : null;
+  // When lender views seller/buyer checklist, use that persona's data for rendering
+  const effectivePersona = (persona === "lender" && lenderViewAs) ? lenderViewAs : persona;
+  const p = effectivePersona ? PERSONAS[effectivePersona] : null;
   const annotatedItems = p ? p.items.map((item, idx) => ({ ...item, _globalIdx: idx })) : [];
   const byPhase = {};
   annotatedItems.forEach(item => {
@@ -1575,6 +1577,21 @@ export default function RealEstateLifecycle({ userId }) {
                 style={{ flex:1, padding:"10px", fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#fff", background:C.blue, border:"none", borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
                 Open Checklist →
               </button>
+              {persona === "buyer" && (
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`Remove ${propertyPopup.txId} from your list? You can re-add it anytime.`)) return;
+                    const updated = buyerTxIds.filter(id => id !== propertyPopup.txId);
+                    setBuyerTxIds(updated);
+                    await setDoc(profRef("buyer"), { txIds: updated }, { merge:true });
+                    // If we just removed the active tx, clear it
+                    if (txId === propertyPopup.txId) { setTxId(""); setItemStates({}); }
+                    setPropertyPopup(null);
+                  }}
+                  style={{ padding:"10px 14px", fontSize:"clamp(12px,1.2vw,14px)", fontWeight:600, color:"#DC2626", background:"#FEF2F2", border:"1px solid #FCA5A5", borderRadius:8, cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
+                  🗑 Remove
+                </button>
+              )}
               <button onClick={() => setPropertyPopup(null)}
                 style={{ padding:"10px 16px", fontSize:"clamp(12px,1.2vw,14px)", color:C.slate, background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
                 Close
