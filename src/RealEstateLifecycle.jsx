@@ -1087,16 +1087,12 @@ export default function RealEstateLifecycle({ userId }) {
           {(buyerTxIds.length > 0 ? buyerTxIds : txId ? [txId] : []).map(id => (
             <button key={id}
               onClick={async () => {
-                if (id === txId) return;
-                setLoading(true);
-                setTxId(id);
                 const snap = await getDoc(txDocRef(userId, id, persona));
                 const data = snap.exists() ? snap.data() : {};
-                setItemStates(data.items || {});
-                setTxStatus(data.status || "active");
-                if (data.myContact) setMyContact(data.myContact);
-                if (data.rmContact) setRmContact(data.rmContact);
-                setLoading(false);
+                const address = data.sellerProfile?.propertyAddress
+                  || data.buyerProfile?.propertyAddress
+                  || "Address not on record yet.";
+                setPropertyPopup({ txId: id, address, status: data.status || "active" });
               }}
               style={{
                 flexShrink:0, padding:"4px 12px", borderRadius:20,
@@ -1104,7 +1100,7 @@ export default function RealEstateLifecycle({ userId }) {
                 background: id === txId ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.06)",
                 color: id === txId ? "#fff" : "rgba(255,255,255,0.55)",
                 fontFamily:"'DM Mono',monospace", fontSize:"clamp(10px,1vw,12px)",
-                fontWeight: id === txId ? 700 : 400, cursor: id === txId ? "default" : "pointer",
+                fontWeight: id === txId ? 700 : 400, cursor:"pointer",
                 transition:"all 0.15s", display:"flex", alignItems:"center", gap:5,
               }}>
               {id === txId && <span style={{ fontSize:8 }}>●</span>} {id}
