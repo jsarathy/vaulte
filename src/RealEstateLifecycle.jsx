@@ -256,18 +256,15 @@ function CheckItem({ item, idx, itemState, onUpdate, onOpenComments }) {
               borderRadius:20, padding:"1px 8px", flexShrink:0,
               fontFamily:"'DM Mono', monospace",
             }}>Day {item.day}</span>
-            <span style={{
-              fontSize:13, color: isWarning ? "#DC2626" : C.text,
-              fontWeight: isWarning ? 600 : 400, lineHeight:1.5,
-            }}>{item.task}</span>
+            <span className="re-item-task" style={{ fontWeight: isWarning ? 600 : 400, color: isWarning ? "#DC2626" : "#1E293B" }}>{item.task}</span>
           </div>
 
           {/* Documents */}
           {item.docs.length > 0 && (
             <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:8 }}>
               {item.docs.map((d,i) => (
-                <span key={i} style={{
-                  fontSize:10, color:C.slate, background:C.mist,
+                <span key={i} className="re-item-doc" style={{
+                  color:C.slate, background:C.mist,
                   border:`1px solid ${C.border}`, borderRadius:4,
                   padding:"2px 7px",
                 }}>📄 {d}</span>
@@ -397,9 +394,7 @@ function PhaseSection({ phase, items, itemStates, onUpdate, onOpenComments }) {
             display:"flex", alignItems:"center", justifyContent:"center",
             fontSize:13, fontWeight:700, color:"#fff", flexShrink:0,
           }}>{phase.num}</div>
-          <span style={{ fontFamily:"'DM Serif Display',serif", fontSize:15, color:"#fff", fontWeight:400 }}>
-            {phase.title}
-          </span>
+          <span className="re-phase-title">{phase.title}</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <span style={{ fontSize:12, color:"rgba(255,255,255,0.75)", fontWeight:500 }}>{validated}/{total}</span>
@@ -493,43 +488,74 @@ export default function RealEstateLifecycle({ userId }) {
   // ── Welcome / persona selection ─────────────────────────────
   if (step === "persona") {
     return (
-      <div style={{ padding:"48px 40px", maxWidth:700, margin:"0 auto" }}>
-        <div style={{ marginBottom:36 }}>
-          <div style={{ fontSize:11, fontWeight:600, color:C.hint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:10 }}>
-            Real Estate Lifecycle
+      <div style={{ minHeight:"100%", background:C.mist, overflowY:"auto" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap');
+          .re-welcome-wrap { padding: clamp(32px,6vw,80px) clamp(24px,8vw,120px); max-width: 960px; margin: 0 auto; }
+          .re-welcome-title { font-size: clamp(26px,4vw,42px); font-weight:700; color:#0D1B2A; line-height:1.2; margin-bottom:12px; }
+          .re-welcome-sub   { font-size: clamp(14px,1.5vw,17px); color:#475569; line-height:1.7; max-width:600px; }
+          .re-persona-grid  { display:grid; grid-template-columns: repeat(3,1fr); gap: clamp(12px,2vw,28px); margin: clamp(28px,4vw,48px) 0; }
+          @media (max-width:640px) { .re-persona-grid { grid-template-columns: 1fr; } }
+          .re-persona-card  {
+            padding: clamp(28px,4vw,52px) clamp(20px,3vw,36px);
+            border-radius:16px; border:2px solid #E2E8F0;
+            background:#fff; cursor:pointer; text-align:center;
+            transition:all 0.2s; font-family:'DM Sans',sans-serif;
+            box-shadow:0 2px 8px rgba(0,0,0,0.05);
+          }
+          .re-persona-card:hover { border-color:#1558C0; box-shadow:0 6px 24px rgba(21,88,192,0.14); transform:translateY(-2px); }
+          .re-persona-icon  { font-size: clamp(40px,6vw,64px); margin-bottom: clamp(12px,2vw,20px); }
+          .re-persona-label { font-size: clamp(18px,2.2vw,26px); font-weight:700; color:#0D1B2A; margin-bottom:6px; }
+          .re-persona-desc  { font-size: clamp(12px,1.3vw,15px); color:#64748B; line-height:1.5; }
+          .re-tip { padding: clamp(14px,2vw,20px) clamp(16px,2vw,24px); background:#EEF4FF; border-radius:10px; border:1px solid #D9E8FF; font-size:clamp(12px,1.3vw,15px); color:#475569; line-height:1.6; }
+
+          .re-txid-wrap { padding: clamp(32px,6vw,72px) clamp(24px,8vw,120px); max-width:600px; margin:0 auto; }
+          .re-txid-title { font-size:clamp(20px,3vw,30px); font-weight:700; color:#0D1B2A; }
+          .re-txid-sub   { font-size:clamp(13px,1.4vw,16px); color:#475569; line-height:1.7; margin-bottom:28px; }
+          .re-txid-input { width:100%; padding:clamp(12px,1.5vw,16px) 16px; font-size:clamp(15px,1.8vw,20px); border-radius:10px; outline:none; box-sizing:border-box; font-family:'DM Mono',monospace; letter-spacing:0.05em; transition:border-color 0.2s, background 0.2s; }
+          .re-txid-btn   { width:100%; padding:clamp(13px,1.5vw,17px); font-size:clamp(14px,1.5vw,17px); font-weight:700; border:none; border-radius:10px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.2s; }
+
+          .re-checklist-content { flex:1; overflow-y:auto; padding: clamp(16px,2.5vw,32px) clamp(16px,4vw,56px) 60px; background:#F8FAFC; }
+          .re-phase-title { font-family:'DM Serif Display',serif; font-size:clamp(14px,1.6vw,18px); font-weight:400; color:#fff; }
+          .re-item-task   { font-size:clamp(13px,1.3vw,15px); color:#1E293B; line-height:1.6; }
+          .re-item-doc    { font-size:clamp(10px,1vw,12px); }
+          .re-header-title { font-size:clamp(13px,1.5vw,16px); font-weight:600; color:#fff; }
+          .re-header-sub   { font-size:clamp(10px,1vw,12px); color:rgba(255,255,255,0.5); letter-spacing:0.06em; text-transform:uppercase; }
+          .re-status-strip { background:#1558C0; padding:clamp(6px,1vw,10px) clamp(16px,4vw,56px); display:flex; gap:clamp(12px,2vw,28px); align-items:center; flex-wrap:wrap; flex-shrink:0; }
+          .re-back-welcome { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:rgba(255,255,255,0.85); border-radius:6px; padding:6px 14px; cursor:pointer; font-size:clamp(11px,1.1vw,13px); font-family:'DM Sans',sans-serif; transition:background 0.2s; white-space:nowrap; }
+          .re-back-welcome:hover { background:rgba(255,255,255,0.22); }
+        `}</style>
+
+        <div className="re-welcome-wrap">
+          <div style={{ marginBottom:"clamp(8px,2vw,16px)" }}>
+            <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:600, color:C.hint, letterSpacing:"0.09em", textTransform:"uppercase", marginBottom:10 }}>
+              Real Estate Lifecycle
+            </div>
+            <h1 className="re-welcome-title">Welcome to your Transaction Hub</h1>
+            <p className="re-welcome-sub">
+              Track every step of your property transaction — documents, approvals and compliance — in one place.
+              Select your role to get started.
+            </p>
           </div>
-          <h1 style={{ fontSize:28, fontWeight:600, color:C.navy, marginBottom:8, lineHeight:1.2 }}>
-            Welcome to your Transaction Hub
-          </h1>
-          <p style={{ fontSize:14, color:C.slate, lineHeight:1.6 }}>
-            Track every step of your property transaction — documents, approvals and compliance — in one place.
-            Select your role to get started.
-          </p>
-        </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:40 }}>
-          {Object.entries(PERSONAS).map(([key, info]) => (
-            <button
-              key={key}
-              onClick={() => { setPersona(key); setStep("txid"); }}
-              style={{
-                padding:"28px 20px", borderRadius:12, border:`2px solid ${C.border}`,
-                background:C.white, cursor:"pointer", textAlign:"center",
-                transition:"all 0.2s", fontFamily:"inherit",
-                boxShadow:"0 1px 4px rgba(0,0,0,0.05)",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.border=`2px solid ${C.blue}`; e.currentTarget.style.boxShadow=`0 4px 16px rgba(21,88,192,0.12)`; }}
-              onMouseLeave={e => { e.currentTarget.style.border=`2px solid ${C.border}`; e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.05)"; }}
-            >
-              <div style={{ fontSize:36, marginBottom:12 }}>{info.icon}</div>
-              <div style={{ fontSize:16, fontWeight:700, color:C.navy, marginBottom:4 }}>{info.label}</div>
-              <div style={{ fontSize:12, color:C.slate }}>{info.desc}</div>
-            </button>
-          ))}
-        </div>
+          <div className="re-persona-grid">
+            {Object.entries(PERSONAS).map(([key, info]) => (
+              <button
+                key={key}
+                className="re-persona-card"
+                onClick={() => { setPersona(key); setStep("txid"); }}
+              >
+                <div className="re-persona-icon">{info.icon}</div>
+                <div className="re-persona-label">{info.label}</div>
+                <div className="re-persona-desc">{info.desc}</div>
+              </button>
+            ))}
+          </div>
 
-        <div style={{ padding:"16px 20px", background:C.pale, borderRadius:8, border:`1px solid ${C.pale2}`, fontSize:12, color:C.slate }}>
-          💡 Each role has a tailored checklist covering all phases from pre-transaction preparation through to post-registration compliance.
+          <div className="re-tip">
+            💡 Each role has a tailored checklist covering all phases from pre-transaction preparation through to post-registration compliance.
+            The Transaction ID is shared — all three parties see live progress on the same transaction.
+          </div>
         </div>
       </div>
     );
@@ -538,60 +564,65 @@ export default function RealEstateLifecycle({ userId }) {
   // ── Transaction ID entry ─────────────────────────────────────
   if (step === "txid") {
     return (
-      <div style={{ padding:"48px 40px", maxWidth:540, margin:"0 auto" }}>
-        <button onClick={() => setStep("persona")}
-          style={{ fontSize:12, color:C.blue, background:"none", border:"none", cursor:"pointer", marginBottom:24, display:"flex", alignItems:"center", gap:4, fontFamily:"inherit", padding:0 }}>
-          ← Back
-        </button>
+      <div style={{ minHeight:"100%", background:C.mist, overflowY:"auto" }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap');
+          .re-txid-wrap { padding: clamp(32px,6vw,72px) clamp(24px,8vw,120px); max-width:600px; margin:0 auto; }
+          .re-txid-title { font-size:clamp(20px,3vw,30px); font-weight:700; color:#0D1B2A; }
+          .re-txid-sub   { font-size:clamp(13px,1.4vw,16px); color:#475569; line-height:1.7; margin-bottom:28px; }
+          .re-txid-input { width:100%; padding:clamp(12px,1.5vw,16px) 16px; font-size:clamp(15px,1.8vw,20px); border-radius:10px; outline:none; box-sizing:border-box; font-family:'DM Mono',monospace; letter-spacing:0.05em; transition:border-color 0.2s, background 0.2s; }
+          .re-txid-btn   { width:100%; padding:clamp(13px,1.5vw,17px); font-size:clamp(14px,1.5vw,17px); font-weight:700; border:none; border-radius:10px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.2s; }
+        `}</style>
 
-        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:28 }}>
-          <span style={{ fontSize:32 }}>{p.icon}</span>
-          <div>
-            <div style={{ fontSize:11, fontWeight:600, color:C.hint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:4 }}>
-              {p.label} Checklist
+        <div className="re-txid-wrap">
+          <button onClick={() => setStep("persona")}
+            style={{ fontSize:"clamp(12px,1.2vw,14px)", color:C.blue, background:"none", border:"none", cursor:"pointer", marginBottom:28, display:"flex", alignItems:"center", gap:6, fontFamily:"inherit", padding:0, fontWeight:500 }}>
+            ← Back to Welcome
+          </button>
+
+          <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:24 }}>
+            <span style={{ fontSize:"clamp(32px,5vw,52px)" }}>{p.icon}</span>
+            <div>
+              <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:600, color:C.hint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
+                {p.label} Checklist
+              </div>
+              <h2 className="re-txid-title">Enter Transaction ID</h2>
             </div>
-            <h2 style={{ fontSize:22, fontWeight:700, color:C.navy }}>Enter Transaction ID</h2>
           </div>
+
+          <p className="re-txid-sub">
+            Each property transaction has a unique Transaction ID shared between Seller, Buyer and Lender.
+            Enter it below to load or create your checklist.
+          </p>
+
+          <div style={{ marginBottom:20 }}>
+            <label style={{ display:"block", fontSize:"clamp(11px,1vw,13px)", fontWeight:600, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:8 }}>
+              Transaction ID
+            </label>
+            <input
+              type="text"
+              value={txInput}
+              onChange={e => setTxInput(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === "Enter" && handleStartChecklist()}
+              placeholder="e.g. TXN-2026-CHN-001"
+              autoFocus
+              className="re-txid-input"
+              style={{
+                border:`1.5px solid ${txInput ? C.blue : C.border}`,
+                color:C.navy, background:txInput ? C.pale : C.mist,
+              }}
+            />
+          </div>
+
+          <button
+            disabled={!txInput.trim() || loading}
+            onClick={handleStartChecklist}
+            className="re-txid-btn"
+            style={{ color:"#fff", background: !txInput.trim() ? C.hint : C.blue, cursor: !txInput.trim() ? "not-allowed" : "pointer" }}
+          >
+            {loading ? "Loading…" : `Open ${p.label} Checklist →`}
+          </button>
         </div>
-
-        <p style={{ fontSize:13, color:C.slate, marginBottom:24, lineHeight:1.6 }}>
-          Each property transaction has a unique Transaction ID shared between Seller, Buyer and Lender.
-          Enter it below to load or create your checklist.
-        </p>
-
-        <div style={{ marginBottom:20 }}>
-          <label style={{ display:"block", fontSize:11, fontWeight:600, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:6 }}>
-            Transaction ID
-          </label>
-          <input
-            type="text"
-            value={txInput}
-            onChange={e => setTxInput(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key === "Enter" && handleStartChecklist()}
-            placeholder="e.g. TXN-2026-CHN-001"
-            autoFocus
-            style={{
-              width:"100%", padding:"12px 14px", fontSize:15,
-              border:`1.5px solid ${txInput ? C.blue : C.border}`,
-              borderRadius:8, outline:"none", fontFamily:"'DM Mono',monospace",
-              color:C.navy, background:txInput ? C.pale : C.mist,
-              letterSpacing:"0.05em", boxSizing:"border-box",
-            }}
-          />
-        </div>
-
-        <button
-          disabled={!txInput.trim() || loading}
-          onClick={handleStartChecklist}
-          style={{
-            width:"100%", padding:"13px", fontSize:14, fontWeight:700,
-            color:"#fff", background: !txInput.trim() ? C.hint : C.blue,
-            border:"none", borderRadius:8, cursor: !txInput.trim() ? "not-allowed" : "pointer",
-            fontFamily:"inherit", transition:"background 0.2s",
-          }}
-        >
-          {loading ? "Loading…" : `Open ${p.label} Checklist →`}
-        </button>
       </div>
     );
   }
@@ -599,34 +630,43 @@ export default function RealEstateLifecycle({ userId }) {
   // ── Checklist view ───────────────────────────────────────────
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%", fontFamily:"'DM Sans',sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap');
+        .re-checklist-content { flex:1; overflow-y:auto; padding: clamp(16px,2.5vw,32px) clamp(16px,4vw,56px) 60px; background:#F8FAFC; }
+        .re-phase-title { font-family:'DM Serif Display',serif; font-size:clamp(14px,1.6vw,18px); font-weight:400; color:#fff; }
+        .re-item-task   { font-size:clamp(13px,1.3vw,15px); color:#1E293B; line-height:1.6; }
+        .re-item-doc    { font-size:clamp(10px,1vw,12px); }
+        .re-header-bar  { background:#0D1B2A; padding:clamp(12px,1.5vw,18px) clamp(16px,4vw,56px); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0; flex-wrap:wrap; }
+        .re-status-strip { background:#1558C0; padding:clamp(6px,1vw,10px) clamp(16px,4vw,56px); display:flex; gap:clamp(12px,2vw,28px); align-items:center; flex-wrap:wrap; flex-shrink:0; }
+        .re-back-welcome { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:rgba(255,255,255,0.85); border-radius:6px; padding:6px 14px; cursor:pointer; font-size:clamp(11px,1.1vw,13px); font-family:'DM Sans',sans-serif; transition:background 0.2s; white-space:nowrap; }
+        .re-back-welcome:hover { background:rgba(255,255,255,0.22); }
+        .re-progress-pill { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:100px; padding:clamp(5px,0.8vw,8px) clamp(10px,1.5vw,16px); display:flex; align-items:center; gap:10px; }
+        .re-progress-text { font-size:clamp(11px,1.1vw,13px); color:rgba(255,255,255,0.85); font-weight:500; white-space:nowrap; }
+        @media (max-width:480px) { .re-progress-pill { display:none; } }
+      `}</style>
 
       {/* Header bar */}
-      <div style={{
-        background:C.navy, padding:"14px 24px",
-        display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, flexShrink:0,
-      }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <button onClick={() => setStep("txid")}
-            style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"4px 10px", cursor:"pointer", fontSize:11, fontFamily:"inherit" }}>
-            ← Back
+      <div className="re-header-bar">
+        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <button className="re-back-welcome" onClick={() => setStep("persona")}>
+            ⌂ Welcome
+          </button>
+          <button className="re-back-welcome" onClick={() => setStep("txid")}>
+            ← Change ID
           </button>
           <div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", letterSpacing:"0.06em", textTransform:"uppercase" }}>
+            <div style={{ fontSize:"clamp(10px,1vw,12px)", color:"rgba(255,255,255,0.5)", letterSpacing:"0.06em", textTransform:"uppercase" }}>
               {p.icon} {p.label} · {txId}
             </div>
-            <div style={{ fontSize:14, fontWeight:600, color:"#fff" }}>Transaction Checklist</div>
+            <div style={{ fontSize:"clamp(13px,1.5vw,16px)", fontWeight:600, color:"#fff" }}>Transaction Checklist</div>
           </div>
         </div>
 
-        {/* Progress pill */}
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
           {saving && <span style={{ fontSize:10, color:"rgba(255,255,255,0.4)" }}>Saving…</span>}
-          <div style={{
-            background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)",
-            borderRadius:100, padding:"6px 14px", display:"flex", alignItems:"center", gap:10,
-          }}>
-            <span style={{ fontSize:12, color:"rgba(255,255,255,0.85)", fontWeight:500 }}>{validated} / {total} validated</span>
-            <div style={{ width:100, height:5, background:"rgba(255,255,255,0.15)", borderRadius:3 }}>
+          <div className="re-progress-pill">
+            <span className="re-progress-text">{validated} / {total} validated</span>
+            <div style={{ width:"clamp(60px,8vw,100px)", height:5, background:"rgba(255,255,255,0.15)", borderRadius:3 }}>
               <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#34D399,#10B981)", borderRadius:3, transition:"width 0.4s" }} />
             </div>
           </div>
@@ -634,25 +674,22 @@ export default function RealEstateLifecycle({ userId }) {
       </div>
 
       {/* Status summary strip */}
-      <div style={{
-        background:C.blue, padding:"8px 24px",
-        display:"flex", gap:20, alignItems:"center", flexShrink:0,
-      }}>
+      <div className="re-status-strip">
         {[
-          { label:"No link", count: total - validated - inReview - failed, color:"#FCA5A5" },
-          { label:"Under review", count: inReview,  color:"#FCD34D" },
-          { label:"Validated",    count: validated,  color:"#6EE7B7" },
-          { label:"Failed",       count: failed,     color:"#FCA5A5" },
+          { label:"No link",     count: total - validated - inReview - failed, color:"#FCA5A5" },
+          { label:"Under review",count: inReview,   color:"#FCD34D" },
+          { label:"Validated",   count: validated,  color:"#6EE7B7" },
+          { label:"Failed",      count: failed,     color:"#FCA5A5" },
         ].map(({ label, count, color }) => (
           <div key={label} style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:color, display:"inline-block" }} />
-            <span style={{ fontSize:11, color:"rgba(255,255,255,0.75)" }}>{count} {label}</span>
+            <span style={{ width:8, height:8, borderRadius:"50%", background:color, display:"inline-block", flexShrink:0 }} />
+            <span style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"rgba(255,255,255,0.8)" }}>{count} {label}</span>
           </div>
         ))}
       </div>
 
       {/* Scrollable checklist */}
-      <div style={{ flex:1, overflowY:"auto", padding:"20px 24px 40px", background:C.mist }}>
+      <div className="re-checklist-content">
         {p.phases.map(phase => {
           const phaseItems = (byPhase[phase.num] || []);
           return (
@@ -672,34 +709,22 @@ export default function RealEstateLifecycle({ userId }) {
       {commentsModal && (
         <div
           onClick={() => setCommentsModal(null)}
-          style={{
-            position:"fixed", inset:0, background:"rgba(0,0,0,0.5)",
-            zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24,
-          }}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{
-              background:"#fff", borderRadius:12, padding:"28px 32px",
-              maxWidth:480, width:"100%", boxShadow:"0 8px 40px rgba(0,0,0,0.25)",
-            }}
+            style={{ background:"#fff", borderRadius:12, padding:"clamp(20px,3vw,32px)", maxWidth:480, width:"100%", boxShadow:"0 8px 40px rgba(0,0,0,0.25)" }}
           >
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-              <div style={{ fontSize:15, fontWeight:700, color:"#DC2626" }}>💬 Reviewer Comments</div>
+              <div style={{ fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700, color:"#DC2626" }}>💬 Reviewer Comments</div>
               <button onClick={() => setCommentsModal(null)}
-                style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:C.hint, lineHeight:1 }}>×</button>
+                style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.hint, lineHeight:1 }}>×</button>
             </div>
-            <div style={{
-              padding:"14px 16px", background:"#FEF2F2", border:"1px solid #FCA5A5",
-              borderRadius:8, fontSize:13, color:"#7F1D1D", lineHeight:1.7,
-            }}>
+            <div style={{ padding:"14px 16px", background:"#FEF2F2", border:"1px solid #FCA5A5", borderRadius:8, fontSize:"clamp(13px,1.3vw,15px)", color:"#7F1D1D", lineHeight:1.7 }}>
               {commentsModal}
             </div>
             <button onClick={() => setCommentsModal(null)}
-              style={{
-                marginTop:18, width:"100%", padding:"10px", fontSize:13, fontWeight:600,
-                color:C.white, background:C.navy, border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit",
-              }}>
+              style={{ marginTop:18, width:"100%", padding:"clamp(10px,1.2vw,13px)", fontSize:"clamp(13px,1.3vw,15px)", fontWeight:600, color:C.white, background:C.navy, border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit" }}>
               Close
             </button>
           </div>
