@@ -15,6 +15,7 @@ import {
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import NutritionTracker from "./NutritionTracker";
 import RoutineTracker from "./RoutineTracker";
+import RealEstateLifecycle from "./RealEstateLifecycle";
 import { auth, db, storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
@@ -615,17 +616,18 @@ export default function App() {
           {/* Left Sidebar */}
           <div className="app-sidebar" style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
             <div className="sidebar-nav-section" style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
-            {navItem("home",      "Home",       "⌂")}
-            {navItem("account",   "My Account", "◈")}
-            {navItem("nutrition", "Nutrition",  "🥗")}
-            {navItem("routine",   "Routine",    "📋")}
+            {navItem("home",      "Home",         "⌂")}
+            {navItem("account",   "My Account",   "◈")}
+            {navItem("nutrition", "Nutrition",     "🥗")}
+            {navItem("routine",   "Routine",       "📋")}
+            {navItem("realestate","Real Estate",   "🏠")}
             <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="app-main" style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}>
+          <div className="app-main" style={{ flex:1, padding: activePanel === "home" || activePanel === "realestate" ? "0" : "48px", overflowY: activePanel === "home" || activePanel === "realestate" ? "hidden" : "auto", position:"relative" }}>
 
             {/* HOME panel */}
             {activePanel === "home" && (
@@ -680,6 +682,12 @@ export default function App() {
             {activePanel === "routine" && (
               <div className="fade-up" style={{ margin:"-24px" }}>
                 <RoutineTracker userId={auth.currentUser?.uid} />
+              </div>
+            )}
+
+            {activePanel === "realestate" && (
+              <div className="fade-up" style={{ margin:"-48px", height:"calc(100% + 48px)", display:"flex", flexDirection:"column" }}>
+                <RealEstateLifecycle userId={auth.currentUser?.uid} />
               </div>
             )}
 
