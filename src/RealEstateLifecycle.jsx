@@ -436,9 +436,13 @@ export default function RealEstateLifecycle({ userId }) {
   const [txInput, setTxInput]   = useState("");
   const [itemStates, setItemStates] = useState({});
   const [loading, setLoading]   = useState(false);
-  const [commentsModal, setCommentsModal] = useState(null); // string | null
+  const [commentsModal, setCommentsModal] = useState(null);
   const [saving, setSaving]     = useState(false);
   const saveTimer = useRef(null);
+
+  const EMPTY_CONTACT = { name:"", phone:"", whatsapp:"" };
+  const [myContact, setMyContact] = useState(EMPTY_CONTACT);
+  const [rmContact, setRmContact] = useState(EMPTY_CONTACT);
 
   const p = persona ? PERSONAS[persona] : null;
 
@@ -459,21 +463,34 @@ export default function RealEstateLifecycle({ userId }) {
     setLoading(true);
     const id = txInput.trim().toUpperCase();
     setTxId(id);
-    const loaded = await loadTxState(userId, id, persona);
-    setItemStates(loaded);
+    const snap = await getDoc(txDocRef(userId, id, persona));
+    const data = snap.exists() ? snap.data() : {};
+    setItemStates(data.items || {});
+    if (data.myContact) setMyContact(data.myContact);
+    if (data.rmContact) setRmContact(data.rmContact);
+    // Save any freshly entered contact details
+    await setDoc(txDocRef(userId, id, persona), { myContact, rmContact }, { merge:true });
     setLoading(false);
     setStep("checklist");
+  };
+
+  const saveContacts = (mc, rc) => {
+    clearTimeout(saveTimer.current);
+    setSaving(true);
+    saveTimer.current = setTimeout(async () => {
+      await setDoc(txDocRef(userId, txId, persona), { myContact: mc, rmContact: rc }, { merge:true });
+      setSaving(false);
+    }, 800);
   };
 
   const handleUpdate = (idx, newState) => {
     const key = `item_${idx}`;
     const updated = { ...itemStates, [key]: newState };
     setItemStates(updated);
-    // Debounced save
     clearTimeout(saveTimer.current);
     setSaving(true);
     saveTimer.current = setTimeout(async () => {
-      await saveTxState(userId, txId, persona, updated);
+      await setDoc(txDocRef(userId, txId, persona), { items: updated, myContact, rmContact }, { merge:true });
       setSaving(false);
     }, 800);
   };
@@ -622,6 +639,39 @@ export default function RealEstateLifecycle({ userId }) {
           >
             {loading ? "Loading…" : `Open ${p.label} Checklist →`}
           </button>
+
+          {/* Contact cards */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginTop:28 }}>
+            {[
+              { label:`Your Details (${p?.label || "You"})`, key:"my", val:myContact, set:setMyContact },
+              { label:"Relationship Manager", key:"rm", val:rmContact, set:setRmContact },
+            ].map(({ label, key, val, set }) => (
+              <div key={key} style={{ background:"#fff", borderRadius:10, border:`1px solid ${C.border}`, padding:"16px 18px" }}>
+                <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:12 }}>{label}</div>
+                {[["name","Full Name","text"],["phone","Phone","tel"],["whatsapp","WhatsApp","tel"]].map(([field, placeholder, type]) => (
+                  <div key={field} style={{ marginBottom:10 }}>
+                    <label style={{ display:"block", fontSize:"clamp(9px,0.9vw,11px)", fontWeight:600, color:C.hint, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>{placeholder}</label>
+                    <input
+                      type={type}
+                      value={val[field]}
+                      onChange={e => set(prev => ({ ...prev, [field]: e.target.value }))}
+                      placeholder={field === "name" ? "Full name" : field === "whatsapp" ? "+91 98xxx xxxxx" : "+91 98xxx xxxxx"}
+                      style={{
+                        width:"100%", padding:"8px 10px", fontSize:"clamp(12px,1.2vw,14px)",
+                        border:`1px solid ${val[field] ? C.blueLt : C.border}`,
+                        borderRadius:6, outline:"none", fontFamily:"inherit",
+                        background: val[field] ? C.pale : "#fff", boxSizing:"border-box",
+                        color:C.navy,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:"clamp(11px,1vw,12px)", color:C.hint, marginTop:10 }}>
+            These details are optional but will appear in the checklist header for quick reference.
+          </div>
         </div>
       </div>
     );
@@ -693,6 +743,50 @@ export default function RealEstateLifecycle({ userId }) {
           </div>
         </div>
       </div>
+
+      {/* Contact cards row */}
+      {(myContact.name || myContact.phone || rmContact.name || rmContact.phone) && (
+        <div style={{
+          background:"#f0f4ff", borderBottom:`1px solid ${C.border}`,
+          padding:"clamp(8px,1vw,12px) clamp(16px,4vw,56px)",
+          display:"flex", gap:16, flexWrap:"wrap", flexShrink:0,
+        }}>
+          {[
+            { label:`${p.icon} ${p.label}`, data:myContact, onEdit:() => setStep("txid") },
+            { label:"👤 Relationship Manager", data:rmContact, onEdit:() => setStep("txid") },
+          ].map(({ label, data }) => (
+            (data.name || data.phone || data.whatsapp) ? (
+              <div key={label} style={{
+                display:"flex", alignItems:"center", gap:14,
+                background:"#fff", borderRadius:8, border:`1px solid ${C.border}`,
+                padding:"8px 16px", flex:"1 1 240px", minWidth:0,
+              }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:"clamp(9px,0.9vw,11px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:3 }}>{label}</div>
+                  <div style={{ fontSize:"clamp(12px,1.2vw,14px)", fontWeight:600, color:C.navy, marginBottom:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{data.name || "—"}</div>
+                  <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+                    {data.phone && (
+                      <a href={`tel:${data.phone}`} style={{ fontSize:"clamp(11px,1vw,13px)", color:C.slate, textDecoration:"none", display:"flex", alignItems:"center", gap:4 }}>
+                        📞 {data.phone}
+                      </a>
+                    )}
+                    {data.whatsapp && (
+                      <a href={`https://wa.me/${data.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize:"clamp(11px,1vw,13px)", color:"#25D366", textDecoration:"none", display:"flex", alignItems:"center", gap:4 }}>
+                        💬 {data.whatsapp}
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => setStep("txid")}
+                  style={{ marginLeft:"auto", flexShrink:0, background:"transparent", border:`1px solid ${C.border}`, color:C.hint, borderRadius:5, padding:"3px 8px", cursor:"pointer", fontSize:"clamp(9px,0.9vw,11px)", fontFamily:"inherit" }}>
+                  Edit
+                </button>
+              </div>
+            ) : null
+          ))}
+        </div>
+      )}
 
       {/* ── Milestone progress bar ── */}
       <div className="re-milestone-bar">
