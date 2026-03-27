@@ -629,20 +629,41 @@ export default function RealEstateLifecycle({ userId }) {
 
   // ── Checklist view ───────────────────────────────────────────
   return (
-    <div style={{ display:"flex", flexDirection:"column", height:"100%", fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ display:"flex", flexDirection:"column", minHeight:0, flex:1, fontFamily:"'DM Sans',sans-serif", overflow:"hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap');
         .re-checklist-content { flex:1; overflow-y:auto; padding: clamp(16px,2.5vw,32px) clamp(16px,4vw,56px) 60px; background:#F8FAFC; }
         .re-phase-title { font-family:'DM Serif Display',serif; font-size:clamp(14px,1.6vw,18px); font-weight:400; color:#fff; }
         .re-item-task   { font-size:clamp(13px,1.3vw,15px); color:#1E293B; line-height:1.6; }
         .re-item-doc    { font-size:clamp(10px,1vw,12px); }
-        .re-header-bar  { background:#0D1B2A; padding:clamp(12px,1.5vw,18px) clamp(16px,4vw,56px); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0; flex-wrap:wrap; }
-        .re-status-strip { background:#1558C0; padding:clamp(6px,1vw,10px) clamp(16px,4vw,56px); display:flex; gap:clamp(12px,2vw,28px); align-items:center; flex-wrap:wrap; flex-shrink:0; }
-        .re-back-welcome { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:rgba(255,255,255,0.85); border-radius:6px; padding:6px 14px; cursor:pointer; font-size:clamp(11px,1.1vw,13px); font-family:'DM Sans',sans-serif; transition:background 0.2s; white-space:nowrap; }
+        .re-header-bar  { background:#0D1B2A; padding:clamp(10px,1.5vw,16px) clamp(16px,4vw,56px); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0; flex-wrap:wrap; }
+        .re-back-welcome { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:rgba(255,255,255,0.85); border-radius:6px; padding:5px 12px; cursor:pointer; font-size:clamp(11px,1.1vw,13px); font-family:'DM Sans',sans-serif; transition:background 0.2s; white-space:nowrap; }
         .re-back-welcome:hover { background:rgba(255,255,255,0.22); }
-        .re-progress-pill { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:100px; padding:clamp(5px,0.8vw,8px) clamp(10px,1.5vw,16px); display:flex; align-items:center; gap:10px; }
+        .re-progress-pill { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:100px; padding:clamp(4px,0.6vw,7px) clamp(10px,1.5vw,16px); display:flex; align-items:center; gap:10px; }
         .re-progress-text { font-size:clamp(11px,1.1vw,13px); color:rgba(255,255,255,0.85); font-weight:500; white-space:nowrap; }
-        @media (max-width:480px) { .re-progress-pill { display:none; } }
+        .re-status-strip { background:#1558C0; padding:clamp(6px,1vw,10px) clamp(16px,4vw,56px); display:flex; gap:clamp(12px,2vw,28px); align-items:center; flex-wrap:wrap; flex-shrink:0; }
+
+        /* Milestone bar */
+        .re-milestone-bar { background:#0a1628; padding:clamp(10px,1.5vw,16px) clamp(16px,4vw,56px); flex-shrink:0; overflow-x:auto; }
+        .re-milestones { display:flex; align-items:center; min-width:max-content; position:relative; }
+        .re-milestone-node { display:flex; flex-direction:column; align-items:center; position:relative; z-index:1; }
+        .re-milestone-dot {
+          width:clamp(28px,3.5vw,40px); height:clamp(28px,3.5vw,40px);
+          border-radius:50%; border:2.5px solid rgba(255,255,255,0.15);
+          display:flex; align-items:center; justify-content:center;
+          font-size:clamp(10px,1.1vw,13px); font-weight:700; color:rgba(255,255,255,0.5);
+          transition:all 0.3s; flex-shrink:0; cursor:default;
+        }
+        .re-milestone-dot.done      { background:#10B981; border-color:#10B981; color:#fff; box-shadow:0 0 0 4px rgba(16,185,129,0.2); }
+        .re-milestone-dot.partial   { background:#F59E0B; border-color:#F59E0B; color:#fff; box-shadow:0 0 0 4px rgba(245,158,11,0.2); }
+        .re-milestone-dot.empty     { background:rgba(255,255,255,0.06); }
+        .re-milestone-label { font-size:clamp(9px,0.9vw,11px); color:rgba(255,255,255,0.5); margin-top:5px; text-align:center; max-width:clamp(60px,8vw,90px); line-height:1.3; white-space:normal; }
+        .re-milestone-label.done    { color:rgba(16,185,129,0.9); }
+        .re-milestone-label.partial { color:rgba(245,158,11,0.9); }
+        .re-milestone-connector { flex:1; min-width:clamp(16px,3vw,40px); height:2px; background:rgba(255,255,255,0.1); position:relative; top:-clamp(14px,1.8vw,20px); margin:0 2px; }
+        .re-milestone-connector-fill { height:100%; background:linear-gradient(90deg,#10B981,#34D399); border-radius:1px; transition:width 0.4s; }
+
+        @media (max-width:480px) { .re-progress-pill { display:none; } .re-milestone-label { display:none; } }
       `}</style>
 
       {/* Header bar */}
@@ -670,6 +691,42 @@ export default function RealEstateLifecycle({ userId }) {
               <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#34D399,#10B981)", borderRadius:3, transition:"width 0.4s" }} />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Milestone progress bar ── */}
+      <div className="re-milestone-bar">
+        <div className="re-milestones">
+          {p.phases.map((phase, i) => {
+            const phItems = (byPhase[phase.num] || []);
+            const phTotal = phItems.length;
+            const phValidated = phItems.filter(item => itemStates[`item_${item._globalIdx}`]?.status === "validated").length;
+            const phFailed    = phItems.filter(item => itemStates[`item_${item._globalIdx}`]?.status === "failed").length;
+            const isDone    = phTotal > 0 && phValidated === phTotal;
+            const isPartial = !isDone && (phValidated > 0 || phFailed > 0);
+            const dotClass  = isDone ? "done" : isPartial ? "partial" : "empty";
+            const prevPhase   = i > 0 ? p.phases[i-1] : null;
+            const prevItems   = prevPhase ? (byPhase[prevPhase.num] || []) : [];
+            const prevTotal   = prevItems.length;
+            const prevValid   = prevItems.filter(item => itemStates[`item_${item._globalIdx}`]?.status === "validated").length;
+            const connFill    = prevTotal > 0 ? Math.round(prevValid / prevTotal * 100) : 0;
+
+            return (
+              <div key={phase.num} style={{ display:"flex", alignItems:"flex-start", flex: i < p.phases.length - 1 ? 1 : "none" }}>
+                <div className="re-milestone-node">
+                  <div className={`re-milestone-dot ${dotClass}`}>
+                    {isDone ? "✓" : phase.num}
+                  </div>
+                  <div className={`re-milestone-label ${dotClass}`}>{phase.title}</div>
+                </div>
+                {i < p.phases.length - 1 && (
+                  <div className="re-milestone-connector">
+                    <div className="re-milestone-connector-fill" style={{ width:`${connFill}%` }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

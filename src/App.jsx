@@ -686,7 +686,7 @@ export default function App() {
             )}
 
             {activePanel === "realestate" && (
-              <div className="fade-up" style={{ margin:"-48px", height:"calc(100% + 48px)", display:"flex", flexDirection:"column" }}>
+              <div className="fade-up" style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", overflow:"hidden" }}>
                 <RealEstateLifecycle userId={auth.currentUser?.uid} />
               </div>
             )}
