@@ -527,6 +527,13 @@ export default function RealEstateLifecycle({ userId }) {
   const [rmContact, setRmContact] = useState({ name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" });
   const [buyerTxIds, setBuyerTxIds] = useState([]);
 
+  // TX ID header controls
+  const [addingTxId, setAddingTxId]     = useState(false);
+  const [txAddInput, setTxAddInput]     = useState("");
+  const [txAddLoading, setTxAddLoading] = useState(false);
+  const [propertyPopup, setPropertyPopup] = useState(null); // { txId, address, status }
+  const txAddRef = useRef(null);
+
   // ── Login state ──
   const [loginUser, setLoginUser] = useState("");
   const [loginPass, setLoginPass] = useState("");
@@ -662,6 +669,40 @@ export default function RealEstateLifecycle({ userId }) {
       await setDoc(txDocRef(userId, txId, persona), { myContact: mc, rmContact: rc }, { merge:true });
       setSaving(false);
     }, 800);
+  };
+
+  // Add a new TX ID from the header bar — fetches address and shows popup
+  const handleAddTxId = async () => {
+    const id = txAddInput.trim().toUpperCase();
+    if (!id) return;
+    setTxAddLoading(true);
+    try {
+      // Try to load existing tx doc for this persona
+      const snap = await getDoc(txDocRef(userId, id, persona));
+      const data = snap.exists() ? snap.data() : {};
+      const address = data.sellerProfile?.propertyAddress
+        || data.buyerProfile?.propertyAddress
+        || "Address not on record yet — your broker will update this.";
+      const status = data.status || "active";
+      // Save to buyer profile list
+      if (persona === "buyer") {
+        const profSnap = await getDoc(profRef());
+        const existing = profSnap.exists() ? (profSnap.data().txIds || []) : [];
+        const merged = existing.includes(id) ? existing : [...existing, id];
+        await setDoc(profRef(), { txIds: merged }, { merge:true });
+        setBuyerTxIds(merged);
+        // Save a stub tx doc if none exists
+        if (!snap.exists()) {
+          await setDoc(txDocRef(userId, id, persona), { txId: id, persona, status:"active", items:{}, myContact, rmContact, createdAt: new Date().toISOString() });
+        }
+      }
+      setPropertyPopup({ txId: id, address, status });
+      setAddingTxId(false);
+      setTxAddInput("");
+    } catch(e) {
+      console.error("Add TX ID error:", e);
+    }
+    setTxAddLoading(false);
   };
 
   const p = persona ? PERSONAS[persona] : null;
@@ -1007,62 +1048,49 @@ export default function RealEstateLifecycle({ userId }) {
         @media (max-width:480px) { .re-progress-pill { display:none; } .re-milestone-label { display:none; } }
       `}</style>
 
-      {/* Header bar */}
-      <div className="re-header-bar">
-        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          <button className="re-back-welcome" onClick={() => setStep("persona")}>
-            ⌂ Welcome
-          </button>
-          <div>
-            <div style={{ fontSize:"clamp(10px,1vw,12px)", color:"rgba(255,255,255,0.5)", letterSpacing:"0.06em", textTransform:"uppercase" }}>
-              {p.icon} {p.label} · {txId}
+      {/* ── Header bar with TX ID pills ── */}
+      <div className="re-header-bar" style={{ flexDirection:"column", alignItems:"stretch", gap:0, padding:0 }}>
+
+        {/* Top row: nav + progress */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, padding:"clamp(10px,1.5vw,16px) clamp(16px,4vw,56px)", flexWrap:"wrap" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <button className="re-back-welcome" onClick={() => setStep("persona")}>⌂ Welcome</button>
+            <div>
+              <div style={{ fontSize:"clamp(10px,1vw,12px)", color:"rgba(255,255,255,0.5)", letterSpacing:"0.06em", textTransform:"uppercase" }}>
+                {p.icon} {p.label}
+              </div>
+              <div style={{ fontSize:"clamp(13px,1.5vw,16px)", fontWeight:600, color:"#fff" }}>Transaction Checklist</div>
             </div>
-            <div style={{ fontSize:"clamp(13px,1.5vw,16px)", fontWeight:600, color:"#fff" }}>Transaction Checklist</div>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            {saving && <span style={{ fontSize:10, color:"rgba(255,255,255,0.4)" }}>Saving…</span>}
+            <div className="re-progress-pill">
+              <span className="re-progress-text">{validated} / {total} validated</span>
+              <div style={{ width:"clamp(60px,8vw,100px)", height:5, background:"rgba(255,255,255,0.15)", borderRadius:3 }}>
+                <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#34D399,#10B981)", borderRadius:3, transition:"width 0.4s" }} />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          {saving && <span style={{ fontSize:10, color:"rgba(255,255,255,0.4)" }}>Saving…</span>}
-          <div className="re-progress-pill">
-            <span className="re-progress-text">{validated} / {total} validated</span>
-            <div style={{ width:"clamp(60px,8vw,100px)", height:5, background:"rgba(255,255,255,0.15)", borderRadius:3 }}>
-              <div style={{ width:`${pct}%`, height:"100%", background:"linear-gradient(90deg,#34D399,#10B981)", borderRadius:3, transition:"width 0.4s" }} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Sold banner ── */}
-      {txStatus === "sold" && (
+        {/* TX ID pill row */}
         <div style={{
-          background:"#FEF3C7", borderBottom:`2px solid #F59E0B`,
-          padding:"clamp(10px,1.2vw,14px) clamp(16px,4vw,56px)",
-          display:"flex", alignItems:"center", gap:14, flexShrink:0,
+          borderTop:"1px solid rgba(255,255,255,0.08)",
+          padding:"8px clamp(16px,4vw,56px)",
+          display:"flex", alignItems:"center", gap:8, overflowX:"auto",
         }}>
-          <span style={{ fontSize:22 }}>⚠️</span>
-          <div>
-            <div style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#92400E" }}>This property has been sold</div>
-            <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#92400E", marginTop:2 }}>
-              This transaction is now closed. The checklist is read-only for historical reference.
-            </div>
-          </div>
-        </div>
-      )}
+          <span style={{ fontSize:"clamp(9px,0.9vw,11px)", fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.06em", flexShrink:0 }}>
+            {persona === "buyer" ? "Properties:" : "Transaction:"}
+          </span>
 
-      {/* ── Buyer: scrollable TX ID strip ── */}
-      {persona === "buyer" && buyerTxIds.length > 1 && (
-        <div style={{
-          background:"#fff", borderBottom:`1px solid ${C.border}`,
-          padding:"8px clamp(16px,4vw,56px)", flexShrink:0,
-          display:"flex", alignItems:"center", gap:10, overflowX:"auto",
-        }}>
-          <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.hint, textTransform:"uppercase", letterSpacing:"0.06em", flexShrink:0 }}>My Properties:</span>
-          {buyerTxIds.map(id => (
+          {/* Active TX IDs as pills */}
+          {(buyerTxIds.length > 0 ? buyerTxIds : txId ? [txId] : []).map(id => (
             <button key={id}
               onClick={async () => {
+                if (id === txId) return;
                 setLoading(true);
-                setTxId(id); setTxInput(id);
-                const snap = await getDoc(txDocRef(userId, id, "buyer"));
+                setTxId(id);
+                const snap = await getDoc(txDocRef(userId, id, persona));
                 const data = snap.exists() ? snap.data() : {};
                 setItemStates(data.items || {});
                 setTxStatus(data.status || "active");
@@ -1071,22 +1099,61 @@ export default function RealEstateLifecycle({ userId }) {
                 setLoading(false);
               }}
               style={{
-                flexShrink:0, padding:"5px 14px", borderRadius:20,
-                border:`1.5px solid ${id === txId ? C.blue : C.border}`,
-                background: id === txId ? C.pale : "#fff",
-                color: id === txId ? C.blue : C.slate,
-                fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)",
-                fontWeight: id === txId ? 700 : 400,
-                cursor:"pointer", transition:"all 0.15s",
-                display:"flex", alignItems:"center", gap:6,
+                flexShrink:0, padding:"4px 12px", borderRadius:20,
+                border:`1.5px solid ${id === txId ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)"}`,
+                background: id === txId ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.06)",
+                color: id === txId ? "#fff" : "rgba(255,255,255,0.55)",
+                fontFamily:"'DM Mono',monospace", fontSize:"clamp(10px,1vw,12px)",
+                fontWeight: id === txId ? 700 : 400, cursor: id === txId ? "default" : "pointer",
+                transition:"all 0.15s", display:"flex", alignItems:"center", gap:5,
               }}>
-              {id === txId && <span>●</span>} {id}
+              {id === txId && <span style={{ fontSize:8 }}>●</span>} {id}
             </button>
           ))}
-          <button onClick={() => setStep("txid")}
-            style={{ flexShrink:0, padding:"5px 12px", borderRadius:20, border:`1.5px dashed ${C.border}`, background:"transparent", color:C.hint, fontSize:"clamp(11px,1.1vw,12px)", cursor:"pointer", fontFamily:"inherit" }}>
-            + Add
-          </button>
+
+          {/* Add TX ID inline input */}
+          {addingTxId ? (
+            <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
+              <input
+                ref={txAddRef}
+                type="text" value={txAddInput}
+                onChange={e => setTxAddInput(e.target.value.toUpperCase())}
+                onKeyDown={e => { if (e.key === "Enter") handleAddTxId(); if (e.key === "Escape") { setAddingTxId(false); setTxAddInput(""); } }}
+                placeholder="TXN-2026-CHN-XXXX"
+                autoFocus
+                style={{
+                  padding:"4px 10px", borderRadius:20, border:"1.5px solid rgba(255,255,255,0.4)",
+                  background:"rgba(255,255,255,0.1)", color:"#fff", outline:"none",
+                  fontFamily:"'DM Mono',monospace", fontSize:"clamp(10px,1vw,12px)",
+                  width:"clamp(140px,16vw,200px)", letterSpacing:"0.04em",
+                }}
+              />
+              <button onClick={handleAddTxId} disabled={!txAddInput.trim() || txAddLoading}
+                style={{ padding:"4px 12px", borderRadius:20, border:"none", background:"#22C55E", color:"#fff", fontSize:"clamp(10px,1vw,12px)", fontWeight:700, cursor:"pointer", flexShrink:0 }}>
+                {txAddLoading ? "…" : "Go"}
+              </button>
+              <button onClick={() => { setAddingTxId(false); setTxAddInput(""); }}
+                style={{ padding:"4px 8px", borderRadius:20, border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.5)", fontSize:12, cursor:"pointer" }}>
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => { setAddingTxId(true); setTimeout(() => txAddRef.current?.focus(), 50); }}
+              style={{ flexShrink:0, padding:"4px 12px", borderRadius:20, border:"1.5px dashed rgba(255,255,255,0.25)", background:"transparent", color:"rgba(255,255,255,0.45)", fontSize:"clamp(10px,1vw,12px)", cursor:"pointer", fontFamily:"inherit" }}>
+              + Add TX ID
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Sold banner ── */}
+      {txStatus === "sold" && (
+        <div style={{ background:"#FEF3C7", borderBottom:`2px solid #F59E0B`, padding:"clamp(10px,1.2vw,14px) clamp(16px,4vw,56px)", display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
+          <span style={{ fontSize:22 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#92400E" }}>This property has been sold</div>
+            <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#92400E", marginTop:2 }}>This transaction is now closed. The checklist is read-only for historical reference.</div>
+          </div>
         </div>
       )}
 
@@ -1187,6 +1254,63 @@ export default function RealEstateLifecycle({ userId }) {
           );
         })}
       </div>
+
+      {/* ── Property Address Popup ── */}
+      {propertyPopup && (
+        <div onClick={() => setPropertyPopup(null)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background:"#fff", borderRadius:14, padding:"28px 32px", maxWidth:460, width:"100%", boxShadow:"0 8px 40px rgba(0,0,0,0.25)" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
+              <div>
+                <div style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>Property Details</div>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(14px,1.6vw,18px)", fontWeight:700, color:C.navy }}>{propertyPopup.txId}</div>
+              </div>
+              <button onClick={() => setPropertyPopup(null)}
+                style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.hint, lineHeight:1, marginLeft:12 }}>×</button>
+            </div>
+
+            <div style={{ padding:"16px 18px", background:C.pale, borderRadius:10, border:`1px solid ${C.pale2}`, marginBottom:16 }}>
+              <div style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:6 }}>📍 Property Address</div>
+              <div style={{ fontSize:"clamp(14px,1.4vw,16px)", color:C.navy, lineHeight:1.6 }}>{propertyPopup.address}</div>
+            </div>
+
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20 }}>
+              <span style={{
+                fontSize:"clamp(11px,1.1vw,13px)", fontWeight:600, padding:"4px 12px", borderRadius:20,
+                background: propertyPopup.status === "sold" ? "#FEF3C7" : "#F0FDF4",
+                color: propertyPopup.status === "sold" ? "#92400E" : "#15803D",
+                border: `1px solid ${propertyPopup.status === "sold" ? "#F59E0B" : "#22C55E"}`,
+              }}>
+                {propertyPopup.status === "sold" ? "⚠️ Sold" : "✓ Active"}
+              </span>
+            </div>
+
+            <div style={{ display:"flex", gap:10 }}>
+              <button
+                onClick={async () => {
+                  setLoading(true);
+                  setTxId(propertyPopup.txId);
+                  const snap = await getDoc(txDocRef(userId, propertyPopup.txId, persona));
+                  const data = snap.exists() ? snap.data() : {};
+                  setItemStates(data.items || {});
+                  setTxStatus(data.status || "active");
+                  if (data.myContact) setMyContact(data.myContact);
+                  if (data.rmContact) setRmContact(data.rmContact);
+                  setLoading(false);
+                  setPropertyPopup(null);
+                }}
+                style={{ flex:1, padding:"10px", fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#fff", background:C.blue, border:"none", borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
+                Open Checklist →
+              </button>
+              <button onClick={() => setPropertyPopup(null)}
+                style={{ padding:"10px 16px", fontSize:"clamp(12px,1.2vw,14px)", color:C.slate, background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reviewer Comments Modal */}
       {commentsModal && (
