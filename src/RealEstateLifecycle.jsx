@@ -427,6 +427,79 @@ function PhaseSection({ phase, items, itemStates, onUpdate, onOpenComments }) {
   );
 }
 
+// ── ContactCard ───────────────────────────────────────────────────────────────
+
+function ContactCard({ label, data, setData, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(data);
+
+  const handleSave = () => {
+    setData(draft);
+    onSave(draft);
+    setEditing(false);
+  };
+
+  return (
+    <div style={{
+      background:"#fff", borderRadius:10, border:`1px solid ${C.border}`,
+      padding:"clamp(10px,1.2vw,14px) clamp(12px,1.5vw,18px)",
+      flex:"1 1 260px", minWidth:0,
+      boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
+    }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+        <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.07em" }}>{label}</div>
+        <button
+          onClick={() => { setDraft(data); setEditing(v => !v); }}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.hint, borderRadius:5, padding:"3px 10px", cursor:"pointer", fontSize:"clamp(10px,1vw,12px)", fontFamily:"inherit" }}>
+          {editing ? "Cancel" : "✎ Edit"}
+        </button>
+      </div>
+
+      {editing ? (
+        <div>
+          {[["name","Full Name","text"],["phone","Phone","tel"],["whatsapp","WhatsApp","tel"]].map(([field, lbl, type]) => (
+            <div key={field} style={{ marginBottom:8 }}>
+              <label style={{ display:"block", fontSize:"clamp(9px,0.9vw,11px)", fontWeight:600, color:C.hint, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>{lbl}</label>
+              <input
+                type={type}
+                value={draft[field]}
+                onChange={e => setDraft(prev => ({ ...prev, [field]: e.target.value }))}
+                style={{
+                  width:"100%", padding:"7px 9px", fontSize:"clamp(12px,1.1vw,14px)",
+                  border:`1.5px solid ${C.blue}`, borderRadius:6, outline:"none",
+                  fontFamily:"inherit", color:C.navy, background:C.pale, boxSizing:"border-box",
+                }}
+              />
+            </div>
+          ))}
+          <button onClick={handleSave}
+            style={{ marginTop:4, width:"100%", padding:"8px", fontSize:"clamp(12px,1.1vw,13px)", fontWeight:700, color:"#fff", background:C.blue, border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit" }}>
+            Save
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:600, color:C.navy, marginBottom:6 }}>{data.name || <span style={{ color:C.hint, fontStyle:"italic" }}>No name</span>}</div>
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+            {data.phone ? (
+              <a href={`tel:${data.phone}`}
+                style={{ fontSize:"clamp(11px,1.1vw,13px)", color:C.slate, textDecoration:"none", display:"flex", alignItems:"center", gap:5 }}>
+                📞 {data.phone}
+              </a>
+            ) : <span style={{ fontSize:"clamp(11px,1.1vw,13px)", color:C.hint, fontStyle:"italic" }}>No phone</span>}
+            {data.whatsapp && (
+              <a href={`https://wa.me/${data.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#25D366", textDecoration:"none", display:"flex", alignItems:"center", gap:5 }}>
+                💬 {data.whatsapp}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function RealEstateLifecycle({ userId }) {
@@ -441,8 +514,8 @@ export default function RealEstateLifecycle({ userId }) {
   const saveTimer = useRef(null);
 
   const EMPTY_CONTACT = { name:"", phone:"", whatsapp:"" };
-  const [myContact, setMyContact] = useState(EMPTY_CONTACT);
-  const [rmContact, setRmContact] = useState(EMPTY_CONTACT);
+  const [myContact, setMyContact] = useState({ name:"Jiten Sarathy", phone:"+91 98400 00001", whatsapp:"+91 98400 00001" });
+  const [rmContact, setRmContact] = useState({ name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" });
 
   const p = persona ? PERSONAS[persona] : null;
 
@@ -639,39 +712,6 @@ export default function RealEstateLifecycle({ userId }) {
           >
             {loading ? "Loading…" : `Open ${p.label} Checklist →`}
           </button>
-
-          {/* Contact cards */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginTop:28 }}>
-            {[
-              { label:`Your Details (${p?.label || "You"})`, key:"my", val:myContact, set:setMyContact },
-              { label:"Relationship Manager", key:"rm", val:rmContact, set:setRmContact },
-            ].map(({ label, key, val, set }) => (
-              <div key={key} style={{ background:"#fff", borderRadius:10, border:`1px solid ${C.border}`, padding:"16px 18px" }}>
-                <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:12 }}>{label}</div>
-                {[["name","Full Name","text"],["phone","Phone","tel"],["whatsapp","WhatsApp","tel"]].map(([field, placeholder, type]) => (
-                  <div key={field} style={{ marginBottom:10 }}>
-                    <label style={{ display:"block", fontSize:"clamp(9px,0.9vw,11px)", fontWeight:600, color:C.hint, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>{placeholder}</label>
-                    <input
-                      type={type}
-                      value={val[field]}
-                      onChange={e => set(prev => ({ ...prev, [field]: e.target.value }))}
-                      placeholder={field === "name" ? "Full name" : field === "whatsapp" ? "+91 98xxx xxxxx" : "+91 98xxx xxxxx"}
-                      style={{
-                        width:"100%", padding:"8px 10px", fontSize:"clamp(12px,1.2vw,14px)",
-                        border:`1px solid ${val[field] ? C.blueLt : C.border}`,
-                        borderRadius:6, outline:"none", fontFamily:"inherit",
-                        background: val[field] ? C.pale : "#fff", boxSizing:"border-box",
-                        color:C.navy,
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize:"clamp(11px,1vw,12px)", color:C.hint, marginTop:10 }}>
-            These details are optional but will appear in the checklist header for quick reference.
-          </div>
         </div>
       </div>
     );
@@ -745,48 +785,35 @@ export default function RealEstateLifecycle({ userId }) {
       </div>
 
       {/* Contact cards row */}
-      {(myContact.name || myContact.phone || rmContact.name || rmContact.phone) && (
-        <div style={{
-          background:"#f0f4ff", borderBottom:`1px solid ${C.border}`,
-          padding:"clamp(8px,1vw,12px) clamp(16px,4vw,56px)",
-          display:"flex", gap:16, flexWrap:"wrap", flexShrink:0,
-        }}>
-          {[
-            { label:`${p.icon} ${p.label}`, data:myContact, onEdit:() => setStep("txid") },
-            { label:"👤 Relationship Manager", data:rmContact, onEdit:() => setStep("txid") },
-          ].map(({ label, data }) => (
-            (data.name || data.phone || data.whatsapp) ? (
-              <div key={label} style={{
-                display:"flex", alignItems:"center", gap:14,
-                background:"#fff", borderRadius:8, border:`1px solid ${C.border}`,
-                padding:"8px 16px", flex:"1 1 240px", minWidth:0,
-              }}>
-                <div style={{ minWidth:0 }}>
-                  <div style={{ fontSize:"clamp(9px,0.9vw,11px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:3 }}>{label}</div>
-                  <div style={{ fontSize:"clamp(12px,1.2vw,14px)", fontWeight:600, color:C.navy, marginBottom:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{data.name || "—"}</div>
-                  <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
-                    {data.phone && (
-                      <a href={`tel:${data.phone}`} style={{ fontSize:"clamp(11px,1vw,13px)", color:C.slate, textDecoration:"none", display:"flex", alignItems:"center", gap:4 }}>
-                        📞 {data.phone}
-                      </a>
-                    )}
-                    {data.whatsapp && (
-                      <a href={`https://wa.me/${data.whatsapp.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize:"clamp(11px,1vw,13px)", color:"#25D366", textDecoration:"none", display:"flex", alignItems:"center", gap:4 }}>
-                        💬 {data.whatsapp}
-                      </a>
-                    )}
-                  </div>
-                </div>
-                <button onClick={() => setStep("txid")}
-                  style={{ marginLeft:"auto", flexShrink:0, background:"transparent", border:`1px solid ${C.border}`, color:C.hint, borderRadius:5, padding:"3px 8px", cursor:"pointer", fontSize:"clamp(9px,0.9vw,11px)", fontFamily:"inherit" }}>
-                  Edit
-                </button>
-              </div>
-            ) : null
-          ))}
-        </div>
-      )}
+      {/* ── Contact cards ── */}
+      {(() => {
+        const cards = [
+          { label:`${p.icon} ${p.label}`, roleKey:"my", data:myContact, setData:setMyContact },
+          { label:"👤 Relationship Manager", roleKey:"rm", data:rmContact, setData:setRmContact },
+        ];
+        return (
+          <div style={{
+            background:"#f0f4ff", borderBottom:`1px solid ${C.border}`,
+            padding:"clamp(10px,1.2vw,14px) clamp(16px,4vw,56px)",
+            display:"flex", gap:16, flexWrap:"wrap", flexShrink:0,
+          }}>
+            {cards.map(({ label, roleKey, data, setData }) => (
+              <ContactCard key={roleKey} label={label} data={data} setData={setData}
+                onSave={(updated) => {
+                  const newMy = roleKey === "my" ? updated : myContact;
+                  const newRm = roleKey === "rm" ? updated : rmContact;
+                  clearTimeout(saveTimer.current);
+                  setSaving(true);
+                  saveTimer.current = setTimeout(async () => {
+                    await setDoc(txDocRef(userId, txId, persona), { myContact:newMy, rmContact:newRm }, { merge:true });
+                    setSaving(false);
+                  }, 800);
+                }}
+              />
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ── Milestone progress bar ── */}
       <div className="re-milestone-bar">
