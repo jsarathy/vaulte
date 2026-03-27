@@ -518,13 +518,42 @@ export default function RealEstateLifecycle({ userId }) {
 
   const [myContact, setMyContact] = useState({ name:"Jiten Sarathy", phone:"+91 98400 00001", whatsapp:"+91 98400 00001" });
   const [rmContact, setRmContact] = useState({ name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" });
+  const [txStatus, setTxStatus] = useState("active"); // active | sold
 
-  // Registration form state (seller only)
+  // Seller registration state
   const EMPTY_REG = { name:"", phone:"", whatsapp:"", address:"", propertyAddress:"" };
   const [reg, setReg]           = useState(EMPTY_REG);
   const [regError, setRegError] = useState("");
   const [regLoading, setRegLoading] = useState(false);
   const [generatedTxId, setGeneratedTxId] = useState("");
+
+  // Buyer-specific state
+  const EMPTY_BUYER_REG = { name:"", phone:"", whatsapp:"", address:"", txIdInterest:"" };
+  const [buyerReg, setBuyerReg]   = useState(EMPTY_BUYER_REG);
+  const [buyerTxIds, setBuyerTxIds] = useState([]); // list of TX IDs this buyer has registered for
+  const [buyerProfileLoading, setBuyerProfileLoading] = useState(false);
+
+  const buyerProfileRef = () => doc(db, "users", userId, "re_buyer_profile", "profile");
+
+  const loadBuyerProfile = async () => {
+    setBuyerProfileLoading(true);
+    try {
+      const snap = await getDoc(buyerProfileRef());
+      if (snap.exists()) {
+        setBuyerTxIds(snap.data().txIds || []);
+        if (snap.data().myContact) setMyContact(snap.data().myContact);
+      }
+    } catch(e) { console.error("loadBuyerProfile:", e); }
+    setBuyerProfileLoading(false);
+  };
+
+  const saveBuyerTxId = async (newTxId, contactData) => {
+    const snap = await getDoc(buyerProfileRef());
+    const existing = snap.exists() ? (snap.data().txIds || []) : [];
+    const merged = existing.includes(newTxId) ? existing : [...existing, newTxId];
+    await setDoc(buyerProfileRef(), { txIds: merged, myContact: contactData }, { merge:true });
+    setBuyerTxIds(merged);
+  };
 
   const generateTxId = () => {
     const year = new Date().getFullYear();
@@ -539,22 +568,52 @@ export default function RealEstateLifecycle({ userId }) {
     setRegLoading(true); setRegError("");
     const newTxId = generateTxId();
     const sellerData = {
-      txId: newTxId,
-      persona: "seller",
+      txId: newTxId, persona: "seller",
       createdAt: new Date().toISOString(),
       myContact: { name: reg.name, phone: reg.phone, whatsapp: reg.whatsapp },
       rmContact: { name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" },
       sellerProfile: { address: reg.address, propertyAddress: reg.propertyAddress },
-      items: {},
+      status: "active", items: {},
     };
     try {
       await setDoc(txDocRef(userId, newTxId, "seller"), sellerData);
-      // Note: shared re_registrations write intentionally omitted until security rules are updated
       setGeneratedTxId(newTxId);
       setMyContact(sellerData.myContact);
       setTxId(newTxId);
     } catch(e) {
       console.error("Registration error:", e);
+      setRegError("Registration failed: " + (e?.message || "unknown error"));
+    }
+    setRegLoading(false);
+  };
+
+  const handleBuyerRegister = async () => {
+    if (!buyerReg.name.trim() || !buyerReg.phone.trim()) {
+      setRegError("Name and phone are required."); return;
+    }
+    setRegLoading(true); setRegError("");
+    const contact = { name: buyerReg.name, phone: buyerReg.phone, whatsapp: buyerReg.whatsapp };
+    const txOfInterest = buyerReg.txIdInterest.trim().toUpperCase();
+    const buyerData = {
+      persona: "buyer", createdAt: new Date().toISOString(),
+      myContact: contact,
+      rmContact: { name:"Priya Krishnamurthy", phone:"+91 98400 00002", whatsapp:"+91 98400 00002" },
+      buyerProfile: { address: buyerReg.address },
+      status: "active", items: {},
+    };
+    try {
+      // Always save a base buyer profile
+      await setDoc(doc(db, "users", userId, "re_buyer_profile", "profile"), { myContact: contact, txIds: [] }, { merge:true });
+      // If a TX ID of interest was provided, link to it
+      if (txOfInterest) {
+        await setDoc(txDocRef(userId, txOfInterest, "buyer"), { ...buyerData, txId: txOfInterest });
+        await saveBuyerTxId(txOfInterest, contact);
+      }
+      setMyContact(contact);
+      setGeneratedTxId("BUYER_OK"); // signals success
+      if (txOfInterest) setTxId(txOfInterest);
+    } catch(e) {
+      console.error("Buyer registration error:", e);
       setRegError("Registration failed: " + (e?.message || "unknown error"));
     }
     setRegLoading(false);
@@ -582,8 +641,13 @@ export default function RealEstateLifecycle({ userId }) {
     const snap = await getDoc(txDocRef(userId, id, persona));
     const data = snap.exists() ? snap.data() : {};
     setItemStates(data.items || {});
+    setTxStatus(data.status || "active");
     if (data.myContact) setMyContact(data.myContact);
     if (data.rmContact) setRmContact(data.rmContact);
+    // For buyer: add this TX ID to their profile if not already there
+    if (persona === "buyer") {
+      await saveBuyerTxId(id, myContact);
+    }
     await setDoc(txDocRef(userId, id, persona), { myContact, rmContact }, { merge:true });
     setLoading(false);
     setStep("checklist");
@@ -695,6 +759,10 @@ export default function RealEstateLifecycle({ userId }) {
 
   // ── Transaction ID entry ─────────────────────────────────────
   if (step === "txid") {
+    // Load buyer profile when arriving at this step
+    if (persona === "buyer" && buyerTxIds.length === 0 && !buyerProfileLoading) {
+      loadBuyerProfile();
+    }
     return (
       <div style={{ minHeight:"100%", background:C.mist, overflowY:"auto" }}>
         <style>{`
@@ -704,6 +772,8 @@ export default function RealEstateLifecycle({ userId }) {
           .re-txid-sub   { font-size:clamp(13px,1.4vw,16px); color:#475569; line-height:1.7; margin-bottom:28px; }
           .re-txid-input { width:100%; padding:clamp(12px,1.5vw,16px) 16px; font-size:clamp(15px,1.8vw,20px); border-radius:10px; outline:none; box-sizing:border-box; font-family:'DM Mono',monospace; letter-spacing:0.05em; transition:border-color 0.2s, background 0.2s; }
           .re-txid-btn   { width:100%; padding:clamp(13px,1.5vw,17px); font-size:clamp(14px,1.5vw,17px); font-weight:700; border:none; border-radius:10px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.2s; }
+          .re-txid-pill  { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; background:#fff; border:1.5px solid ${C.border}; border-radius:20px; cursor:pointer; font-size:clamp(12px,1.2vw,14px); font-family:'DM Mono',monospace; color:${C.navy}; transition:all 0.15s; white-space:nowrap; }
+          .re-txid-pill:hover { border-color:${C.blue}; background:${C.pale}; color:${C.blue}; }
         `}</style>
 
         <div className="re-txid-wrap">
@@ -718,13 +788,46 @@ export default function RealEstateLifecycle({ userId }) {
               <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:600, color:C.hint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:6 }}>
                 {p.label} Checklist
               </div>
-              <h2 className="re-txid-title">Enter Transaction ID</h2>
+              <h2 className="re-txid-title">
+                {persona === "buyer" && buyerTxIds.length > 0 ? "Your Properties" : "Enter Transaction ID"}
+              </h2>
             </div>
           </div>
 
-          <p className="re-txid-sub">
-            Each property transaction has a unique Transaction ID shared between Seller, Buyer and Lender.
-            Enter it below to load or create your checklist.
+          {/* Buyer: show their saved TX IDs first */}
+          {persona === "buyer" && (
+            <>
+              {buyerProfileLoading ? (
+                <div style={{ fontSize:"clamp(13px,1.3vw,15px)", color:C.hint, marginBottom:20 }}>Loading your properties…</div>
+              ) : buyerTxIds.length > 0 ? (
+                <div style={{ marginBottom:28 }}>
+                  <div style={{ fontSize:"clamp(11px,1vw,13px)", fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:12 }}>
+                    Properties you're tracking
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
+                    {buyerTxIds.map(id => (
+                      <button key={id} className="re-txid-pill"
+                        onClick={() => { setTxInput(id); }}>
+                        🔑 {id}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginTop:10, fontSize:"clamp(11px,1vw,12px)", color:C.hint }}>
+                    Click a property to load it, or enter a new TX ID below.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginBottom:20, padding:"14px 18px", background:"#fff", borderRadius:8, border:`1px solid ${C.border}`, fontSize:"clamp(13px,1.3vw,15px)", color:C.hint, fontStyle:"italic" }}>
+                  No properties registered yet.
+                </div>
+              )}
+            </>
+          )}
+
+          <p className="re-txid-sub" style={{ marginBottom:16 }}>
+            {persona === "buyer"
+              ? "Enter a Transaction ID given to you by your broker, or select one above."
+              : "Enter your Transaction ID to open your checklist."}
           </p>
 
           <div style={{ marginBottom:20 }}>
@@ -755,16 +858,21 @@ export default function RealEstateLifecycle({ userId }) {
             {loading ? "Loading…" : `Open ${p.label} Checklist →`}
           </button>
 
-          {/* New seller registration link */}
-          {persona === "seller" && (
+          {/* Registration links */}
+          {(persona === "seller" || persona === "buyer") && (
             <div style={{ marginTop:24, padding:"16px 20px", background:"#fff", borderRadius:10, border:`1px solid ${C.border}`, textAlign:"center" }}>
               <div style={{ fontSize:"clamp(13px,1.3vw,15px)", color:C.navy, fontWeight:500, marginBottom:8 }}>
-                New seller? Don't have a Transaction ID yet?
+                {persona === "seller" ? "New seller? Don't have a Transaction ID yet?" : "New buyer? Register your interest in a property."}
               </div>
               <button
-                onClick={() => { setReg(EMPTY_REG); setRegError(""); setGeneratedTxId(""); setStep("register"); }}
+                onClick={() => {
+                  setRegError(""); setGeneratedTxId("");
+                  if (persona === "seller") setReg(EMPTY_REG);
+                  else setBuyerReg(EMPTY_BUYER_REG);
+                  setStep("register");
+                }}
                 style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:C.blue, background:"none", border:`1.5px solid ${C.blue}`, borderRadius:8, padding:"10px 24px", cursor:"pointer", fontFamily:"inherit" }}>
-                Register as a new Seller →
+                {persona === "seller" ? "Register as a new Seller →" : "Register as a new Buyer →"}
               </button>
             </div>
           )}
@@ -773,8 +881,16 @@ export default function RealEstateLifecycle({ userId }) {
     );
   }
 
-  // ── Seller Registration ───────────────────────────────────────
+  // ── Registration (Seller + Buyer) ─────────────────────────────
   if (step === "register") {
+    const isBuyer = persona === "buyer";
+    const formData = isBuyer ? buyerReg : reg;
+    const setFormData = isBuyer ? setBuyerReg : setReg;
+    const handleSubmit = isBuyer ? handleBuyerRegister : handleRegister;
+
+    const buyerSuccess = isBuyer && generatedTxId === "BUYER_OK";
+    const sellerSuccess = !isBuyer && generatedTxId && generatedTxId !== "BUYER_OK";
+
     return (
       <div style={{ minHeight:"100%", background:C.mist, overflowY:"auto" }}>
         <style>{`
@@ -792,46 +908,64 @@ export default function RealEstateLifecycle({ userId }) {
             ← Back
           </button>
 
-          {/* Header */}
           <div style={{ marginBottom:28 }}>
             <div style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.hint, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>
-              🏠 New Seller Registration
+              {isBuyer ? "🔑 New Buyer Registration" : "🏠 New Seller Registration"}
             </div>
             <h2 style={{ fontSize:"clamp(22px,3vw,32px)", fontWeight:700, color:C.navy, marginBottom:8 }}>
-              Register your property
+              {isBuyer ? "Register your interest" : "Register your property"}
             </h2>
             <p style={{ fontSize:"clamp(13px,1.3vw,15px)", color:C.slate, lineHeight:1.7 }}>
-              Complete the form below. You'll receive a unique Transaction ID to track your sale from listing to registration.
+              {isBuyer
+                ? "Complete the form below. If your broker gave you a Transaction ID, enter it here to start tracking the property immediately."
+                : "Complete the form below. You'll receive a unique Transaction ID to track your sale from listing to registration."}
             </p>
           </div>
 
-          {/* If registration succeeded — show TX ID */}
-          {generatedTxId ? (
+          {/* Success state */}
+          {(buyerSuccess || sellerSuccess) ? (
             <div style={{ background:"#F0FDF4", border:"2px solid #22C55E", borderRadius:12, padding:"28px 32px", textAlign:"center" }}>
               <div style={{ fontSize:40, marginBottom:12 }}>🎉</div>
-              <div style={{ fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700, color:"#15803D", marginBottom:6 }}>
+              <div style={{ fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700, color:"#15803D", marginBottom:12 }}>
                 Registration successful!
               </div>
-              <div style={{ fontSize:"clamp(12px,1.2vw,14px)", color:"#166534", marginBottom:20 }}>
-                Your Transaction ID is:
-              </div>
-              <div style={{
-                fontFamily:"'DM Mono',monospace", fontSize:"clamp(20px,3vw,32px)", fontWeight:700,
-                color:C.navy, background:"#fff", border:`2px solid #22C55E`,
-                borderRadius:10, padding:"14px 24px", letterSpacing:"0.08em",
-                display:"inline-block", marginBottom:20, userSelect:"all",
-              }}>
-                {generatedTxId}
-              </div>
-              <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#166534", marginBottom:24, lineHeight:1.6 }}>
-                Save this ID — you'll need it every time you log in to your checklist.<br/>
-                Share it with your buyer and lender so all parties see live progress.
-              </div>
-              <button
-                onClick={() => { setItemStates({}); setStep("checklist"); }}
-                style={{ fontSize:"clamp(14px,1.4vw,16px)", fontWeight:700, color:"#fff", background:"#15803D", border:"none", borderRadius:8, padding:"12px 32px", cursor:"pointer", fontFamily:"inherit" }}>
-                Open My Checklist →
-              </button>
+
+              {sellerSuccess ? (
+                <>
+                  <div style={{ fontSize:"clamp(12px,1.2vw,14px)", color:"#166534", marginBottom:16 }}>Your Transaction ID is:</div>
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(20px,3vw,32px)", fontWeight:700, color:C.navy, background:"#fff", border:`2px solid #22C55E`, borderRadius:10, padding:"14px 24px", letterSpacing:"0.08em", display:"inline-block", marginBottom:20, userSelect:"all" }}>
+                    {generatedTxId}
+                  </div>
+                  <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#166534", marginBottom:24, lineHeight:1.6 }}>
+                    Save this ID — you'll need it every time you log in.<br/>Share it with your buyer and lender so all parties see live progress.
+                  </div>
+                  <button onClick={() => { setItemStates({}); setStep("checklist"); }}
+                    style={{ fontSize:"clamp(14px,1.4vw,16px)", fontWeight:700, color:"#fff", background:"#15803D", border:"none", borderRadius:8, padding:"12px 32px", cursor:"pointer", fontFamily:"inherit" }}>
+                    Open My Checklist →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize:"clamp(13px,1.3vw,15px)", color:"#166534", marginBottom:8, lineHeight:1.6 }}>
+                    You're registered as a buyer.
+                  </div>
+                  {txId && (
+                    <div style={{ marginBottom:16 }}>
+                      <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#166534", marginBottom:8 }}>Tracking property:</div>
+                      <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(16px,2vw,24px)", fontWeight:700, color:C.navy, background:"#fff", border:`2px solid #22C55E`, borderRadius:10, padding:"10px 20px", letterSpacing:"0.08em", display:"inline-block", userSelect:"all" }}>
+                        {txId}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#166534", marginBottom:24, lineHeight:1.6 }}>
+                    Next time you log in, select Buyer and your saved properties will appear automatically.
+                  </div>
+                  <button onClick={() => { setItemStates({}); setStep(txId ? "checklist" : "txid"); }}
+                    style={{ fontSize:"clamp(14px,1.4vw,16px)", fontWeight:700, color:"#fff", background:"#15803D", border:"none", borderRadius:8, padding:"12px 32px", cursor:"pointer", fontFamily:"inherit" }}>
+                    {txId ? "Open My Checklist →" : "Go to My Properties →"}
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -839,38 +973,55 @@ export default function RealEstateLifecycle({ userId }) {
                 {/* Full Name */}
                 <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
                   <label className="re-reg-label">Full Name *</label>
-                  <input className="re-reg-input" type="text" value={reg.name} placeholder="e.g. Rajesh Venkataraman"
-                    onChange={e => setReg(p => ({...p, name:e.target.value}))}
-                    style={{ border:`1.5px solid ${reg.name ? C.blue : C.border}`, background: reg.name ? C.pale : "#fff", color:C.navy }} />
+                  <input className="re-reg-input" type="text" value={formData.name} placeholder="e.g. Ananya Subramanian"
+                    onChange={e => setFormData(p => ({...p, name:e.target.value}))}
+                    style={{ border:`1.5px solid ${formData.name ? C.blue : C.border}`, background: formData.name ? C.pale : "#fff", color:C.navy }} />
                 </div>
                 {/* Phone */}
                 <div className="re-reg-field">
                   <label className="re-reg-label">Phone Number *</label>
-                  <input className="re-reg-input" type="tel" value={reg.phone} placeholder="+91 98400 XXXXX"
-                    onChange={e => setReg(p => ({...p, phone:e.target.value}))}
-                    style={{ border:`1.5px solid ${reg.phone ? C.blue : C.border}`, background: reg.phone ? C.pale : "#fff", color:C.navy }} />
+                  <input className="re-reg-input" type="tel" value={formData.phone} placeholder="+91 98400 XXXXX"
+                    onChange={e => setFormData(p => ({...p, phone:e.target.value}))}
+                    style={{ border:`1.5px solid ${formData.phone ? C.blue : C.border}`, background: formData.phone ? C.pale : "#fff", color:C.navy }} />
                 </div>
                 {/* WhatsApp */}
                 <div className="re-reg-field">
                   <label className="re-reg-label">WhatsApp Handle</label>
-                  <input className="re-reg-input" type="tel" value={reg.whatsapp} placeholder="+91 98400 XXXXX"
-                    onChange={e => setReg(p => ({...p, whatsapp:e.target.value}))}
-                    style={{ border:`1.5px solid ${reg.whatsapp ? C.blue : C.border}`, background: reg.whatsapp ? C.pale : "#fff", color:C.navy }} />
+                  <input className="re-reg-input" type="tel" value={formData.whatsapp} placeholder="+91 98400 XXXXX"
+                    onChange={e => setFormData(p => ({...p, whatsapp:e.target.value}))}
+                    style={{ border:`1.5px solid ${formData.whatsapp ? C.blue : C.border}`, background: formData.whatsapp ? C.pale : "#fff", color:C.navy }} />
                 </div>
-                {/* Home Address */}
+                {/* Address */}
                 <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
                   <label className="re-reg-label">Your Address</label>
-                  <input className="re-reg-input" type="text" value={reg.address} placeholder="Flat 4B, Prestige Towers, Anna Nagar, Chennai 600040"
-                    onChange={e => setReg(p => ({...p, address:e.target.value}))}
-                    style={{ border:`1.5px solid ${reg.address ? C.blue : C.border}`, background: reg.address ? C.pale : "#fff", color:C.navy }} />
+                  <input className="re-reg-input" type="text" value={formData.address} placeholder="Flat 4B, Prestige Towers, Anna Nagar, Chennai 600040"
+                    onChange={e => setFormData(p => ({...p, address:e.target.value}))}
+                    style={{ border:`1.5px solid ${formData.address ? C.blue : C.border}`, background: formData.address ? C.pale : "#fff", color:C.navy }} />
                 </div>
-                {/* Property for Sale */}
-                <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
-                  <label className="re-reg-label">Property Address for Sale *</label>
-                  <input className="re-reg-input" type="text" value={reg.propertyAddress} placeholder="12/3, Boat Club Road, R.A. Puram, Chennai 600028"
-                    onChange={e => setReg(p => ({...p, propertyAddress:e.target.value}))}
-                    style={{ border:`1.5px solid ${reg.propertyAddress ? C.blue : C.border}`, background: reg.propertyAddress ? C.pale : "#fff", color:C.navy }} />
-                </div>
+
+                {/* Seller-only: property for sale */}
+                {!isBuyer && (
+                  <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
+                    <label className="re-reg-label">Property Address for Sale *</label>
+                    <input className="re-reg-input" type="text" value={formData.propertyAddress} placeholder="12/3, Boat Club Road, R.A. Puram, Chennai 600028"
+                      onChange={e => setFormData(p => ({...p, propertyAddress:e.target.value}))}
+                      style={{ border:`1.5px solid ${formData.propertyAddress ? C.blue : C.border}`, background: formData.propertyAddress ? C.pale : "#fff", color:C.navy }} />
+                  </div>
+                )}
+
+                {/* Buyer-only: TX ID of interest */}
+                {isBuyer && (
+                  <div className="re-reg-field" style={{ gridColumn:"1 / -1" }}>
+                    <label className="re-reg-label">Transaction ID (if given by broker)</label>
+                    <input className="re-reg-input" type="text" value={formData.txIdInterest}
+                      placeholder="TXN-2026-CHN-XXXX — leave blank if you don't have one yet"
+                      onChange={e => setFormData(p => ({...p, txIdInterest:e.target.value.toUpperCase()}))}
+                      style={{ fontFamily:"'DM Mono',monospace", letterSpacing:"0.04em", border:`1.5px solid ${formData.txIdInterest ? C.blue : C.border}`, background: formData.txIdInterest ? C.pale : "#fff", color:C.navy }} />
+                    <div style={{ marginTop:6, fontSize:"clamp(10px,1vw,12px)", color:C.hint }}>
+                      Optional — your broker will provide this. You can add more TX IDs later from the login screen.
+                    </div>
+                  </div>
+                )}
               </div>
 
               {regError && (
@@ -879,16 +1030,15 @@ export default function RealEstateLifecycle({ userId }) {
                 </div>
               )}
 
-              <button disabled={regLoading} onClick={handleRegister}
+              <button disabled={regLoading} onClick={handleSubmit}
                 style={{ width:"100%", padding:"clamp(13px,1.5vw,16px)", fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700,
                   color:"#fff", background: regLoading ? C.hint : C.blue, border:"none", borderRadius:10,
                   cursor: regLoading ? "not-allowed" : "pointer", fontFamily:"inherit", transition:"background 0.2s" }}>
-                {regLoading ? "Registering…" : "Register & Get Transaction ID →"}
+                {regLoading
+                  ? "Registering…"
+                  : isBuyer ? "Register as Buyer →" : "Register & Get Transaction ID →"}
               </button>
-
-              <div style={{ marginTop:12, fontSize:"clamp(10px,1vw,12px)", color:C.hint, textAlign:"center" }}>
-                * Required fields
-              </div>
+              <div style={{ marginTop:12, fontSize:"clamp(10px,1vw,12px)", color:C.hint, textAlign:"center" }}>* Required fields</div>
             </>
           )}
         </div>
@@ -963,12 +1113,69 @@ export default function RealEstateLifecycle({ userId }) {
         </div>
       </div>
 
-      {/* Contact cards row */}
+      {/* ── Sold banner ── */}
+      {txStatus === "sold" && (
+        <div style={{
+          background:"#FEF3C7", borderBottom:`2px solid #F59E0B`,
+          padding:"clamp(10px,1.2vw,14px) clamp(16px,4vw,56px)",
+          display:"flex", alignItems:"center", gap:14, flexShrink:0,
+        }}>
+          <span style={{ fontSize:22 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#92400E" }}>This property has been sold</div>
+            <div style={{ fontSize:"clamp(11px,1.1vw,13px)", color:"#92400E", marginTop:2 }}>
+              This transaction is now closed. The checklist is read-only for historical reference.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Buyer: scrollable TX ID strip ── */}
+      {persona === "buyer" && buyerTxIds.length > 1 && (
+        <div style={{
+          background:"#fff", borderBottom:`1px solid ${C.border}`,
+          padding:"8px clamp(16px,4vw,56px)", flexShrink:0,
+          display:"flex", alignItems:"center", gap:10, overflowX:"auto",
+        }}>
+          <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.hint, textTransform:"uppercase", letterSpacing:"0.06em", flexShrink:0 }}>My Properties:</span>
+          {buyerTxIds.map(id => (
+            <button key={id}
+              onClick={async () => {
+                setLoading(true);
+                setTxId(id); setTxInput(id);
+                const snap = await getDoc(txDocRef(userId, id, "buyer"));
+                const data = snap.exists() ? snap.data() : {};
+                setItemStates(data.items || {});
+                setTxStatus(data.status || "active");
+                if (data.myContact) setMyContact(data.myContact);
+                if (data.rmContact) setRmContact(data.rmContact);
+                setLoading(false);
+              }}
+              style={{
+                flexShrink:0, padding:"5px 14px", borderRadius:20,
+                border:`1.5px solid ${id === txId ? C.blue : C.border}`,
+                background: id === txId ? C.pale : "#fff",
+                color: id === txId ? C.blue : C.slate,
+                fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)",
+                fontWeight: id === txId ? 700 : 400,
+                cursor:"pointer", transition:"all 0.15s",
+                display:"flex", alignItems:"center", gap:6,
+              }}>
+              {id === txId && <span>●</span>} {id}
+            </button>
+          ))}
+          <button onClick={() => setStep("txid")}
+            style={{ flexShrink:0, padding:"5px 12px", borderRadius:20, border:`1.5px dashed ${C.border}`, background:"transparent", color:C.hint, fontSize:"clamp(11px,1.1vw,12px)", cursor:"pointer", fontFamily:"inherit" }}>
+            + Add
+          </button>
+        </div>
+      )}
+
       {/* ── Contact cards ── */}
       {(() => {
         const cards = [
           { label:`${p.icon} ${p.label}`, roleKey:"my", data:myContact, setData:setMyContact, readOnly:false },
-          { label:"👤 Relationship Manager", roleKey:"rm", data:rmContact, setData:setRmContact, readOnly: persona === "seller" },
+          { label:"👤 Relationship Manager", roleKey:"rm", data:rmContact, setData:setRmContact, readOnly: persona === "seller" || persona === "buyer" },
         ];
         return (
           <div style={{
