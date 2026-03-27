@@ -548,18 +548,14 @@ export default function RealEstateLifecycle({ userId }) {
       items: {},
     };
     try {
-      // Save under user's own subcollection AND a shared lookup doc
       await setDoc(txDocRef(userId, newTxId, "seller"), sellerData);
-      await setDoc(doc(db, "re_registrations", newTxId), {
-        txId: newTxId, sellerUserId: userId,
-        sellerName: reg.name, propertyAddress: reg.propertyAddress,
-        createdAt: sellerData.createdAt,
-      });
+      // Note: shared re_registrations write intentionally omitted until security rules are updated
       setGeneratedTxId(newTxId);
       setMyContact(sellerData.myContact);
       setTxId(newTxId);
     } catch(e) {
-      setRegError("Registration failed. Please try again.");
+      console.error("Registration error:", e);
+      setRegError("Registration failed: " + (e?.message || "unknown error"));
     }
     setRegLoading(false);
   };
