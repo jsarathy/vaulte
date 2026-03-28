@@ -50,7 +50,7 @@ function timeAgo(iso) {
 }
 
 // ── RmExpandableCard ──────────────────────────────────────────────────────────
-function RmExpandableCard({ rm, assignedItems, userId, onEdit, onRemove }) {
+function RmExpandableCard({ rm, assignedItems, userId, onEdit, onRemove, onTxClick }) {
   const [expanded, setExpanded]   = useState(false);
   const [txDetails, setTxDetails] = useState({}); // { txId: { address, status } }
   const [loading, setLoading]     = useState(false);
@@ -157,11 +157,16 @@ function RmExpandableCard({ rm, assignedItems, userId, onEdit, onRemove }) {
                     const d = txDetails[txId] || {};
                     const deal = rmDeals.find(i => i.txId === txId);
                     return (
-                      <div key={txId} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 12px", background:"#fff", borderRadius:8, border:`1px solid ${C.border}`, marginBottom:7 }}>
+                      <div key={txId}
+                        onClick={() => onTxClick && onTxClick(txId)}
+                        style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 12px", background:"#fff", borderRadius:8, border:`1px solid ${C.border}`, marginBottom:7, cursor: onTxClick ? "pointer" : "default", transition:"background 0.15s" }}
+                        onMouseEnter={e => { if (onTxClick) e.currentTarget.style.background = C.pale; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
                             <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)", fontWeight:700, color:C.navy }}>{txId}</span>
                             <span style={{ fontSize:"clamp(9px,0.9vw,10px)", fontWeight:600, padding:"1px 7px", borderRadius:20, background:C.greenBg, color:C.green, border:`1px solid ${C.greenBorder}` }}>Active</span>
+                            {onTxClick && <span style={{ fontSize:"clamp(9px,0.9vw,10px)", color:C.blue, marginLeft:"auto" }}>View →</span>}
                           </div>
                           <div style={{ fontSize:"clamp(10px,1vw,12px)", color:C.slate, marginBottom:4, lineHeight:1.4 }}>{d.address}</div>
                           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
@@ -188,7 +193,11 @@ function RmExpandableCard({ rm, assignedItems, userId, onEdit, onRemove }) {
                   {pastDeals.map(txId => {
                     const d = txDetails[txId] || {};
                     return (
-                      <div key={txId} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 12px", background:"#F8FAFC", borderRadius:8, border:`1px solid ${C.border}`, marginBottom:7, opacity:0.8 }}>
+                      <div key={txId}
+                        onClick={() => onTxClick && onTxClick(txId)}
+                        style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 12px", background:"#F8FAFC", borderRadius:8, border:`1px solid ${C.border}`, marginBottom:7, opacity:0.8, cursor: onTxClick ? "pointer" : "default", transition:"opacity 0.15s" }}
+                        onMouseEnter={e => { if (onTxClick) e.currentTarget.style.opacity = "1"; }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = "0.8"; }}>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
                             <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)", fontWeight:700, color:C.slate }}>{txId}</span>
@@ -853,6 +862,7 @@ export default function RMSupervisorDashboard({ userId }) {
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(clamp(300px,40%,480px), 1fr))", gap:"clamp(10px,1.5vw,16px)" }}>
                   {rmRoster.map((rm, i) => (
                     <RmExpandableCard key={i} rm={rm} assignedItems={assigned} userId={userId}
+                      onTxClick={openSupDetail}
                       onEdit={() => { setEditRmIdx(i); setRmForm({ name:rm.name||"", phone:rm.phone||"", institution:rm.institution||"", username:rm.username||"" }); setAddRmOpen(true); setRmFormError(""); }}
                       onRemove={() => handleRemoveRm(i)}
                     />
