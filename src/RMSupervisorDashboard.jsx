@@ -48,41 +48,169 @@ function timeAgo(iso) {
   return `${Math.floor(h/24)}d ago`;
 }
 
-// ── RmCard ────────────────────────────────────────────────────────────────────
-function RmCard({ rm, onEdit, onRemove }) {
+// ── RmExpandableCard ──────────────────────────────────────────────────────────
+function RmExpandableCard({ rm, assignedItems, userId, onEdit, onRemove }) {
+  const [expanded, setExpanded]   = useState(false);
+  const [txDetails, setTxDetails] = useState({}); // { txId: { address, status } }
+  const [loading, setLoading]     = useState(false);
+
+  // All tx IDs assigned to this RM (from supervisor assigned list)
+  const rmDeals = assignedItems.filter(i => i.assignedRm === rm.name);
+  // Fallback: also check rm.txIds if roster has them
+  const allIds = [...new Set([
+    ...rmDeals.map(i => i.txId).filter(Boolean),
+    ...(rm.txIds || []),
+  ])];
+
+  const loadDetails = async () => {
+    if (Object.keys(txDetails).length > 0) return; // already loaded
+    setLoading(true);
+    const details = {};
+    await Promise.all(allIds.map(async (txId) => {
+      try {
+        // Try seller doc first for address
+        const sellerSnap = await getDoc(doc(db, "users", userId, "re_transactions", `${txId}_seller`));
+        const sellerData = sellerSnap.exists() ? sellerSnap.data() : {};
+        const buyerSnap  = await getDoc(doc(db, "users", userId, "re_transactions", `${txId}_buyer`));
+        const buyerData  = buyerSnap.exists() ? buyerSnap.data() : {};
+        details[txId] = {
+          address: sellerData.sellerProfile?.propertyAddress
+            || buyerData.buyerProfile?.propertyAddress
+            || "Address not on record",
+          status: sellerData.status || buyerData.status || "active",
+          sellerName: sellerData.myContact?.name || null,
+          buyerName:  buyerData.myContact?.name  || null,
+        };
+      } catch { details[txId] = { address:"Could not load", status:"unknown" }; }
+    }));
+    setTxDetails(details);
+    setLoading(false);
+  };
+
+  const handleExpand = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next) loadDetails();
+  };
+
+  const activeDeals = allIds.filter(id => txDetails[id]?.status !== "sold" && txDetails[id]?.status !== "closed");
+  const pastDeals   = allIds.filter(id => txDetails[id]?.status === "sold" || txDetails[id]?.status === "closed");
+  const totalActive = expanded && Object.keys(txDetails).length > 0 ? activeDeals.length : (allIds.length);
+  const totalPast   = expanded && Object.keys(txDetails).length > 0 ? pastDeals.length : 0;
+
   return (
     <div style={{
       background:"#fff", borderRadius:12, border:`1px solid ${C.border}`,
-      padding:"16px 18px", boxShadow:"0 1px 6px rgba(0,0,0,0.05)",
+      boxShadow:"0 1px 6px rgba(0,0,0,0.05)", overflow:"hidden",
     }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:38, height:38, borderRadius:"50%", background:`linear-gradient(135deg,${C.blue},${C.blueLt})`, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:15, flexShrink:0 }}>
-            {(rm.name||"?")[0].toUpperCase()}
-          </div>
-          <div>
-            <div style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:C.navy }}>{rm.name}</div>
-            <div style={{ fontSize:"clamp(10px,1vw,12px)", color:C.hint }}>{rm.institution || "No institution"}</div>
-          </div>
+      {/* Header row */}
+      <div style={{ padding:"14px 18px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}
+        onClick={handleExpand}>
+        <div style={{ width:40, height:40, borderRadius:"50%", background:`linear-gradient(135deg,${C.blue},${C.blueLt})`, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:16, flexShrink:0 }}>
+          {(rm.name||"?")[0].toUpperCase()}
         </div>
-        <div style={{ display:"flex", gap:6 }}>
-          <button onClick={onEdit}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:C.navy }}>{rm.name}</div>
+          <div style={{ fontSize:"clamp(10px,1vw,12px)", color:C.hint }}>{rm.institution || "No institution"}{rm.phone ? ` · ${rm.phone}` : ""}</div>
+        </div>
+        {/* Deal count pills */}
+        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+          <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:600, padding:"2px 10px", borderRadius:20, background:C.greenBg, color:C.green, border:`1px solid ${C.greenBorder}` }}>
+            {totalActive} active
+          </span>
+          {totalPast > 0 && (
+            <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:600, padding:"2px 10px", borderRadius:20, background:"#F1F5F9", color:C.slate, border:`1px solid ${C.border}` }}>
+              {totalPast} past
+            </span>
+          )}
+        </div>
+        <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+          <button onClick={e => { e.stopPropagation(); onEdit(); }}
             style={{ background:C.pale, border:`1px solid ${C.pale2}`, color:C.blue, borderRadius:5, padding:"3px 9px", cursor:"pointer", fontSize:"clamp(10px,1vw,11px)", fontFamily:"inherit" }}>
-            ✎ Edit
+            ✎
           </button>
-          <button onClick={onRemove}
+          <button onClick={e => { e.stopPropagation(); onRemove(); }}
             style={{ background:C.redBg, border:`1px solid ${C.redBorder}`, color:C.red, borderRadius:5, padding:"3px 9px", cursor:"pointer", fontSize:"clamp(10px,1vw,11px)", fontFamily:"inherit" }}>
             ✕
           </button>
         </div>
+        <span style={{ color:C.hint, fontSize:13, flexShrink:0, transition:"transform 0.2s", transform: expanded ? "rotate(180deg)" : "none" }}>▾</span>
       </div>
-      <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
-        {rm.phone && <span style={{ fontSize:"clamp(11px,1.1vw,12px)", color:C.slate }}>📞 {rm.phone}</span>}
-        {rm.username && <span style={{ fontSize:"clamp(11px,1.1vw,12px)", color:C.hint, fontFamily:"'DM Mono',monospace" }}>@{rm.username}</span>}
-        <span style={{ fontSize:"clamp(11px,1.1vw,12px)", fontWeight:600, color:C.green }}>
-          {rm.txIds?.length || 0} active deal{rm.txIds?.length !== 1 ? "s" : ""}
-        </span>
-      </div>
+
+      {/* Expanded tx list */}
+      {expanded && (
+        <div style={{ borderTop:`1px solid ${C.border}`, background:"#FAFBFD" }}>
+          {loading ? (
+            <div style={{ padding:"20px", textAlign:"center", color:C.hint, fontSize:"clamp(12px,1.2vw,13px)" }}>Loading transactions…</div>
+          ) : allIds.length === 0 ? (
+            <div style={{ padding:"20px", textAlign:"center", color:C.hint, fontSize:"clamp(12px,1.2vw,13px)", fontStyle:"italic" }}>No deals assigned yet.</div>
+          ) : (
+            <>
+              {/* Active deals */}
+              {activeDeals.length > 0 && (
+                <div style={{ padding:"12px 18px 0" }}>
+                  <div style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:700, color:C.green, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>
+                    ✅ Active ({activeDeals.length})
+                  </div>
+                  {activeDeals.map(txId => {
+                    const d = txDetails[txId] || {};
+                    const deal = rmDeals.find(i => i.txId === txId);
+                    return (
+                      <div key={txId} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 12px", background:"#fff", borderRadius:8, border:`1px solid ${C.border}`, marginBottom:7 }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+                            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)", fontWeight:700, color:C.navy }}>{txId}</span>
+                            <span style={{ fontSize:"clamp(9px,0.9vw,10px)", fontWeight:600, padding:"1px 7px", borderRadius:20, background:C.greenBg, color:C.green, border:`1px solid ${C.greenBorder}` }}>Active</span>
+                          </div>
+                          <div style={{ fontSize:"clamp(10px,1vw,12px)", color:C.slate, marginBottom:4, lineHeight:1.4 }}>{d.address}</div>
+                          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                            {d.sellerName && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", color:C.hint }}>🏠 {d.sellerName}</span>}
+                            {d.buyerName  && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", color:C.hint }}>🔑 {d.buyerName}</span>}
+                            {deal?.persona && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", padding:"1px 6px", borderRadius:10, background:PERSONA_META[deal.persona]?.bg || C.pale, color:PERSONA_META[deal.persona]?.color || C.blue }}>{PERSONA_META[deal.persona]?.icon} {deal.persona}</span>}
+                          </div>
+                        </div>
+                        {deal?.assignedAt && (
+                          <div style={{ fontSize:"clamp(9px,0.9vw,10px)", color:C.hint, flexShrink:0, textAlign:"right" }}>{timeAgo(deal.assignedAt)}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Past deals */}
+              {pastDeals.length > 0 && (
+                <div style={{ padding:"12px 18px 0" }}>
+                  <div style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:8 }}>
+                    🔒 Past / Closed ({pastDeals.length})
+                  </div>
+                  {pastDeals.map(txId => {
+                    const d = txDetails[txId] || {};
+                    return (
+                      <div key={txId} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"9px 12px", background:"#F8FAFC", borderRadius:8, border:`1px solid ${C.border}`, marginBottom:7, opacity:0.8 }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+                            <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)", fontWeight:700, color:C.slate }}>{txId}</span>
+                            <span style={{ fontSize:"clamp(9px,0.9vw,10px)", fontWeight:600, padding:"1px 7px", borderRadius:20, background:"#F1F5F9", color:C.slate, border:`1px solid ${C.border}` }}>Sold</span>
+                          </div>
+                          <div style={{ fontSize:"clamp(10px,1vw,12px)", color:C.hint, lineHeight:1.4 }}>{d.address}</div>
+                          {(d.sellerName || d.buyerName) && (
+                            <div style={{ display:"flex", gap:10, marginTop:3 }}>
+                              {d.sellerName && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", color:C.hint }}>🏠 {d.sellerName}</span>}
+                              {d.buyerName  && <span style={{ fontSize:"clamp(9px,0.9vw,11px)", color:C.hint }}>🔑 {d.buyerName}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ height:12 }} />
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -482,6 +610,8 @@ export default function RMSupervisorDashboard({ userId }) {
         .sup-col-header { font-size:clamp(12px,1.2vw,14px); font-weight:700; color:${C.navy}; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
         .sup-empty { text-align:center; padding:32px 16px; color:${C.hint}; font-size:clamp(12px,1.2vw,13px); font-style:italic; border:1.5px dashed ${C.border}; border-radius:12px; }
         .sup-assigned-row { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#fff; border-radius:8px; border:1px solid ${C.border}; margin-bottom:8px; }
+        .sup-two-col { display:grid; grid-template-columns:1fr 1fr; gap:clamp(14px,2vw,24px); margin-bottom:clamp(24px,3vw,36px); }
+        @media(max-width:720px){ .sup-two-col { grid-template-columns:1fr; } }
       `}</style>
 
       {/* Header */}
@@ -525,40 +655,44 @@ export default function RMSupervisorDashboard({ userId }) {
         {dataLoading ? (
           <div style={{ textAlign:"center", padding:"48px", color:C.hint, fontSize:"clamp(13px,1.3vw,15px)" }}>Loading dashboard…</div>
         ) : (
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:clamp(16,28), alignItems:"start" }}
-            ref={el => el && (el.style.gap = "clamp(16px,2vw,28px)")}>
+          <>
+            {/* ── Top two-col: Inbox + Recently Assigned ── */}
+            <div className="sup-two-col">
 
-            {/* ── LEFT: Unassigned Inbox ── */}
-            <div>
-              <div className="sup-col-header">
-                <span>📬 Unassigned Inbox</span>
-                <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:400, color:C.hint }}>{unassigned.length} pending</span>
-              </div>
-              {unassigned.length === 0 ? (
-                <div className="sup-empty">No unassigned transactions.<br/>New seller/buyer registrations will appear here.</div>
-              ) : (
-                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                  {unassigned.map(item => (
-                    <UnassignedCard key={item.id} item={item} rmRoster={rmRoster} onAssign={handleAssign} />
-                  ))}
+              {/* Unassigned Inbox */}
+              <div>
+                <div className="sup-col-header">
+                  <span>📬 Unassigned Inbox</span>
+                  <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:400, color:C.hint }}>{unassigned.length} pending</span>
                 </div>
-              )}
-
-              {/* Recently assigned */}
-              {assigned.length > 0 && (
-                <div style={{ marginTop:28 }}>
-                  <div className="sup-col-header">
-                    <span>✅ Recently Assigned</span>
-                    <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:400, color:C.hint }}>{assigned.length} total</span>
+                {unassigned.length === 0 ? (
+                  <div className="sup-empty">No unassigned transactions.<br/>New seller/buyer registrations will appear here.</div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                    {unassigned.map(item => (
+                      <UnassignedCard key={item.id} item={item} rmRoster={rmRoster} onAssign={handleAssign} />
+                    ))}
                   </div>
-                  {assigned.slice(0,5).map(item => {
+                )}
+              </div>
+
+              {/* Recently Assigned */}
+              <div>
+                <div className="sup-col-header">
+                  <span>✅ Recently Assigned</span>
+                  <span style={{ fontSize:"clamp(10px,1vw,12px)", fontWeight:400, color:C.hint }}>{assigned.length} total</span>
+                </div>
+                {assigned.length === 0 ? (
+                  <div className="sup-empty">No assignments yet.<br/>Assigned deals will appear here.</div>
+                ) : (
+                  assigned.slice(0,8).map(item => {
                     const meta = PERSONA_META[item.persona] || PERSONA_META.seller;
                     return (
                       <div key={item.id} className="sup-assigned-row">
                         <span style={{ fontSize:16 }}>{meta.icon}</span>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:"clamp(12px,1.2vw,14px)", fontWeight:600, color:C.navy, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{item.name}</div>
-                          <div style={{ fontSize:"clamp(10px,1vw,11px)", color:C.hint }}>{item.txId || "—"}</div>
+                          <div style={{ fontSize:"clamp(10px,1vw,11px)", color:C.hint, fontFamily:"'DM Mono',monospace" }}>{item.txId || "—"}</div>
                         </div>
                         <div style={{ textAlign:"right", flexShrink:0 }}>
                           <div style={{ fontSize:"clamp(11px,1.1vw,12px)", fontWeight:600, color:C.green }}>→ {item.assignedRm}</div>
@@ -566,26 +700,26 @@ export default function RMSupervisorDashboard({ userId }) {
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
+                  })
+                )}
+              </div>
             </div>
 
-            {/* ── RIGHT: RM Roster ── */}
+            {/* ── Full-width RM Roster ── */}
             <div>
-              <div className="sup-col-header">
-                <span>👔 RM Roster</span>
+              <div className="sup-col-header" style={{ marginBottom:16 }}>
+                <span>👔 RM Roster — click any card to expand transactions</span>
                 <button onClick={() => { setAddRmOpen(true); setEditRmIdx(null); setRmForm(EMPTY_RM); setRmFormError(""); }}
-                  style={{ padding:"5px 14px", background:C.blue, color:"#fff", border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(11px,1.1vw,13px)" }}>
+                  style={{ padding:"6px 16px", background:C.blue, color:"#fff", border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(11px,1.1vw,13px)" }}>
                   + Add RM
                 </button>
               </div>
               {rmRoster.length === 0 ? (
-                <div className="sup-empty">No RMs added yet.<br/>Click "+ Add RM" to build your team.</div>
+                <div className="sup-empty">No RMs added yet. Click "+ Add RM" to build your team.</div>
               ) : (
-                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(clamp(300px,40%,480px), 1fr))", gap:"clamp(10px,1.5vw,16px)" }}>
                   {rmRoster.map((rm, i) => (
-                    <RmCard key={i} rm={rm}
+                    <RmExpandableCard key={i} rm={rm} assignedItems={assigned} userId={userId}
                       onEdit={() => { setEditRmIdx(i); setRmForm({ name:rm.name||"", phone:rm.phone||"", institution:rm.institution||"", username:rm.username||"" }); setAddRmOpen(true); setRmFormError(""); }}
                       onRemove={() => handleRemoveRm(i)}
                     />
@@ -593,7 +727,7 @@ export default function RMSupervisorDashboard({ userId }) {
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
 
