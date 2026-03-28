@@ -672,6 +672,21 @@ export default function RealEstateLifecycle({ userId, rmPersona, rmTxId, onRmBac
       setBuyerTxIds(txIds);
       if (isLender) setLenderTxIds(txIds);
       if (newTxId) setTxId(newTxId);
+
+      // Notify supervisor inbox (seller and buyer only)
+      if (!isLender) {
+        const unassignedKey = newTxId ? `${newTxId}_${persona}` : `pending_${persona}_${Date.now()}`;
+        await setDoc(
+          doc(db, "users", userId, "re_unassigned", unassignedKey),
+          {
+            txId: newTxId || "", persona, name: reg.name, phone: reg.phone,
+            propertyAddress: persona === "seller" ? reg.propertyAddress : (reg.txIdInterest || ""),
+            assignedRm: null, assignedAt: null,
+            createdAt: new Date().toISOString(),
+          }
+        );
+      }
+
       setRegSuccess({ txId: newTxId, persona });
     } catch(e) {
       console.error("Register error:", e);
