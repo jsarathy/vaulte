@@ -5,6 +5,7 @@ import {
   doc, setDoc, getDoc, getDocs,
   collection, updateDoc, query, orderBy,
 } from "firebase/firestore";
+import RealEstateLifecycle from "./RealEstateLifecycle";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const C = {
@@ -312,6 +313,15 @@ export default function RMSupervisorDashboard({ userId }) {
   const [rmRoster, setRmRoster]       = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
 
+  // Supervisor transaction view (mirrors lender)
+  const [supTxInput, setSupTxInput]       = useState("");
+  const [supTxListOpen, setSupTxListOpen] = useState(false);
+  const [supTxIds, setSupTxIds]           = useState([]);   // all tracked TX IDs
+  const [supTxAddLoading, setSupTxAddLoading] = useState(false);
+  const [supDetailPopup, setSupDetailPopup]   = useState(null); // { txId, address, status, sellerContact, buyerContact }
+  const [supViewPersona, setSupViewPersona]   = useState(null);
+  const [supViewTxId, setSupViewTxId]         = useState(null);
+
   // RM editor
   const [addRmOpen, setAddRmOpen]   = useState(false);
   const [editRmIdx, setEditRmIdx]   = useState(null);
@@ -334,6 +344,7 @@ export default function RMSupervisorDashboard({ userId }) {
       const profData = profSnap.exists() ? profSnap.data() : {};
       setMyName(profData.name || "");
       setRmRoster(profData.rmRoster || []);
+      setSupTxIds(profData.supTxIds || []);
 
       // Load unassigned / assigned
       const snap = await getDocs(unassignedCol(userId));
@@ -395,6 +406,52 @@ export default function RMSupervisorDashboard({ userId }) {
   const saveRoster = async (newRoster) => {
     setRmRoster(newRoster);
     await setDoc(supProfRef(userId), { rmRoster: newRoster }, { merge:true });
+  };
+
+  // ── Supervisor transaction handlers ──
+  const handleSupAddTx = async (id) => {
+    const txId = (id || supTxInput).trim().toUpperCase();
+    if (!txId || supTxIds.includes(txId)) { setSupTxInput(""); return; }
+    setSupTxAddLoading(true);
+    try {
+      const merged = [...supTxIds, txId];
+      await setDoc(supProfRef(userId), { supTxIds: merged }, { merge:true });
+      setSupTxIds(merged);
+      setSupTxInput("");
+      // immediately open detail popup
+      openSupDetail(txId);
+    } catch(e) { console.error("Add sup tx:", e); }
+    setSupTxAddLoading(false);
+  };
+
+  const openSupDetail = async (txId) => {
+    try {
+      const [sellerSnap, buyerSnap, lenderSnap] = await Promise.all([
+        getDoc(doc(db, "users", userId, "re_transactions", `${txId}_seller`)),
+        getDoc(doc(db, "users", userId, "re_transactions", `${txId}_buyer`)),
+        getDoc(doc(db, "users", userId, "re_transactions", `${txId}_lender`)),
+      ]);
+      const sd = sellerSnap.exists() ? sellerSnap.data() : {};
+      const bd = buyerSnap.exists()  ? buyerSnap.data()  : {};
+      const address = sd.sellerProfile?.propertyAddress || bd.buyerProfile?.propertyAddress || "Address not on record yet.";
+      const status  = sd.status || bd.status || "active";
+      setSupDetailPopup({
+        txId, address, status,
+        sellerContact: sd.myContact || null,
+        buyerContact:  bd.myContact || null,
+        lenderContact: lenderSnap.exists() ? lenderSnap.data().myContact || null : null,
+      });
+    } catch(e) {
+      setSupDetailPopup({ txId, address:"Could not load.", status:"unknown", sellerContact:null, buyerContact:null, lenderContact:null });
+    }
+  };
+
+  const goSupChecklist = async (viewAs) => {
+    const txId = supDetailPopup.txId;
+    setSupViewTxId(txId);
+    setSupViewPersona(viewAs);
+    setSupDetailPopup(null);
+    setSupTxListOpen(false);
   };
 
   const loadRegisteredRms = async () => {
@@ -485,6 +542,18 @@ export default function RMSupervisorDashboard({ userId }) {
       showToast("Assignment failed: " + (e?.message || "error"), false);
     }
   };
+
+  // ── Supervisor checklist view ──────────────────────────────────────────────────
+  if (supViewPersona && supViewTxId) {
+    return (
+      <RealEstateLifecycle
+        userId={userId}
+        rmPersona={supViewPersona}
+        rmTxId={supViewTxId}
+        onRmBack={() => { setSupViewPersona(null); setSupViewTxId(null); }}
+      />
+    );
+  }
 
   // ── Auth screens ──────────────────────────────────────────────────────────────
   if (step === "sup_login") {
@@ -730,6 +799,45 @@ export default function RMSupervisorDashboard({ userId }) {
               </div>
             </div>
 
+            {/* ── Full-width Transactions ── */}
+            <div style={{ marginBottom:"clamp(24px,3vw,36px)" }}>
+              <div className="sup-col-header" style={{ marginBottom:12 }}>
+                <span>📁 Transactions</span>
+                <button onClick={() => setSupTxListOpen(true)}
+                  style={{ padding:"6px 16px", background:C.navy, color:"#fff", border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(11px,1.1vw,13px)" }}>
+                  View All ({supTxIds.length})
+                </button>
+              </div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+                {supTxIds.slice(0,6).map(id => (
+                  <button key={id} onClick={() => openSupDetail(id)}
+                    style={{ padding:"6px 14px", borderRadius:20, border:`1.5px solid ${C.border}`, background:"#fff", fontFamily:"'DM Mono',monospace", fontSize:"clamp(10px,1vw,12px)", fontWeight:600, color:C.navy, cursor:"pointer", transition:"all 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.blue; e.currentTarget.style.color = C.blue; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.navy; }}>
+                    {id}
+                  </button>
+                ))}
+                {supTxIds.length > 6 && (
+                  <button onClick={() => setSupTxListOpen(true)}
+                    style={{ padding:"6px 12px", borderRadius:20, border:`1.5px dashed ${C.border}`, background:"transparent", fontSize:"clamp(10px,1vw,12px)", color:C.hint, cursor:"pointer", fontFamily:"inherit" }}>
+                    +{supTxIds.length - 6} more
+                  </button>
+                )}
+                {/* Quick-add inline */}
+                <div style={{ display:"flex", gap:6, marginLeft:"auto" }}>
+                  <input type="text" value={supTxInput}
+                    onChange={e => setSupTxInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => e.key === "Enter" && handleSupAddTx()}
+                    placeholder="Add TX ID…"
+                    style={{ padding:"6px 10px", fontFamily:"'DM Mono',monospace", fontSize:"clamp(11px,1.1vw,13px)", border:`1.5px solid ${supTxInput ? C.blue : C.border}`, borderRadius:7, outline:"none", background: supTxInput ? C.pale : "#fff", color:C.navy, width:"clamp(130px,16vw,200px)" }} />
+                  <button disabled={!supTxInput.trim() || supTxAddLoading} onClick={() => handleSupAddTx()}
+                    style={{ padding:"6px 12px", background: supTxInput ? C.blue : C.hint, color:"#fff", border:"none", borderRadius:7, cursor: supTxInput ? "pointer" : "not-allowed", fontWeight:700, fontSize:"clamp(11px,1.1vw,12px)", fontFamily:"inherit" }}>
+                    {supTxAddLoading ? "…" : "Open"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* ── Full-width RM Roster ── */}
             <div>
               <div className="sup-col-header" style={{ marginBottom:16 }}>
@@ -755,6 +863,102 @@ export default function RMSupervisorDashboard({ userId }) {
           </>
         )}
       </div>
+
+      {/* ── Supervisor TX List Modal ── */}
+      {supTxListOpen && (
+        <div onClick={e => e.target === e.currentTarget && setSupTxListOpen(false)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9000, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:14, width:"100%", maxWidth:540, maxHeight:"80vh", display:"flex", flexDirection:"column", boxShadow:"0 8px 40px rgba(0,0,0,0.25)", fontFamily:"'DM Sans',sans-serif" }}>
+            <div style={{ padding:"18px 24px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+              <div style={{ fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700, color:C.navy }}>📁 All Transactions</div>
+              <button onClick={() => setSupTxListOpen(false)} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.hint }}>×</button>
+            </div>
+            <div style={{ padding:"10px 20px", borderBottom:`1px solid ${C.border}`, display:"flex", gap:8, flexShrink:0 }}>
+              <input type="text" value={supTxInput}
+                onChange={e => setSupTxInput(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === "Enter" && handleSupAddTx()}
+                placeholder="Add TX ID…"
+                style={{ flex:1, padding:"7px 10px", fontFamily:"'DM Mono',monospace", fontSize:"clamp(12px,1.2vw,14px)", border:`1px solid ${C.border}`, borderRadius:7, outline:"none" }} />
+              <button disabled={!supTxInput.trim() || supTxAddLoading} onClick={() => handleSupAddTx()}
+                style={{ padding:"7px 14px", background:C.blue, color:"#fff", border:"none", borderRadius:7, cursor:"pointer", fontWeight:700, fontSize:"clamp(12px,1.2vw,13px)", fontFamily:"inherit" }}>
+                {supTxAddLoading ? "…" : "+ Add"}
+              </button>
+            </div>
+            <div style={{ flex:1, overflowY:"auto" }}>
+              {supTxIds.length === 0 ? (
+                <div style={{ padding:"32px 24px", textAlign:"center", color:C.hint, fontSize:"clamp(13px,1.3vw,15px)", fontStyle:"italic" }}>No transactions yet. Add a TX ID above.</div>
+              ) : supTxIds.map((id, i) => (
+                <div key={id}
+                  onClick={() => { openSupDetail(id); setSupTxListOpen(false); }}
+                  style={{ display:"flex", alignItems:"center", padding:"12px 20px", borderBottom:`1px solid ${C.border}`, cursor:"pointer", transition:"background 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = C.pale}
+                  onMouseLeave={e => e.currentTarget.style.background = "#fff"}>
+                  <div style={{ width:28, height:28, borderRadius:"50%", background:C.pale, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:C.blue, flexShrink:0, marginRight:12 }}>{i+1}</div>
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(12px,1.2vw,14px)", fontWeight:600, color:C.navy, flex:1 }}>{id}</div>
+                  <span style={{ fontSize:"clamp(10px,1vw,12px)", color:C.blue }}>View →</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding:"10px 20px", borderTop:`1px solid ${C.border}`, fontSize:"clamp(10px,1vw,12px)", color:C.hint, flexShrink:0 }}>
+              {supTxIds.length} transaction{supTxIds.length !== 1 ? "s" : ""} · Click any row to view participants
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Supervisor Transaction Detail Popup ── */}
+      {supDetailPopup && (
+        <div onClick={e => e.target === e.currentTarget && setSupDetailPopup(null)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:14, padding:"28px 32px", maxWidth:500, width:"100%", boxShadow:"0 8px 40px rgba(0,0,0,0.3)", fontFamily:"'DM Sans',sans-serif" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
+              <div>
+                <div style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>Transaction</div>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(16px,1.8vw,22px)", fontWeight:700, color:C.navy }}>{supDetailPopup.txId}</div>
+              </div>
+              <button onClick={() => setSupDetailPopup(null)} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.hint }}>×</button>
+            </div>
+
+            {/* Property address */}
+            <div style={{ padding:"14px 16px", background:C.pale, borderRadius:10, border:`1px solid ${C.pale2}`, marginBottom:16 }}>
+              <div style={{ fontSize:"clamp(10px,1vw,11px)", fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:5 }}>📍 Property Address</div>
+              <div style={{ fontSize:"clamp(13px,1.3vw,15px)", color:C.navy, lineHeight:1.6 }}>{supDetailPopup.address}</div>
+            </div>
+
+            {/* Status + participant badges */}
+            <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
+              <span style={{ fontSize:"clamp(11px,1.1vw,13px)", fontWeight:600, padding:"4px 12px", borderRadius:20, background: supDetailPopup.status === "sold" ? "#FEF3C7" : "#F0FDF4", color: supDetailPopup.status === "sold" ? "#92400E" : "#15803D", border:`1px solid ${supDetailPopup.status === "sold" ? "#F59E0B" : "#22C55E"}` }}>
+                {supDetailPopup.status === "sold" ? "⚠️ Sold" : "✓ Active"}
+              </span>
+              {supDetailPopup.sellerContact?.name && <span style={{ fontSize:"clamp(11px,1.1vw,12px)", padding:"4px 10px", borderRadius:20, background:"#EEF4FF", color:C.blue, border:`1px solid ${C.pale2}` }}>🏠 {supDetailPopup.sellerContact.name}</span>}
+              {supDetailPopup.buyerContact?.name  && <span style={{ fontSize:"clamp(11px,1.1vw,12px)", padding:"4px 10px", borderRadius:20, background:"#F5F3FF", color:"#7C3AED", border:"1px solid #DDD6FE" }}>🔑 {supDetailPopup.buyerContact.name}</span>}
+              {supDetailPopup.lenderContact?.name && <span style={{ fontSize:"clamp(11px,1.1vw,12px)", padding:"4px 10px", borderRadius:20, background:"#F0FDF4", color:"#1E6B35", border:"1px solid #BBF7D0" }}>🏦 {supDetailPopup.lenderContact.name}</span>}
+            </div>
+
+            {/* 3 checklist buttons */}
+            <div style={{ fontSize:"clamp(11px,1.1vw,13px)", fontWeight:700, color:C.hint, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:12 }}>View Checklist As</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:16 }}>
+              {[
+                { viewAs:"seller", icon:"🏠", label:"Seller",  color:C.blue,    bg:"#EEF4FF", border:C.blue },
+                { viewAs:"buyer",  icon:"🔑", label:"Buyer",   color:"#7C3AED", bg:"#F5F3FF", border:"#7C3AED" },
+                { viewAs:"lender", icon:"🏦", label:"Lender",  color:"#1E6B35", bg:"#F0FDF4", border:"#1E6B35" },
+              ].map(({ viewAs, icon, label, color, bg, border }) => (
+                <button key={viewAs} onClick={() => goSupChecklist(viewAs)}
+                  style={{ padding:"clamp(10px,1.2vw,14px) 8px", borderRadius:10, border:`2px solid ${border}`, background:bg, color, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(12px,1.2vw,14px)", display:"flex", flexDirection:"column", alignItems:"center", gap:5, transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = color; e.currentTarget.style.color = "#fff"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = bg; e.currentTarget.style.color = color; }}>
+                  <span style={{ fontSize:22 }}>{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setSupDetailPopup(null)}
+              style={{ width:"100%", padding:"9px", fontSize:"clamp(12px,1.2vw,14px)", color:C.slate, background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Add/Edit RM Modal ── */}
       {addRmOpen && (
