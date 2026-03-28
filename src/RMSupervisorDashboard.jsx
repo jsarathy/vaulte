@@ -318,6 +318,9 @@ export default function RMSupervisorDashboard({ userId }) {
   const EMPTY_RM = { name:"", phone:"", institution:"", username:"" };
   const [rmForm, setRmForm]         = useState(EMPTY_RM);
   const [rmFormError, setRmFormError] = useState("");
+  const [rmSearch, setRmSearch]     = useState("");
+  const [registeredRms, setRegisteredRms] = useState([]); // RMs found in re_profile/rm
+  const [rmLookupLoading, setRmLookupLoading] = useState(false);
 
   // Toast
   const [toast, setToast] = useState(null);
@@ -392,6 +395,28 @@ export default function RMSupervisorDashboard({ userId }) {
   const saveRoster = async (newRoster) => {
     setRmRoster(newRoster);
     await setDoc(supProfRef(userId), { rmRoster: newRoster }, { merge:true });
+  };
+
+  const loadRegisteredRms = async () => {
+    setRmLookupLoading(true);
+    try {
+      // re_profile/rm holds the single registered RM for this userId
+      const profSnap = await getDoc(rmProfRef(userId));
+      const credSnap = await getDoc(doc(db, "users", userId, "re_credentials", "rm"));
+      const found = [];
+      if (profSnap.exists()) {
+        const p = profSnap.data();
+        found.push({
+          name: p.name || p.myContact?.name || "",
+          phone: p.phone || p.myContact?.phone || "",
+          institution: p.institution || "",
+          username: credSnap.exists() ? credSnap.data().username || "" : "",
+          txIds: p.txIds || [],
+        });
+      }
+      setRegisteredRms(found);
+    } catch(e) { console.error("loadRegisteredRms:", e); }
+    setRmLookupLoading(false);
   };
 
   const handleAddRm = async () => {
@@ -709,7 +734,7 @@ export default function RMSupervisorDashboard({ userId }) {
             <div>
               <div className="sup-col-header" style={{ marginBottom:16 }}>
                 <span>👔 RM Roster — click any card to expand transactions</span>
-                <button onClick={() => { setAddRmOpen(true); setEditRmIdx(null); setRmForm(EMPTY_RM); setRmFormError(""); }}
+                <button onClick={() => { setAddRmOpen(true); setEditRmIdx(null); setRmForm(EMPTY_RM); setRmFormError(""); setRmSearch(""); setRegisteredRms([]); loadRegisteredRms(); }}
                   style={{ padding:"6px 16px", background:C.blue, color:"#fff", border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(11px,1.1vw,13px)" }}>
                   + Add RM
                 </button>
@@ -735,36 +760,133 @@ export default function RMSupervisorDashboard({ userId }) {
       {addRmOpen && (
         <div onClick={e => e.target === e.currentTarget && setAddRmOpen(false)}
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-          <div style={{ background:"#fff", borderRadius:14, padding:"28px 32px", maxWidth:460, width:"100%", boxShadow:"0 8px 40px rgba(0,0,0,0.25)", fontFamily:"'DM Sans',sans-serif" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <div style={{ background:"#fff", borderRadius:14, width:"100%", maxWidth:520, maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 8px 40px rgba(0,0,0,0.25)", fontFamily:"'DM Sans',sans-serif" }}>
+
+            {/* Modal header */}
+            <div style={{ padding:"20px 24px", borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
               <div style={{ fontSize:"clamp(14px,1.5vw,17px)", fontWeight:700, color:C.navy }}>
                 {editRmIdx !== null ? "Edit Relationship Manager" : "Add Relationship Manager"}
               </div>
-              <button onClick={() => setAddRmOpen(false)} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.hint }}>×</button>
+              <button onClick={() => { setAddRmOpen(false); setRmSearch(""); }} style={{ background:"none", border:"none", fontSize:22, cursor:"pointer", color:C.hint }}>×</button>
             </div>
-            {[
-              ["name",        "Full Name *",    "text", "e.g. Priya Krishnamurthy"],
-              ["phone",       "Phone",          "tel",  "+91 98400 XXXXX"],
-              ["institution", "Institution",    "text", "e.g. PropTrack Realty"],
-              ["username",    "Username (for RM portal)", "text", "e.g. priya_rm"],
-            ].map(([field, lbl, type, ph]) => (
-              <div key={field} style={{ marginBottom:14 }}>
-                <label style={{ display:"block", fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:5 }}>{lbl}</label>
-                <input type={type} value={rmForm[field]} placeholder={ph}
-                  onChange={e => setRmForm(p => ({...p, [field]: e.target.value}))}
-                  style={{ width:"100%", padding:"10px 13px", fontSize:"clamp(13px,1.3vw,15px)", border:`1.5px solid ${rmForm[field] ? C.blue : C.border}`, borderRadius:8, outline:"none", fontFamily:"inherit", background: rmForm[field] ? C.pale : "#fff", color:C.navy, boxSizing:"border-box" }} />
+
+            <div style={{ flex:1, overflowY:"auto", padding:"20px 24px" }}>
+
+              {/* ── Registered RMs from DB ── */}
+              {editRmIdx === null && (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:"clamp(11px,1vw,12px)", fontWeight:700, color:C.blue, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>
+                    Registered RMs in this account
+                  </div>
+
+                  {/* Search box */}
+                  <input
+                    type="text"
+                    value={rmSearch}
+                    onChange={e => setRmSearch(e.target.value)}
+                    placeholder="Search by name, username or institution…"
+                    autoFocus
+                    style={{
+                      width:"100%", padding:"9px 12px", fontSize:"clamp(13px,1.3vw,14px)",
+                      border:`1.5px solid ${rmSearch ? C.blue : C.border}`, borderRadius:8,
+                      outline:"none", fontFamily:"inherit", background: rmSearch ? C.pale : "#fff",
+                      color:C.navy, boxSizing:"border-box", marginBottom:10,
+                    }}
+                  />
+
+                  {rmLookupLoading ? (
+                    <div style={{ textAlign:"center", padding:"14px", color:C.hint, fontSize:"clamp(12px,1.2vw,13px)" }}>Looking up registered RMs…</div>
+                  ) : registeredRms.length === 0 ? (
+                    <div style={{ padding:"12px 14px", background:C.mist, borderRadius:8, fontSize:"clamp(12px,1.2vw,13px)", color:C.hint, fontStyle:"italic" }}>
+                      No registered RMs found. RMs who sign up via the RM Dashboard will appear here.
+                    </div>
+                  ) : (
+                    (() => {
+                      const q = rmSearch.toLowerCase();
+                      const filtered = registeredRms.filter(rm =>
+                        !q ||
+                        rm.name.toLowerCase().includes(q) ||
+                        rm.username.toLowerCase().includes(q) ||
+                        rm.institution.toLowerCase().includes(q)
+                      );
+                      const alreadyInRoster = (rm) => rmRoster.some(r => r.username === rm.username && r.name === rm.name);
+
+                      return filtered.length === 0 ? (
+                        <div style={{ padding:"12px 14px", background:C.mist, borderRadius:8, fontSize:"clamp(12px,1.2vw,13px)", color:C.hint }}>No match for "{rmSearch}"</div>
+                      ) : filtered.map((rm, i) => {
+                        const inRoster = alreadyInRoster(rm);
+                        return (
+                          <div key={i} style={{
+                            display:"flex", alignItems:"center", gap:12, padding:"12px 14px",
+                            background: inRoster ? "#F8FAFC" : "#fff",
+                            border:`1.5px solid ${inRoster ? C.border : C.pale2}`,
+                            borderRadius:10, marginBottom:8,
+                          }}>
+                            <div style={{ width:36, height:36, borderRadius:"50%", background:`linear-gradient(135deg,${C.blue},${C.blueLt})`, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:15, flexShrink:0 }}>
+                              {(rm.name||"?")[0].toUpperCase()}
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:"clamp(13px,1.3vw,14px)", fontWeight:700, color: inRoster ? C.hint : C.navy }}>{rm.name || "—"}</div>
+                              <div style={{ fontSize:"clamp(10px,1vw,12px)", color:C.hint }}>
+                                {[rm.institution, rm.username ? `@${rm.username}` : null, rm.phone].filter(Boolean).join(" · ")}
+                              </div>
+                              <div style={{ fontSize:"clamp(10px,1vw,11px)", color:C.green, marginTop:2 }}>{rm.txIds?.length || 0} deal{rm.txIds?.length !== 1 ? "s" : ""} tracked</div>
+                            </div>
+                            {inRoster ? (
+                              <span style={{ fontSize:"clamp(10px,1vw,12px)", color:C.hint, fontStyle:"italic", flexShrink:0 }}>In roster</span>
+                            ) : (
+                              <button
+                                onClick={async () => {
+                                  const newRm = { name:rm.name, phone:rm.phone, institution:rm.institution, username:rm.username, txIds: rm.txIds || [] };
+                                  const newRoster = [...rmRoster, newRm];
+                                  await saveRoster(newRoster);
+                                  setAddRmOpen(false); setRmSearch("");
+                                  showToast(`${rm.name} added to roster ✓`);
+                                }}
+                                style={{ padding:"7px 14px", background:C.blue, color:"#fff", border:"none", borderRadius:7, cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:"clamp(11px,1.1vw,13px)", flexShrink:0 }}>
+                                + Add
+                              </button>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
+
+                  <div style={{ display:"flex", alignItems:"center", gap:10, margin:"18px 0 0" }}>
+                    <div style={{ flex:1, height:1, background:C.border }} />
+                    <span style={{ fontSize:"clamp(10px,1vw,12px)", color:C.hint, whiteSpace:"nowrap" }}>or add manually</span>
+                    <div style={{ flex:1, height:1, background:C.border }} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Manual form ── */}
+              {[
+                ["name",        "Full Name *",               "text", "e.g. Priya Krishnamurthy"],
+                ["phone",       "Phone",                     "tel",  "+91 98400 XXXXX"],
+                ["institution", "Institution",               "text", "e.g. PropTrack Realty"],
+                ["username",    "Username (for RM portal)",  "text", "e.g. priya_rm"],
+              ].map(([field, lbl, type, ph]) => (
+                <div key={field} style={{ marginBottom:14 }}>
+                  <label style={{ display:"block", fontSize:"clamp(10px,1vw,12px)", fontWeight:700, color:C.slate, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:5 }}>{lbl}</label>
+                  <input type={type} value={rmForm[field]} placeholder={ph}
+                    onChange={e => setRmForm(p => ({...p, [field]: e.target.value}))}
+                    style={{ width:"100%", padding:"10px 13px", fontSize:"clamp(13px,1.3vw,15px)", border:`1.5px solid ${rmForm[field] ? C.blue : C.border}`, borderRadius:8, outline:"none", fontFamily:"inherit", background: rmForm[field] ? C.pale : "#fff", color:C.navy, boxSizing:"border-box" }} />
+                </div>
+              ))}
+              {rmFormError && <div style={{ padding:"9px 12px", background:C.redBg, border:`1px solid ${C.redBorder}`, borderRadius:7, fontSize:"clamp(12px,1.1vw,13px)", color:C.red, marginBottom:14 }}>{rmFormError}</div>}
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={handleAddRm}
+                  style={{ flex:1, padding:"11px", fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#fff", background:C.blue, border:"none", borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
+                  {editRmIdx !== null ? "Save Changes" : "Add Manually"}
+                </button>
+                <button onClick={() => { setAddRmOpen(false); setRmSearch(""); }}
+                  style={{ padding:"11px 18px", fontSize:"clamp(12px,1.2vw,14px)", color:C.slate, background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
+                  Cancel
+                </button>
               </div>
-            ))}
-            {rmFormError && <div style={{ padding:"9px 12px", background:C.redBg, border:`1px solid ${C.redBorder}`, borderRadius:7, fontSize:"clamp(12px,1.1vw,13px)", color:C.red, marginBottom:14 }}>{rmFormError}</div>}
-            <div style={{ display:"flex", gap:10 }}>
-              <button onClick={handleAddRm}
-                style={{ flex:1, padding:"11px", fontSize:"clamp(13px,1.3vw,15px)", fontWeight:700, color:"#fff", background:C.blue, border:"none", borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
-                {editRmIdx !== null ? "Save Changes" : "Add to Roster"}
-              </button>
-              <button onClick={() => setAddRmOpen(false)}
-                style={{ padding:"11px 18px", fontSize:"clamp(12px,1.2vw,14px)", color:C.slate, background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, cursor:"pointer", fontFamily:"inherit" }}>
-                Cancel
-              </button>
+
             </div>
           </div>
         </div>
