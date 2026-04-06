@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -24,7 +24,7 @@ const actionCodeSettings = {
   handleCodeInApp: true,
 };
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Helpers
 const generateUID = () => "USR-" + Math.random().toString(36).substr(2, 9).toUpperCase();
 
 const saveProfile = async (uid, data) => {
@@ -36,7 +36,7 @@ const fetchProfile = async (uid) => {
   return snap.exists() ? snap.data() : null;
 };
 
-// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Styles
 const fonts = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&display=swap');`;
 
 const globalStyle = `
@@ -72,7 +72,6 @@ const globalStyle = `
   ::-webkit-scrollbar { width:4px; }
   ::-webkit-scrollbar-track { background:transparent; }
   ::-webkit-scrollbar-thumb { background:rgba(212,175,55,0.3); border-radius:2px; }
-
   @media (max-width: 768px) {
     .app-sidebar { width:100% !important; height:56px !important; flex-direction:row !important; padding:0 !important; border-right:none !important; border-top:1px solid rgba(212,175,55,0.15) !important; order:2; gap:0 !important; }
     .app-sidebar .sidebar-label { display:none; }
@@ -92,7 +91,7 @@ const cardStyle = { background:"rgba(255,255,255,0.03)", border:"1px solid rgba(
 const hdg = { fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"28px", fontWeight:"400", letterSpacing:"3px", marginBottom:"6px" };
 const sub = { color:"rgba(240,234,214,0.4)", fontSize:"14px", letterSpacing:"0.5px", marginBottom:"36px", fontStyle:"italic" };
 
-// â”€â”€ Reusable Components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Reusable Components
 const EyeIcon = ({ show }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     {show
@@ -141,7 +140,29 @@ const ErrorBox = ({ msg }) => msg ? (
   <div style={{ background:"rgba(180,50,50,0.15)", border:"1px solid rgba(180,50,50,0.4)", borderRadius:"4px", padding:"10px 14px", color:"#e07070", fontSize:"13px", marginBottom:"20px", letterSpacing:"0.3px" }}>{msg}</div>
 ) : null;
 
-// â”€â”€ Main App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const GoogleButton = ({ onClick, disabled }) => (
+  <button onClick={onClick} disabled={disabled} style={{
+    width:"100%", padding:"12px", marginBottom:"20px",
+    background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
+    borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
+    fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
+    display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
+    transition:"all 0.3s", textTransform:"uppercase"
+  }}
+    onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+    onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+  >
+    <svg width="18" height="18" viewBox="0 0 48 48">
+      <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
+      <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
+    </svg>
+    Continue with Google
+  </button>
+);
+
+// Main App
 export default function App() {
   const [page, setPage]               = useState("loading");
   const [profile, setProfile]         = useState(null);
@@ -151,7 +172,7 @@ export default function App() {
   const [editing, setEditing]         = useState(false);
   const [editData, setEditData]       = useState({});
   const [savingEdit, setSavingEdit]   = useState(false);
-  const [activePanel, setActivePanel]   = useState("home");
+  const [activePanel, setActivePanel] = useState("home");
   const [signupData, setSignupData]   = useState({ firstName:"", lastName:"", email:"", password:"", phone:"", address:"", city:"", postcode:"" });
   const [loginData, setLoginData]     = useState({ email:"", password:"" });
   const [magicEmail, setMagicEmail]   = useState("");
@@ -161,7 +182,6 @@ export default function App() {
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
   const go = (p) => { setError(""); setPage(p); };
 
-  // Handle magic link redirect + normal auth state
   useEffect(() => {
     if (isSignInWithEmailLink(auth, window.location.href)) {
       let email = window.localStorage.getItem("vaulte:magicEmail");
@@ -192,7 +212,6 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // â”€â”€ Sign Up â”€â”€
   const handleSignup = async () => {
     const { firstName, lastName, email, password, phone, address, city, postcode } = signupData;
     if (!firstName || !lastName || !email || !password) { setError("Please fill in all required fields."); return; }
@@ -218,7 +237,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // â”€â”€ Login â”€â”€
   const handleLogin = async () => {
     if (!loginData.email || !loginData.password) { setError("Please enter your email and password."); return; }
     setLoading(true); setError("");
@@ -236,7 +254,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // â”€â”€ Magic Link â”€â”€
   const handleMagicLink = async () => {
     if (!magicEmail) { setError("Please enter your email address."); return; }
     setLoading(true); setError("");
@@ -249,7 +266,7 @@ export default function App() {
     }
     setLoading(false);
   };
-  // â”€â”€ Google Sign In â”€â”€
+
   const handleGoogleSignIn = async () => {
     setLoading(true); setError("");
     try {
@@ -261,7 +278,7 @@ export default function App() {
           firstName: cred.user.displayName?.split(" ")[0] || "",
           lastName:  cred.user.displayName?.split(" ").slice(1).join(" ") || "",
           email:     cred.user.email,
-          phone:     "", address:   "", city:      "", postcode:  "",
+          phone:     "", address: "", city: "", postcode: "",
           photoURL:  cred.user.photoURL || "",
           uid:       generateUID(),
           firebaseUid: cred.user.uid,
@@ -287,17 +304,14 @@ export default function App() {
     go("landing");
   };
 
-  // â”€â”€ Edit Profile â”€â”€
   const openEdit = () => { setEditData({ ...profile }); setEditing(true); };
   const handleSaveEdit = async () => {
     setSavingEdit(true);
     try {
       const updated = { ...profile, ...editData };
-      // Update password in Firebase Auth if changed
       if (editData.password && editData.password !== profile.password) {
         await updatePassword(auth.currentUser, editData.password);
       }
-      // Save to Firestore (don't store password in DB)
       const { password, ...safeProfile } = updated;
       await saveProfile(auth.currentUser.uid, safeProfile);
       setProfile(safeProfile);
@@ -309,7 +323,6 @@ export default function App() {
     setSavingEdit(false);
   };
 
-  // â”€â”€ Delete Account â”€â”€
   const handleDeleteAccount = async () => {
     if (!window.confirm("Are you sure? This cannot be undone.")) return;
     try {
@@ -322,7 +335,6 @@ export default function App() {
     }
   };
 
-  // â”€â”€ Loading screen â”€â”€
   if (page === "loading") return (
     <div style={{ ...bg, flexDirection:"column", gap:"16px" }}>
       <style>{globalStyle}</style>
@@ -331,11 +343,10 @@ export default function App() {
     </div>
   );
 
-  // â”€â”€ Landing â”€â”€
   if (page === "landing") return (
     <div style={bg}>
       <style>{globalStyle}</style>
-      {toast && <div className="toast">âœ¦ {toast}</div>}
+      {toast && <div className="toast">* {toast}</div>}
       <div style={{ textAlign:"center" }} className="fade-up">
         <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"8px" }}>WELCOME TO</div>
         <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:"56px", color:"#d4af37", fontWeight:"400", letterSpacing:"8px", lineHeight:"1", marginBottom:"16px" }}>VAULTE</h1>
@@ -348,17 +359,16 @@ export default function App() {
     </div>
   );
 
-  // â”€â”€ Sign Up â”€â”€
   if (page === "signup") return (
     <div style={{ ...bg, alignItems:"flex-start", paddingTop:"40px" }}>
       <style>{globalStyle}</style>
-      {toast && <div className="toast">âœ¦ {toast}</div>}
+      {toast && <div className="toast">* {toast}</div>}
       <div style={cardStyle}>
         <DecorLines />
         <div className="fade-up">
           <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"4px" }}>VAULTE</div>
           <h2 style={hdg}>Create Account</h2>
-          <p style={sub}>Join us â€” it only takes a moment</p>
+          <p style={sub}>Join us -- it only takes a moment</p>
         </div>
         <ErrorBox msg={error} />
         <div className="fade-up-2">
@@ -382,36 +392,17 @@ export default function App() {
             {loading && <span className="spinner" />}Create My Account
           </button>
           <div className="divider">or</div>
-          <button onClick={handleGoogleSignIn} disabled={loading} style={{
-            width:"100%", padding:"12px", marginBottom:"12px",
-            background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
-            borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
-            fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
-            display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
-            transition:"all 0.3s", textTransform:"uppercase"
-          }}
-            onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
-            onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
-          >
-            <svg width="18" height="18" viewBox="0 0 48 48">
-              <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
-              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
-              <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
-            </svg>
-            Continue with Google
-          </button>
+          <GoogleButton onClick={handleGoogleSignIn} disabled={loading} />
           <button className="btn-ghost" style={{ width:"100%" }} onClick={() => go("login")}>Sign In Instead</button>
         </div>
       </div>
     </div>
   );
 
-  // â”€â”€ Login â”€â”€
   if (page === "login") return (
     <div style={bg}>
       <style>{globalStyle}</style>
-      {toast && <div className="toast">âœ¦ {toast}</div>}
+      {toast && <div className="toast">* {toast}</div>}
       <div style={cardStyle}>
         <DecorLines />
         <div className="fade-up">
@@ -420,7 +411,6 @@ export default function App() {
           <p style={sub}>Sign in to your account</p>
         </div>
 
-        {/* Toggle tabs */}
         <div style={{ display:"flex", gap:"0", marginBottom:"28px", border:"1px solid rgba(212,175,55,0.2)", borderRadius:"4px", overflow:"hidden" }}>
           <button onClick={() => { setLoginMode("password"); setError(""); setMagicSent(false); }}
             style={{ flex:1, padding:"10px", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", cursor:"pointer", border:"none", transition:"all 0.3s", textTransform:"uppercase",
@@ -436,70 +426,24 @@ export default function App() {
           </button>
         </div>
 
-        {/* Google Sign In */}
-        <button onClick={handleGoogleSignIn} disabled={loading} style={{
-          width:"100%", padding:"12px", marginBottom:"20px",
-          background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
-          borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
-          fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
-          display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
-          transition:"all 0.3s", textTransform:"uppercase"
-        }}
-          onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
-          onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
-        >
-          <svg width="18" height="18" viewBox="0 0 48 48">
-            <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
-            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
-            <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
-          </svg>
-          Continue with Google
-        </button>
-
+        <GoogleButton onClick={handleGoogleSignIn} disabled={loading} />
         <div className="divider">or</div>
-
-        {/* Google Sign In */}
-        <button onClick={handleGoogleSignIn} disabled={loading} style={{
-          width:"100%", padding:"12px", marginBottom:"20px",
-          background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
-          borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
-          fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
-          display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
-          transition:"all 0.3s", textTransform:"uppercase"
-        }}
-          onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
-          onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
-        >
-          <svg width="18" height="18" viewBox="0 0 48 48">
-            <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
-            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5l-6.2-5.2C29.5 35.5 26.9 36 24 36c-5.2 0-9.6-2.9-11.3-7l-6.5 5C9.6 39.6 16.3 44 24 44z"/>
-            <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2C40.5 35.5 44 30.2 44 24c0-1.3-.1-2.7-.4-4z"/>
-          </svg>
-          Continue with Google
-        </button>
-
-        <div className="divider">or</div>
-
         <ErrorBox msg={error} />
 
-        {/* Password login */}
         {loginMode === "password" && (
           <div className="fade-up-2">
             <Field label="Email Address" type="email"    value={loginData.email}    onChange={v => setLoginData({...loginData,email:v})}    placeholder="jane@example.com" />
-            <Field label="Password"      type="password" value={loginData.password} onChange={v => setLoginData({...loginData,password:v})} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+            <Field label="Password"      type="password" value={loginData.password} onChange={v => setLoginData({...loginData,password:v})} placeholder="........" />
             <button className="btn-primary" onClick={handleLogin} disabled={loading}>
               {loading && <span className="spinner" />}Sign In
             </button>
           </div>
         )}
 
-        {/* Magic link login */}
         {loginMode === "magic" && !magicSent && (
           <div className="fade-up-2">
             <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", marginBottom:"20px", lineHeight:"1.6" }}>
-              Enter your email and we'll send you a sign-in link â€” no password needed.
+              Enter your email and we will send you a sign-in link -- no password needed.
             </p>
             <Field label="Email Address" type="email" value={magicEmail} onChange={setMagicEmail} placeholder="jane@example.com" />
             <button className="btn-primary" onClick={handleMagicLink} disabled={loading}>
@@ -508,10 +452,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Magic link sent confirmation */}
         {loginMode === "magic" && magicSent && (
           <div className="fade-up-2" style={{ textAlign:"center", padding:"16px 0" }}>
-            <div style={{ fontSize:"40px", marginBottom:"16px" }}>✉️</div>
+            <div style={{ fontSize:"40px", marginBottom:"16px" }}>&#9993;</div>
             <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"14px", letterSpacing:"2px", marginBottom:"12px" }}>CHECK YOUR INBOX</div>
             <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", lineHeight:"1.6" }}>
               We sent a sign-in link to<br />
@@ -534,7 +477,6 @@ export default function App() {
     </div>
   );
 
-  // â”€â”€ Account Page â”€â”€
   if (page === "account" && profile) {
 
     const InfoCard = ({ icon, label, value }) => (
@@ -558,16 +500,16 @@ export default function App() {
         fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
         cursor:"pointer", transition:"all 0.25s", textTransform:"uppercase", textAlign:"left",
       }}>
-        <span style={{ fontSize:"16px" }}>{icon}</span><span className="sidebar-label">{label}</span>
+        <span style={{ fontSize:"16px" }}>{icon}</span>
+        <span className="sidebar-label">{label}</span>
       </button>
     );
 
     return (
       <div style={{ height:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'Cormorant Garamond',serif", overflow:"hidden" }}>
         <style>{globalStyle}</style>
-        {toast && <div className="toast">âœ¦ {toast}</div>}
+        {toast && <div className="toast">* {toast}</div>}
 
-        {/* Edit Modal */}
         {editing && (
           <div className="overlay" onClick={e => { if (e.target === e.currentTarget) setEditing(false); }}>
             <div style={{ ...cardStyle, maxWidth:"520px", maxHeight:"90vh", overflowY:"auto" }} className="modal-in">
@@ -598,7 +540,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Top bar */}
         <div className="app-topbar" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 32px", borderBottom:"1px solid rgba(212,175,55,0.1)", background:"rgba(0,0,0,0.2)", flexShrink:0 }}>
           <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"20px", letterSpacing:"6px" }}>VAULTE</div>
           <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
@@ -609,29 +550,23 @@ export default function App() {
           </div>
         </div>
 
-        {/* Body */}
         <div className="app-body" style={{ display:"flex", flex:1, minHeight:0, overflow:"hidden" }}>
 
-          {/* Left Sidebar */}
           <div className="app-sidebar" style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
             <div className="sidebar-nav-section" style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
-            {navItem("home",      "Home",         "⌂")}
-            {navItem("account",   "My Account",   "◈")}
-            {navItem("nutrition", "Nutrition",     "🥗")}
-            {navItem("routine",   "Routine",       "📋")}
+            {navItem("home",      "Home",       "~")}
+            {navItem("account",   "My Account", "*")}
+            {navItem("nutrition", "Nutrition",  "N")}
+            {navItem("routine",   "Routine",    "R")}
             <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="app-main" style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}></div>
-          
-            {/* HOME panel */}
+          <div className="app-main" style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}>
+
             {activePanel === "home" && (
               <div className="fade-up" style={{ position:"absolute", inset:0, overflow:"hidden" }}>
-
-                {/* Full-bleed background photo or dark fallback */}
                 {profile.photoURL
                   ? <div style={{
                       position:"absolute", inset:0,
@@ -642,35 +577,24 @@ export default function App() {
                     }} />
                   : <div style={{ position:"absolute", inset:0, background:"linear-gradient(160deg,#0d0d0f 60%,#1a1408)" }} />
                 }
-
-                {/* Gradient overlay â€” bottom fade to dark */}
                 <div style={{
                   position:"absolute", inset:0,
                   background:"linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(10,10,12,0.7) 60%, rgba(10,10,12,0.95) 100%)",
                 }} />
-
-                {/* Content */}
                 <div style={{ position:"relative", zIndex:1, padding:"56px 56px 48px", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%" }}>
-
-                  {/* Date */}
                   <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"4px", marginBottom:"20px", textTransform:"uppercase" }}>
                     {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
                   </div>
-
-                  {/* Welcome + Name on same line */}
                   <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"52px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.1", marginBottom:"16px", textShadow:"0 4px 24px rgba(0,0,0,0.8)" }}>
                     Welcome, {profile.firstName}.
                   </h1>
-
                   <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"15px", fontStyle:"italic", letterSpacing:"1px", textShadow:"0 2px 8px rgba(0,0,0,0.8)" }}>
                     Good to have you back.
                   </p>
-
                 </div>
               </div>
             )}
 
-            {/* NUTRITION panel */}
             {activePanel === "nutrition" && (
               <div className="fade-up" style={{ margin:"-24px" }}>
                 <NutritionTracker userId={auth.currentUser?.uid} />
@@ -683,7 +607,6 @@ export default function App() {
               </div>
             )}
 
-            {/* MY ACCOUNT panel */}
             {activePanel === "account" && (
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"32px" }} className="fade-up">
@@ -694,22 +617,18 @@ export default function App() {
                   <button className="btn-ghost" onClick={openEdit}>Edit Profile</button>
                 </div>
 
-                {/* Avatar + name + photo upload */}
                 <div style={{ padding:"24px 28px", background:"linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.03))", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"8px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"20px" }} className="fade-up-2">
-                  {/* Left: initials avatar */}
                   <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#c9a84c,#b8962e)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Cinzel',serif", fontSize:"20px", color:"#0d0d0f", fontWeight:"600", flexShrink:0 }}>
                     {profile.firstName?.[0]}{profile.lastName?.[0]}
                   </div>
-                  {/* Centre: name, uid, member since */}
                   <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"18px", letterSpacing:"2px" }}>{profile.firstName} {profile.lastName}</div>
                     <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"rgba(212,175,55,0.1)", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"20px", padding:"3px 10px", margin:"6px 0" }}>
-                      <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"9px" }}>â—†</span>
+                      <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"9px" }}>+</span>
                       <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"2px", color:"rgba(212,175,55,0.7)" }}>{profile.uid}</span>
                     </div>
                     <div style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
                   </div>
-                  {/* Right: photo upload */}
                   <div style={{ flexShrink:0, textAlign:"center" }}>
                     <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={async e => {
                       const file = e.target.files[0];
@@ -742,7 +661,7 @@ export default function App() {
                             boxShadow:"0 4px 16px rgba(0,0,0,0.3)"
                           }} />
                         : <div style={{ width:"200px", height:"200px", borderRadius:"12px", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(212,175,55,0.03)" }}>
-                            <span style={{ fontSize:"40px" }}>📷</span>
+                            <span style={{ fontSize:"40px" }}>[ photo ]</span>
                             <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)", textAlign:"center" }}>CLICK TO<br/>ADD PHOTO</span>
                           </div>
                       }
@@ -766,9 +685,9 @@ export default function App() {
                 </div>
 
                 <div style={{ display:"grid", gap:"12px" }} className="fade-up-3">
-                  <InfoCard icon="✉️" label="Email Address" value={profile.email} />
-                  <InfoCard icon="📞" label="Telephone"     value={profile.phone} />
-                  <InfoCard icon="🏠" label="Address"       value={[profile.address, profile.city, profile.postcode].filter(Boolean).join(", ")} />
+                  <InfoCard icon="@" label="Email Address" value={profile.email} />
+                  <InfoCard icon="T" label="Telephone"     value={profile.phone} />
+                  <InfoCard icon="A" label="Address"       value={[profile.address, profile.city, profile.postcode].filter(Boolean).join(", ")} />
                 </div>
               </div>
             )}
@@ -780,5 +699,3 @@ export default function App() {
 
   return null;
 }
-
-
