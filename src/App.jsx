@@ -15,9 +15,6 @@ import {
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import NutritionTracker from "./NutritionTracker";
 import RoutineTracker from "./RoutineTracker";
-import RealEstateLifecycle from "./RealEstateLifecycle";
-import RMDashboard from "./RMDashboard";
-import RMSupervisorDashboard from "./RMSupervisorDashboard";
 import { auth, db, storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
@@ -622,17 +619,14 @@ export default function App() {
             {navItem("account",   "My Account",   "◈")}
             {navItem("nutrition", "Nutrition",     "🥗")}
             {navItem("routine",   "Routine",       "📋")}
-            {navItem("realestate","Real Estate",   "🏠")}
-            {navItem("rm",        "RM Dashboard",  "👔")}
-            {navItem("supervisor","Supervisor",     "🏢")}
             <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="app-main" style={{ flex:1, padding: ["home","realestate","rm","supervisor"].includes(activePanel) ? "0" : "48px", overflowY: ["home","realestate","rm","supervisor"].includes(activePanel) ? "hidden" : "auto", position:"relative" }}>
-
+          <div className="app-main" style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}></div>
+          
             {/* HOME panel */}
             {activePanel === "home" && (
               <div className="fade-up" style={{ position:"absolute", inset:0, overflow:"hidden" }}>
@@ -686,24 +680,6 @@ export default function App() {
             {activePanel === "routine" && (
               <div className="fade-up" style={{ margin:"-24px" }}>
                 <RoutineTracker userId={auth.currentUser?.uid} />
-              </div>
-            )}
-
-            {activePanel === "realestate" && (
-              <div className="fade-up" style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-                <RealEstateLifecycle userId={auth.currentUser?.uid} />
-              </div>
-            )}
-
-            {activePanel === "rm" && (
-              <div className="fade-up" style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-                <RMDashboard userId={auth.currentUser?.uid} />
-              </div>
-            )}
-
-            {activePanel === "supervisor" && (
-              <div className="fade-up" style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-                <RMSupervisorDashboard userId={auth.currentUser?.uid} />
               </div>
             )}
 
