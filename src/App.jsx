@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -24,7 +24,7 @@ const actionCodeSettings = {
   handleCodeInApp: true,
 };
 
-// ── Helpers ──────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const generateUID = () => "USR-" + Math.random().toString(36).substr(2, 9).toUpperCase();
 
 const saveProfile = async (uid, data) => {
@@ -36,7 +36,7 @@ const fetchProfile = async (uid) => {
   return snap.exists() ? snap.data() : null;
 };
 
-// ── Styles ────────────────────────────────────────────────────
+// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const fonts = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&display=swap');`;
 
 const globalStyle = `
@@ -92,7 +92,7 @@ const cardStyle = { background:"rgba(255,255,255,0.03)", border:"1px solid rgba(
 const hdg = { fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"28px", fontWeight:"400", letterSpacing:"3px", marginBottom:"6px" };
 const sub = { color:"rgba(240,234,214,0.4)", fontSize:"14px", letterSpacing:"0.5px", marginBottom:"36px", fontStyle:"italic" };
 
-// ── Reusable Components ───────────────────────────────────────
+// â”€â”€ Reusable Components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const EyeIcon = ({ show }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     {show
@@ -141,7 +141,7 @@ const ErrorBox = ({ msg }) => msg ? (
   <div style={{ background:"rgba(180,50,50,0.15)", border:"1px solid rgba(180,50,50,0.4)", borderRadius:"4px", padding:"10px 14px", color:"#e07070", fontSize:"13px", marginBottom:"20px", letterSpacing:"0.3px" }}>{msg}</div>
 ) : null;
 
-// ── Main App ──────────────────────────────────────────────────
+// â”€â”€ Main App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function App() {
   const [page, setPage]               = useState("loading");
   const [profile, setProfile]         = useState(null);
@@ -192,7 +192,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // ── Sign Up ──
+  // â”€â”€ Sign Up â”€â”€
   const handleSignup = async () => {
     const { firstName, lastName, email, password, phone, address, city, postcode } = signupData;
     if (!firstName || !lastName || !email || !password) { setError("Please fill in all required fields."); return; }
@@ -218,7 +218,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // ── Login ──
+  // â”€â”€ Login â”€â”€
   const handleLogin = async () => {
     if (!loginData.email || !loginData.password) { setError("Please enter your email and password."); return; }
     setLoading(true); setError("");
@@ -236,7 +236,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // ── Magic Link ──
+  // â”€â”€ Magic Link â”€â”€
   const handleMagicLink = async () => {
     if (!magicEmail) { setError("Please enter your email address."); return; }
     setLoading(true); setError("");
@@ -249,7 +249,7 @@ export default function App() {
     }
     setLoading(false);
   };
-  // ── Google Sign In ──
+  // â”€â”€ Google Sign In â”€â”€
   const handleGoogleSignIn = async () => {
     setLoading(true); setError("");
     try {
@@ -287,7 +287,7 @@ export default function App() {
     go("landing");
   };
 
-  // ── Edit Profile ──
+  // â”€â”€ Edit Profile â”€â”€
   const openEdit = () => { setEditData({ ...profile }); setEditing(true); };
   const handleSaveEdit = async () => {
     setSavingEdit(true);
@@ -309,7 +309,7 @@ export default function App() {
     setSavingEdit(false);
   };
 
-  // ── Delete Account ──
+  // â”€â”€ Delete Account â”€â”€
   const handleDeleteAccount = async () => {
     if (!window.confirm("Are you sure? This cannot be undone.")) return;
     try {
@@ -322,7 +322,7 @@ export default function App() {
     }
   };
 
-  // ── Loading screen ──
+  // â”€â”€ Loading screen â”€â”€
   if (page === "loading") return (
     <div style={{ ...bg, flexDirection:"column", gap:"16px" }}>
       <style>{globalStyle}</style>
@@ -331,11 +331,11 @@ export default function App() {
     </div>
   );
 
-  // ── Landing ──
+  // â”€â”€ Landing â”€â”€
   if (page === "landing") return (
     <div style={bg}>
       <style>{globalStyle}</style>
-      {toast && <div className="toast">✦ {toast}</div>}
+      {toast && <div className="toast">âœ¦ {toast}</div>}
       <div style={{ textAlign:"center" }} className="fade-up">
         <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"8px" }}>WELCOME TO</div>
         <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:"56px", color:"#d4af37", fontWeight:"400", letterSpacing:"8px", lineHeight:"1", marginBottom:"16px" }}>VAULTE</h1>
@@ -348,17 +348,17 @@ export default function App() {
     </div>
   );
 
-  // ── Sign Up ──
+  // â”€â”€ Sign Up â”€â”€
   if (page === "signup") return (
     <div style={{ ...bg, alignItems:"flex-start", paddingTop:"40px" }}>
       <style>{globalStyle}</style>
-      {toast && <div className="toast">✦ {toast}</div>}
+      {toast && <div className="toast">âœ¦ {toast}</div>}
       <div style={cardStyle}>
         <DecorLines />
         <div className="fade-up">
           <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"4px" }}>VAULTE</div>
           <h2 style={hdg}>Create Account</h2>
-          <p style={sub}>Join us — it only takes a moment</p>
+          <p style={sub}>Join us â€” it only takes a moment</p>
         </div>
         <ErrorBox msg={error} />
         <div className="fade-up-2">
@@ -407,11 +407,11 @@ export default function App() {
     </div>
   );
 
-  // ── Login ──
+  // â”€â”€ Login â”€â”€
   if (page === "login") return (
     <div style={bg}>
       <style>{globalStyle}</style>
-      {toast && <div className="toast">✦ {toast}</div>}
+      {toast && <div className="toast">âœ¦ {toast}</div>}
       <div style={cardStyle}>
         <DecorLines />
         <div className="fade-up">
@@ -488,7 +488,7 @@ export default function App() {
         {loginMode === "password" && (
           <div className="fade-up-2">
             <Field label="Email Address" type="email"    value={loginData.email}    onChange={v => setLoginData({...loginData,email:v})}    placeholder="jane@example.com" />
-            <Field label="Password"      type="password" value={loginData.password} onChange={v => setLoginData({...loginData,password:v})} placeholder="••••••••" />
+            <Field label="Password"      type="password" value={loginData.password} onChange={v => setLoginData({...loginData,password:v})} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
             <button className="btn-primary" onClick={handleLogin} disabled={loading}>
               {loading && <span className="spinner" />}Sign In
             </button>
@@ -499,7 +499,7 @@ export default function App() {
         {loginMode === "magic" && !magicSent && (
           <div className="fade-up-2">
             <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", marginBottom:"20px", lineHeight:"1.6" }}>
-              Enter your email and we'll send you a sign-in link — no password needed.
+              Enter your email and we'll send you a sign-in link â€” no password needed.
             </p>
             <Field label="Email Address" type="email" value={magicEmail} onChange={setMagicEmail} placeholder="jane@example.com" />
             <button className="btn-primary" onClick={handleMagicLink} disabled={loading}>
@@ -534,7 +534,7 @@ export default function App() {
     </div>
   );
 
-  // ── Account Page ──
+  // â”€â”€ Account Page â”€â”€
   if (page === "account" && profile) {
 
     const InfoCard = ({ icon, label, value }) => (
@@ -565,7 +565,7 @@ export default function App() {
     return (
       <div style={{ height:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'Cormorant Garamond',serif", overflow:"hidden" }}>
         <style>{globalStyle}</style>
-        {toast && <div className="toast">✦ {toast}</div>}
+        {toast && <div className="toast">âœ¦ {toast}</div>}
 
         {/* Edit Modal */}
         {editing && (
@@ -643,7 +643,7 @@ export default function App() {
                   : <div style={{ position:"absolute", inset:0, background:"linear-gradient(160deg,#0d0d0f 60%,#1a1408)" }} />
                 }
 
-                {/* Gradient overlay — bottom fade to dark */}
+                {/* Gradient overlay â€” bottom fade to dark */}
                 <div style={{
                   position:"absolute", inset:0,
                   background:"linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(10,10,12,0.7) 60%, rgba(10,10,12,0.95) 100%)",
@@ -704,7 +704,7 @@ export default function App() {
                   <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"18px", letterSpacing:"2px" }}>{profile.firstName} {profile.lastName}</div>
                     <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"rgba(212,175,55,0.1)", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"20px", padding:"3px 10px", margin:"6px 0" }}>
-                      <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"9px" }}>◆</span>
+                      <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"9px" }}>â—†</span>
                       <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"2px", color:"rgba(212,175,55,0.7)" }}>{profile.uid}</span>
                     </div>
                     <div style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
@@ -780,3 +780,5 @@ export default function App() {
 
   return null;
 }
+
+
