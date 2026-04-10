@@ -20,8 +20,11 @@ export function generateWeightProjection(cfg) {
   const rows = [];
   let d = new Date(cfg.startDate + "T12:00:00");
   const phase1EndWeight = parseFloat((cfg.startWeightKg - (cfg.phase1Weeks - 1) * cfg.weeklyLossKg).toFixed(1));
+  // Safety ceiling so a misconfigured plan (e.g. target >= start weight) cannot
+  // loop forever. Phase 3 completion always breaks out first for a valid plan.
+  const maxWeeks = cfg.phase1Weeks + cfg.resetWeeks + 80;
 
-  for (let week = 1; week <= 60; week++) {
+  for (let week = 1; week <= maxWeeks; week++) {
     const dateStr = `${String(d.getDate()).padStart(2,"0")} ${d.toLocaleString("en-GB",{month:"short"})} ${d.getFullYear()}`;
     let phase, projected;
     if (week <= cfg.phase1Weeks) {
@@ -37,10 +40,11 @@ export function generateWeightProjection(cfg) {
     }
     projected = Math.max(projected, parseFloat((cfg.targetWeightMinKg - 0.5).toFixed(1)));
     rows.push({ week, date: dateStr, projected, phase });
-    d = new Date(d.getTime() + 7 * 24 * 60 * 60 * 1000);
+    d.setDate(d.getDate() + 7);
     if (phase === "Phase 3 — Resume" && projected <= cfg.targetWeightMinKg) {
       for (let e = 1; e <= 2; e++) {
-        const ed = new Date(d.getTime() + (e - 1) * 7 * 24 * 60 * 60 * 1000);
+        const ed = new Date(d);
+        ed.setDate(ed.getDate() + (e - 1) * 7);
         rows.push({
           week: week + e,
           date: `${String(ed.getDate()).padStart(2,"0")} ${ed.toLocaleString("en-GB",{month:"short"})} ${ed.getFullYear()}`,
@@ -50,7 +54,6 @@ export function generateWeightProjection(cfg) {
       }
       break;
     }
-    if (week >= 52) break;
   }
   return rows;
 }
