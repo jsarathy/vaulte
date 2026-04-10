@@ -18,9 +18,8 @@ import RoutineTracker from "./RoutineTracker";
 import { auth, db, storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
-const VERCEL_URL = "https://vaulte-roan.vercel.app";
 const actionCodeSettings = {
-  url: VERCEL_URL,
+  url: window.location.origin,
   handleCodeInApp: true,
 };
 
@@ -178,15 +177,18 @@ export default function App() {
   const [magicEmail, setMagicEmail]   = useState("");
   const [magicSent, setMagicSent]     = useState(false);
   const [loginMode, setLoginMode]     = useState("password");
+  const [pendingMagicHref, setPendingMagicHref]     = useState(null);
+  const [pendingMagicEmail, setPendingMagicEmail]   = useState("");
+  const [pendingMagicLoading, setPendingMagicLoading] = useState(false);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
   const go = (p) => { setError(""); setPage(p); };
 
   useEffect(() => {
     if (isSignInWithEmailLink(auth, window.location.href)) {
-      let email = window.localStorage.getItem("vaulte:magicEmail");
-      if (!email) email = window.prompt("Please enter your email to confirm sign in:");
+      const email = window.localStorage.getItem("vaulte:magicEmail");
       if (email) {
+        // Email was stored in this browser — complete sign-in immediately.
         signInWithEmailLink(auth, email, window.location.href)
           .then(async (cred) => {
             window.localStorage.removeItem("vaulte:magicEmail");
@@ -196,6 +198,11 @@ export default function App() {
             else { setSignupData(s => ({ ...s, email })); setPage("signup"); }
           })
           .catch(e => { setError(e.message); setPage("login"); });
+      } else {
+        // Link opened on a different device or browser — show inline confirmation form.
+        setPendingMagicHref(window.location.href);
+        window.history.replaceState({}, document.title, "/");
+        setPage("magic-confirm");
       }
       return;
     }
@@ -265,6 +272,23 @@ export default function App() {
       setError(e.message);
     }
     setLoading(false);
+  };
+
+  const handleConfirmMagicLink = async () => {
+    if (!pendingMagicEmail) { setError("Please enter your email address."); return; }
+    setPendingMagicLoading(true); setError("");
+    try {
+      const cred = await signInWithEmailLink(auth, pendingMagicEmail, pendingMagicHref);
+      window.localStorage.removeItem("vaulte:magicEmail");
+      const prof = await fetchProfile(cred.user.uid);
+      if (prof) { setProfile(prof); setPage("account"); showToast("WELCOME BACK"); }
+      else { setSignupData(s => ({ ...s, email: pendingMagicEmail })); setPage("signup"); }
+    } catch (e) {
+      setError(e.code === "auth/invalid-action-code"
+        ? "This sign-in link has already been used or has expired."
+        : e.message);
+    }
+    setPendingMagicLoading(false);
   };
 
   const handleGoogleSignIn = async () => {
@@ -394,6 +418,33 @@ export default function App() {
           <div className="divider">or</div>
           <GoogleButton onClick={handleGoogleSignIn} disabled={loading} />
           <button className="btn-ghost" style={{ width:"100%" }} onClick={() => go("login")}>Sign In Instead</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (page === "magic-confirm") return (
+    <div style={bg}>
+      <style>{globalStyle}</style>
+      <div style={cardStyle} className="modal-in">
+        <DecorLines />
+        <div className="fade-up">
+          <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"4px" }}>VAULTE</div>
+          <h2 style={hdg}>Confirm Sign In</h2>
+          <p style={sub}>Enter the email address you used to request this link.</p>
+        </div>
+        <ErrorBox msg={error} />
+        <div className="fade-up-2">
+          <Field label="Email Address" type="email" value={pendingMagicEmail} onChange={setPendingMagicEmail} placeholder="jane@example.com" />
+          <button className="btn-primary" onClick={handleConfirmMagicLink} disabled={pendingMagicLoading}>
+            {pendingMagicLoading && <span className="spinner" />}Complete Sign In
+          </button>
+        </div>
+        <div style={{ marginTop:"20px" }}>
+          <button className="btn-ghost" style={{ width:"100%" }}
+            onClick={() => { setPendingMagicHref(null); setPendingMagicEmail(""); go("login"); }}>
+            Back to Sign In
+          </button>
         </div>
       </div>
     </div>

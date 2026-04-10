@@ -3,7 +3,6 @@ import { fmt, formatDateShort, ACTIVITY_LEVELS, calcMacros, getDayTotals } from 
 import { C, FONT, border } from "../constants/design";
 
 export default function CompareTab({ compareSlots, setCompareSlots, compareData, setCompareData, allDays, calcSex, setCalcSex, calcAge, setCalcAge, calcHeight, setCalcHeight, calcWeight, setCalcWeight, calcProtein, setCalcProtein, calcFatPct, setCalcFatPct }) {
-  const todayStr = new Date().toISOString().split("T")[0];
   const BMR = calcSex==="m" ? 10*calcWeight+6.25*calcHeight-5*calcAge+5 : 10*calcWeight+6.25*calcHeight-5*calcAge-161;
 
   const inp = { width:"100%", padding:"5px 8px", border:`0.5px solid ${C.borderMid}`, borderRadius:"5px", fontSize:"12px", fontFamily:FONT.sans, outline:"none", background:"#fff", height:"30px" };
@@ -23,10 +22,15 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
             const t=getDayTotals(data);
             return (
               <div key={idx} style={{ background:"#fff",border:`0.5px solid ${C.border}`,borderRadius:"8px",overflow:"hidden" }}>
-                <div onClick={()=>{ const nd=prompt("Date (YYYY-MM-DD):",date||todayStr); if(!nd)return; const found=allDays.find(d=>d.date===nd); const ns=[...compareSlots];ns[idx]=nd;const nd2=[...compareData];nd2[idx]=found||null;setCompareSlots(ns);setCompareData(nd2); }}
-                  style={{ padding:"7px 8px",cursor:"pointer",background:C.bg,borderBottom:`0.5px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-                  <span style={{ fontSize:"11px",fontWeight:"500",color:C.text }}>{date?formatDateShort(date):"— pick —"}</span>
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={C.hint} strokeWidth="1.5"><path d="M2 3.5l3 3 3-3"/></svg>
+                {/* Native select overlaid invisibly so the visual design is unchanged */}
+                <div style={{ padding:"7px 8px",background:C.bg,borderBottom:`0.5px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",position:"relative" }}>
+                  <span style={{ fontSize:"11px",fontWeight:"500",color:C.text,pointerEvents:"none" }}>{date?formatDateShort(date):"— pick —"}</span>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={C.hint} strokeWidth="1.5" style={{ pointerEvents:"none" }}><path d="M2 3.5l3 3 3-3"/></svg>
+                  <select value={date||""} onChange={e=>{ const nd=e.target.value; if(!nd)return; const found=allDays.find(d=>d.date===nd); const ns=[...compareSlots];ns[idx]=nd;const nd2=[...compareData];nd2[idx]=found||null;setCompareSlots(ns);setCompareData(nd2); }}
+                    style={{ position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%",height:"100%" }}>
+                    <option value="">— pick —</option>
+                    {allDays.map(d=><option key={d.date} value={d.date}>{formatDateShort(d.date)}</option>)}
+                  </select>
                 </div>
                 <div style={{ padding:"8px 10px" }}>
                   {!data
