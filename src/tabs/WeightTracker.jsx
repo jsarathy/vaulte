@@ -13,7 +13,9 @@ export default function WeightTracker({
 }) {
   const cfg = weightPlanConfig;
   const proj = weightLog;
-  const bmi = (cfg.startWeightKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
+  // Use the most recent week with an actual reading; fall back to start weight.
+  const currentWeight = weightLog.filter(r => r.actual != null).at(-1)?.actual ?? cfg.startWeightKg;
+  const bmi = (currentWeight / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
   const tBmiLo = (cfg.targetWeightMinKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
   const tBmiHi = (cfg.targetWeightMaxKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
   const dailyDeficit = Math.round(cfg.weeklyLossKg * 7700 / 7);
