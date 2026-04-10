@@ -6,6 +6,36 @@ import { C, FONT, border, IconChat, IconSend, IconX, IconTrash } from "../consta
 export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChatMessages, chatInput, setChatInput, chatMealId, setChatMealId, chatDate, setChatDate, chatLoading, justChatHistory, CHAT_CONTEXT_LIMIT, clearChat, sendChat, confirmLog, allDays, currentDayData }) {
   const chatBottomRef = useRef(null);
 
+  // Determine where the context window boundary falls in the display list.
+  // Chat-mode exchanges (user → claude pairs) are tracked in justChatHistory;
+  // food-log exchanges (user → preview) are not. Any chat pairs beyond the
+  // last CHAT_CONTEXT_LIMIT entries are outside Claude's memory.
+  const contextDividerAt = (() => {
+    // Count total chat pairs (user message immediately followed by claude response)
+    let totalChatPairs = 0;
+    for (let i = 0; i < chatMessages.length - 1; i++) {
+      if (chatMessages[i].type === "user") {
+        const next = chatMessages[i + 1];
+        if (next?.type === "claude") totalChatPairs++;
+      }
+    }
+    const inContextPairs = Math.floor(justChatHistory.length / 2);
+    const stalePairs = totalChatPairs - inContextPairs;
+    if (stalePairs <= 0) return null;
+    // Walk forward and find the index just after the stalePairs-th chat pair
+    let seen = 0;
+    for (let i = 0; i < chatMessages.length - 1; i++) {
+      if (chatMessages[i].type === "user") {
+        const next = chatMessages[i + 1];
+        if (next?.type === "claude") {
+          seen++;
+          if (seen === stalePairs) return i + 2; // insert divider after this pair
+        }
+      }
+    }
+    return null;
+  })();
+
   return (
     <div style={{ position:"absolute", bottom:"16px", right:"16px", zIndex:500 }}>
       {chatOpen && (
@@ -49,20 +79,28 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
                 {justChatHistory.length>= CHAT_CONTEXT_LIMIT ? `Last ${CHAT_CONTEXT_LIMIT} messages` : `${justChatHistory.length} messages`}
               </div>
             )}
-            {chatMessages.map(msg=>{
-              if (msg.type==="user") return (
-                <div key={msg.id} style={{ background:C.blue, color:"#fff", alignSelf:"flex-end", borderRadius:"10px 10px 3px 10px", padding:"7px 11px", fontSize:"12px", lineHeight:1.5, maxWidth:"82%" }}>{msg.text}</div>
-              );
-              if (msg.type==="error") return (
-                <div key={msg.id} style={{ background:C.dangerBg, color:C.danger, alignSelf:"center", border:`0.5px solid #f09595`, fontSize:"11px", borderRadius:"6px", padding:"7px 11px" }}>{msg.text}</div>
-              );
-              if (msg.type==="preview"&&!msg.confirmed) {
+            {chatMessages.flatMap((msg,i)=>{
+              // Render the context-window divider just before the first in-context message
+              const divider = i === contextDividerAt ? (
+                <div key="ctx-window-divider" style={{ display:"flex", alignItems:"center", gap:"8px", padding:"4px 0", flexShrink:0 }}>
+                  <div style={{ flex:1, height:"0.5px", background:C.borderMid }}/>
+                  <span style={{ fontSize:"9px", color:C.hint, whiteSpace:"nowrap", textTransform:"uppercase", letterSpacing:"0.5px" }}>above: outside Claude's context</span>
+                  <div style={{ flex:1, height:"0.5px", background:C.borderMid }}/>
+                </div>
+              ) : null;
+
+              let el;
+              if (msg.type==="user") {
+                el = <div key={msg.id} style={{ background:C.blue, color:"#fff", alignSelf:"flex-end", borderRadius:"10px 10px 3px 10px", padding:"7px 11px", fontSize:"12px", lineHeight:1.5, maxWidth:"82%" }}>{msg.text}</div>;
+              } else if (msg.type==="error") {
+                el = <div key={msg.id} style={{ background:C.dangerBg, color:C.danger, alignSelf:"center", border:`0.5px solid #f09595`, fontSize:"11px", borderRadius:"6px", padding:"7px 11px" }}>{msg.text}</div>;
+              } else if (msg.type==="preview"&&!msg.confirmed) {
                 const tKcal=msg.items.reduce((s,i)=>s+i.kcal,0);
                 const tFat=msg.items.reduce((s,i)=>s+i.fat,0);
                 const tCarbs=msg.items.reduce((s,i)=>s+i.carbs,0);
                 const tFibre=msg.items.reduce((s,i)=>s+i.fibre,0);
                 const tProt=msg.items.reduce((s,i)=>s+i.protein,0);
-                return (
+                el = (
                   <div key={msg.id} style={{ background:"#fff", border:`0.5px solid ${C.border}`, alignSelf:"flex-start", borderRadius:"10px 10px 10px 3px", padding:"9px 11px", fontSize:"12px", maxWidth:"96%", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
                     <div style={{ fontSize:"10px", color:C.muted, marginBottom:"6px" }}>Adding to <strong style={{ color:C.text }}>{msg.mealName}</strong></div>
                     <div style={{ overflowX:"auto" }}>
@@ -92,16 +130,13 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
                     </div>
                   </div>
                 );
+              } else if (msg.type==="preview"&&msg.confirmed) {
+                el = <div key={msg.id} style={{ alignSelf:"flex-start", fontSize:"11px", color:C.greenText, fontWeight:"500" }}>Logged {msg.items.length} item{msg.items.length!==1?"s":""}</div>;
+              } else {
+                el = <div key={msg.id} style={{ background:C.bg, color:C.text, alignSelf:"flex-start", border:`0.5px solid ${C.border}`, borderRadius:"10px 10px 10px 3px", padding:"8px 11px", fontSize:"12px", lineHeight:1.6, maxWidth:"88%" }}
+                  dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g,"<br/>") }}/>;
               }
-              if (msg.type==="preview"&&msg.confirmed) return (
-                <div key={msg.id} style={{ alignSelf:"flex-start", fontSize:"11px", color:C.greenText, fontWeight:"500" }}>
-                  Logged {msg.items.length} item{msg.items.length!==1?"s":""}
-                </div>
-              );
-              return (
-                <div key={msg.id} style={{ background:C.bg, color:C.text, alignSelf:"flex-start", border:`0.5px solid ${C.border}`, borderRadius:"10px 10px 10px 3px", padding:"8px 11px", fontSize:"12px", lineHeight:1.6, maxWidth:"88%" }}
-                  dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g,"<br/>") }}/>
-              );
+              return divider ? [divider, el] : [el];
             })}
             <div ref={chatBottomRef}/>
           </div>

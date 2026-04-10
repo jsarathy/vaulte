@@ -36,15 +36,15 @@ const fetchProfile = async (uid) => {
 };
 
 // Styles
-const fonts = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600&display=swap');`;
+const fonts = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');`;
 
 const globalStyle = `
   ${fonts}
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root { height: 100%; }
-  body { background: #0d0d0f; }
-  input::placeholder { color: rgba(240,234,214,0.3); }
-  input:focus { border-color: rgba(212,175,55,0.8) !important; box-shadow: 0 0 0 3px rgba(212,175,55,0.08); }
+  body { background: #0d0d0f; font-family: 'DM Sans', system-ui, sans-serif; }
+  input::placeholder { color: rgba(255,255,255,0.25); }
+  input:focus { border-color: rgba(55,138,221,0.7) !important; box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
   @keyframes fadeUp  { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
   @keyframes modalIn { from { opacity:0; transform:scale(0.96) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }
   @keyframes spin    { to { transform:rotate(360deg); } }
@@ -53,26 +53,26 @@ const globalStyle = `
   .fade-up-3 { animation:fadeUp 0.7s 0.24s ease forwards; opacity:0; }
   .fade-up-4 { animation:fadeUp 0.7s 0.36s ease forwards; opacity:0; }
   .modal-in  { animation:modalIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
-  .btn-primary { background:linear-gradient(135deg,#c9a84c,#d4af37,#b8962e); color:#0d0d0f; border:none; padding:13px 28px; font-family:'Cinzel',serif; font-size:12px; letter-spacing:2px; cursor:pointer; width:100%; border-radius:3px; font-weight:600; transition:all 0.3s; text-transform:uppercase; }
-  .btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 24px rgba(212,175,55,0.3); }
+  .btn-primary { background:#378ADD; color:#fff; border:none; padding:12px 24px; font-family:'DM Sans',system-ui,sans-serif; font-size:13px; letter-spacing:0.2px; cursor:pointer; width:100%; border-radius:6px; font-weight:500; transition:all 0.2s; }
+  .btn-primary:hover:not(:disabled) { background:#2B7BC8; transform:translateY(-1px); box-shadow:0 6px 20px rgba(55,138,221,0.35); }
   .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
-  .btn-ghost { background:transparent; color:rgba(212,175,55,0.7); border:1px solid rgba(212,175,55,0.3); padding:11px 28px; font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; cursor:pointer; border-radius:3px; transition:all 0.3s; text-transform:uppercase; }
-  .btn-ghost:hover { border-color:rgba(212,175,55,0.8); color:#d4af37; }
-  .btn-danger { background:transparent; color:rgba(200,80,80,0.7); border:1px solid rgba(200,80,80,0.3); padding:11px 28px; font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; cursor:pointer; border-radius:3px; transition:all 0.3s; text-transform:uppercase; }
-  .btn-danger:hover { border-color:rgba(200,80,80,0.8); color:#e07070; }
-  .divider { display:flex; align-items:center; gap:16px; margin:20px 0; color:rgba(240,234,214,0.3); font-family:'Cormorant Garamond',serif; font-size:12px; letter-spacing:2px; }
-  .divider::before,.divider::after { content:''; flex:1; height:1px; background:rgba(212,175,55,0.2); }
-  .spinner { width:18px; height:18px; border:2px solid rgba(0,0,0,0.2); border-top-color:#0d0d0f; border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:8px; }
-  .spinner-gold { width:18px; height:18px; border:2px solid rgba(212,175,55,0.2); border-top-color:#d4af37; border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:8px; }
-  .info-card { padding:20px 24px; background:rgba(255,255,255,0.03); border:1px solid rgba(212,175,55,0.15); border-radius:6px; display:flex; gap:16px; align-items:flex-start; transition:border-color 0.3s; }
-  .info-card:hover { border-color:rgba(212,175,55,0.3); }
-  .toast { position:fixed; bottom:32px; right:32px; background:rgba(30,28,20,0.95); border:1px solid rgba(212,175,55,0.4); border-radius:6px; padding:14px 20px; color:#d4af37; font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; animation:fadeUp 0.4s ease; z-index:999; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+  .btn-ghost { background:transparent; color:rgba(55,138,221,0.85); border:0.5px solid rgba(55,138,221,0.4); padding:11px 24px; font-family:'DM Sans',system-ui,sans-serif; font-size:12px; letter-spacing:0.2px; cursor:pointer; border-radius:6px; transition:all 0.2s; }
+  .btn-ghost:hover { border-color:rgba(55,138,221,0.8); color:#378ADD; }
+  .btn-danger { background:transparent; color:rgba(200,80,80,0.75); border:0.5px solid rgba(200,80,80,0.3); padding:11px 24px; font-family:'DM Sans',system-ui,sans-serif; font-size:12px; letter-spacing:0.2px; cursor:pointer; border-radius:6px; transition:all 0.2s; }
+  .btn-danger:hover { border-color:rgba(200,80,80,0.7); color:#e07070; }
+  .divider { display:flex; align-items:center; gap:16px; margin:20px 0; color:rgba(255,255,255,0.3); font-family:'DM Sans',system-ui,sans-serif; font-size:12px; }
+  .divider::before,.divider::after { content:''; flex:1; height:1px; background:rgba(55,138,221,0.2); }
+  .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,0.25); border-top-color:#fff; border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:8px; }
+  .spinner-blue { width:18px; height:18px; border:2px solid rgba(55,138,221,0.2); border-top-color:#378ADD; border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:8px; }
+  .info-card { padding:16px 20px; background:rgba(255,255,255,0.03); border:0.5px solid rgba(55,138,221,0.15); border-radius:8px; display:flex; gap:16px; align-items:flex-start; transition:border-color 0.2s; }
+  .info-card:hover { border-color:rgba(55,138,221,0.3); }
+  .toast { position:fixed; bottom:32px; right:32px; background:rgba(10,12,18,0.96); border:0.5px solid rgba(55,138,221,0.4); border-radius:6px; padding:12px 18px; color:#378ADD; font-family:'DM Sans',system-ui,sans-serif; font-size:12px; letter-spacing:0.2px; animation:fadeUp 0.4s ease; z-index:999; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
   .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; }
   ::-webkit-scrollbar { width:4px; }
   ::-webkit-scrollbar-track { background:transparent; }
-  ::-webkit-scrollbar-thumb { background:rgba(212,175,55,0.3); border-radius:2px; }
+  ::-webkit-scrollbar-thumb { background:rgba(55,138,221,0.3); border-radius:2px; }
   @media (max-width: 768px) {
-    .app-sidebar { width:100% !important; height:56px !important; flex-direction:row !important; padding:0 !important; border-right:none !important; border-top:1px solid rgba(212,175,55,0.15) !important; order:2; gap:0 !important; }
+    .app-sidebar { width:100% !important; height:56px !important; flex-direction:row !important; padding:0 !important; border-right:none !important; border-top:1px solid rgba(55,138,221,0.15) !important; order:2; gap:0 !important; }
     .app-sidebar .sidebar-label { display:none; }
     .app-sidebar .sidebar-nav-section { display:none; }
     .app-sidebar .sidebar-delete { display:none; }
@@ -83,12 +83,12 @@ const globalStyle = `
   }
 `;
 
-const inp = { width:"100%", padding:"12px 16px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(212,175,55,0.3)", borderRadius:"4px", color:"#f0ead6", fontSize:"14px", fontFamily:"'Cormorant Garamond',serif", letterSpacing:"0.5px", outline:"none", transition:"border-color 0.3s, box-shadow 0.3s" };
-const lbl = { display:"block", color:"rgba(212,175,55,0.7)", fontSize:"10px", letterSpacing:"2px", fontFamily:"'Cinzel',serif", marginBottom:"8px", textTransform:"uppercase" };
-const bg  = { minHeight:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Cormorant Garamond',serif", padding:"24px" };
-const cardStyle = { background:"rgba(255,255,255,0.03)", border:"1px solid rgba(212,175,55,0.2)", borderRadius:"8px", padding:"48px", width:"100%", maxWidth:"440px", backdropFilter:"blur(20px)", position:"relative" };
-const hdg = { fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"28px", fontWeight:"400", letterSpacing:"3px", marginBottom:"6px" };
-const sub = { color:"rgba(240,234,214,0.4)", fontSize:"14px", letterSpacing:"0.5px", marginBottom:"36px", fontStyle:"italic" };
+const inp = { width:"100%", padding:"11px 14px", background:"rgba(255,255,255,0.05)", border:"0.5px solid rgba(55,138,221,0.25)", borderRadius:"6px", color:"rgba(255,255,255,0.9)", fontSize:"13px", fontFamily:"'DM Sans',system-ui,sans-serif", outline:"none", transition:"border-color 0.2s, box-shadow 0.2s" };
+const lbl = { display:"block", color:"rgba(55,138,221,0.75)", fontSize:"10px", letterSpacing:"0.8px", fontFamily:"'DM Sans',system-ui,sans-serif", marginBottom:"6px", textTransform:"uppercase" };
+const bg  = { minHeight:"100vh", background:"radial-gradient(ellipse at 20% 50%,#0d1520 0%,#0d0d0f 60%,#080810 100%)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans',system-ui,sans-serif", padding:"24px" };
+const cardStyle = { background:"rgba(255,255,255,0.04)", border:"0.5px solid rgba(55,138,221,0.2)", borderRadius:"10px", padding:"40px", width:"100%", maxWidth:"440px", backdropFilter:"blur(20px)", position:"relative" };
+const hdg = { fontFamily:"'DM Sans',system-ui,sans-serif", color:"rgba(255,255,255,0.92)", fontSize:"24px", fontWeight:"500", letterSpacing:"-0.3px", marginBottom:"6px" };
+const sub = { color:"rgba(255,255,255,0.4)", fontSize:"13px", marginBottom:"32px" };
 
 // Reusable Components
 const EyeIcon = ({ show }) => (
@@ -115,7 +115,7 @@ const Field = ({ label, type="text", value, onChange, placeholder }) => {
         />
         {isPassword && (
           <button onClick={() => setShow(s => !s)}
-            style={{ position:"absolute", right:"12px", top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"rgba(212,175,55,0.5)", padding:"0", display:"flex", alignItems:"center" }}>
+            style={{ position:"absolute", right:"12px", top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"rgba(55,138,221,0.5)", padding:"0", display:"flex", alignItems:"center" }}>
             <EyeIcon show={show} />
           </button>
         )}
@@ -130,8 +130,8 @@ const Row = ({ children }) => (
 
 const DecorLines = () => (
   <>
-    <div style={{ position:"absolute",top:0,left:0,right:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(212,175,55,0.5),transparent)" }} />
-    <div style={{ position:"absolute",bottom:0,left:0,right:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(212,175,55,0.3),transparent)" }} />
+    <div style={{ position:"absolute",top:0,left:0,right:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(55,138,221,0.4),transparent)" }} />
+    <div style={{ position:"absolute",bottom:0,left:0,right:0,height:"1px",background:"linear-gradient(90deg,transparent,rgba(55,138,221,0.2),transparent)" }} />
   </>
 );
 
@@ -141,15 +141,15 @@ const ErrorBox = ({ msg }) => msg ? (
 
 const GoogleButton = ({ onClick, disabled }) => (
   <button onClick={onClick} disabled={disabled} style={{
-    width:"100%", padding:"12px", marginBottom:"20px",
-    background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)",
-    borderRadius:"4px", color:"#f0ead6", fontFamily:"'Cinzel',serif",
-    fontSize:"11px", letterSpacing:"2px", cursor:"pointer",
+    width:"100%", padding:"11px", marginBottom:"16px",
+    background:"rgba(255,255,255,0.05)", border:"0.5px solid rgba(255,255,255,0.15)",
+    borderRadius:"6px", color:"rgba(255,255,255,0.85)", fontFamily:"'DM Sans',system-ui,sans-serif",
+    fontSize:"13px", cursor:"pointer",
     display:"flex", alignItems:"center", justifyContent:"center", gap:"12px",
-    transition:"all 0.3s", textTransform:"uppercase"
+    transition:"all 0.2s"
   }}
-    onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.1)"}
-    onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+    onMouseOver={e => e.currentTarget.style.background="rgba(255,255,255,0.09)"}
+    onMouseOut={e => e.currentTarget.style.background="rgba(255,255,255,0.05)"}
   >
     <svg width="18" height="18" viewBox="0 0 48 48">
       <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
@@ -362,8 +362,8 @@ export default function App() {
   if (page === "loading") return (
     <div style={{ ...bg, flexDirection:"column", gap:"16px" }}>
       <style>{globalStyle}</style>
-      <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"32px", letterSpacing:"8px" }}>VAULTE</div>
-      <span className="spinner-gold" />
+      <div style={{ fontFamily:"'DM Sans',system-ui,sans-serif", color:"#378ADD", fontSize:"28px", fontWeight:"500", letterSpacing:"-0.5px" }}>vaulte</div>
+      <span className="spinner-blue" />
     </div>
   );
 
@@ -372,9 +372,9 @@ export default function App() {
       <style>{globalStyle}</style>
       {toast && <div className="toast">* {toast}</div>}
       <div style={{ textAlign:"center" }} className="fade-up">
-        <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"4px", marginBottom:"8px" }}>WELCOME TO</div>
-        <h1 style={{ fontFamily:"'Cinzel',serif", fontSize:"56px", color:"#d4af37", fontWeight:"400", letterSpacing:"8px", lineHeight:"1", marginBottom:"16px" }}>VAULTE</h1>
-        <p style={{ color:"rgba(240,234,214,0.4)", fontSize:"16px", fontStyle:"italic", marginBottom:"52px", letterSpacing:"1px" }}>Your personal account, secured.</p>
+        <div style={{ color:"rgba(55,138,221,0.6)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"11px", letterSpacing:"0.5px", marginBottom:"12px" }}>Welcome to</div>
+        <h1 style={{ fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"48px", color:"rgba(255,255,255,0.92)", fontWeight:"500", letterSpacing:"-1px", lineHeight:"1", marginBottom:"12px" }}>vaulte</h1>
+        <p style={{ color:"rgba(255,255,255,0.4)", fontSize:"15px", marginBottom:"48px" }}>Your personal tracker, secured.</p>
         <div style={{ display:"flex", gap:"16px", justifyContent:"center" }}>
           <button className="btn-primary" style={{ width:"auto", padding:"14px 44px" }} onClick={() => go("signup")}>Create Account</button>
           <button className="btn-ghost" onClick={() => go("login")}>Sign In</button>
@@ -390,7 +390,7 @@ export default function App() {
       <div style={cardStyle}>
         <DecorLines />
         <div className="fade-up">
-          <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"4px" }}>VAULTE</div>
+          <div style={{ color:"rgba(55,138,221,0.5)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"10px", letterSpacing:"-0.3px", marginBottom:"6px", fontWeight:"500" }}>vaulte</div>
           <h2 style={hdg}>Create Account</h2>
           <p style={sub}>Join us -- it only takes a moment</p>
         </div>
@@ -429,7 +429,7 @@ export default function App() {
       <div style={cardStyle} className="modal-in">
         <DecorLines />
         <div className="fade-up">
-          <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"4px" }}>VAULTE</div>
+          <div style={{ color:"rgba(55,138,221,0.5)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"10px", letterSpacing:"-0.3px", marginBottom:"6px", fontWeight:"500" }}>vaulte</div>
           <h2 style={hdg}>Confirm Sign In</h2>
           <p style={sub}>Enter the email address you used to request this link.</p>
         </div>
@@ -457,22 +457,22 @@ export default function App() {
       <div style={cardStyle}>
         <DecorLines />
         <div className="fade-up">
-          <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"4px" }}>VAULTE</div>
+          <div style={{ color:"rgba(55,138,221,0.5)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"10px", letterSpacing:"-0.3px", marginBottom:"6px", fontWeight:"500" }}>vaulte</div>
           <h2 style={hdg}>Welcome Back</h2>
           <p style={sub}>Sign in to your account</p>
         </div>
 
-        <div style={{ display:"flex", gap:"0", marginBottom:"28px", border:"1px solid rgba(212,175,55,0.2)", borderRadius:"4px", overflow:"hidden" }}>
+        <div style={{ display:"flex", gap:"0", marginBottom:"24px", border:"0.5px solid rgba(55,138,221,0.2)", borderRadius:"6px", overflow:"hidden" }}>
           <button onClick={() => { setLoginMode("password"); setError(""); setMagicSent(false); }}
-            style={{ flex:1, padding:"10px", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", cursor:"pointer", border:"none", transition:"all 0.3s", textTransform:"uppercase",
-              background: loginMode === "password" ? "rgba(212,175,55,0.15)" : "transparent",
-              color: loginMode === "password" ? "#d4af37" : "rgba(212,175,55,0.4)" }}>
+            style={{ flex:1, padding:"9px", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"12px", cursor:"pointer", border:"none", transition:"all 0.2s",
+              background: loginMode === "password" ? "rgba(55,138,221,0.12)" : "transparent",
+              color: loginMode === "password" ? "#378ADD" : "rgba(255,255,255,0.4)" }}>
             Password
           </button>
           <button onClick={() => { setLoginMode("magic"); setError(""); setMagicSent(false); }}
-            style={{ flex:1, padding:"10px", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"2px", cursor:"pointer", border:"none", borderLeft:"1px solid rgba(212,175,55,0.2)", transition:"all 0.3s", textTransform:"uppercase",
-              background: loginMode === "magic" ? "rgba(212,175,55,0.15)" : "transparent",
-              color: loginMode === "magic" ? "#d4af37" : "rgba(212,175,55,0.4)" }}>
+            style={{ flex:1, padding:"9px", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"12px", cursor:"pointer", border:"none", borderLeft:"0.5px solid rgba(55,138,221,0.2)", transition:"all 0.2s",
+              background: loginMode === "magic" ? "rgba(55,138,221,0.12)" : "transparent",
+              color: loginMode === "magic" ? "#378ADD" : "rgba(255,255,255,0.4)" }}>
             Magic Link
           </button>
         </div>
@@ -493,7 +493,7 @@ export default function App() {
 
         {loginMode === "magic" && !magicSent && (
           <div className="fade-up-2">
-            <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", marginBottom:"20px", lineHeight:"1.6" }}>
+            <p style={{ color:"rgba(255,255,255,0.45)", fontSize:"14px", fontStyle:"italic", marginBottom:"20px", lineHeight:"1.6" }}>
               Enter your email and we will send you a sign-in link -- no password needed.
             </p>
             <Field label="Email Address" type="email" value={magicEmail} onChange={setMagicEmail} placeholder="jane@example.com" />
@@ -506,10 +506,10 @@ export default function App() {
         {loginMode === "magic" && magicSent && (
           <div className="fade-up-2" style={{ textAlign:"center", padding:"16px 0" }}>
             <div style={{ fontSize:"40px", marginBottom:"16px" }}>&#9993;</div>
-            <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"14px", letterSpacing:"2px", marginBottom:"12px" }}>CHECK YOUR INBOX</div>
-            <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"14px", fontStyle:"italic", lineHeight:"1.6" }}>
+            <div style={{ fontFamily:"'DM Sans',system-ui,sans-serif", color:"#378ADD", fontSize:"14px", fontWeight:"500", marginBottom:"12px" }}>Check your inbox</div>
+            <p style={{ color:"rgba(255,255,255,0.45)", fontSize:"14px", fontStyle:"italic", lineHeight:"1.6" }}>
               We sent a sign-in link to<br />
-              <span style={{ color:"#d4af37" }}>{magicEmail}</span><br /><br />
+              <span style={{ color:"#378ADD" }}>{magicEmail}</span><br /><br />
               Click the link in the email to sign in.
             </p>
             <button className="btn-ghost" style={{ marginTop:"24px", width:"100%" }} onClick={() => { setMagicSent(false); setMagicEmail(""); }}>
@@ -534,9 +534,9 @@ export default function App() {
       <div className="info-card">
         <div style={{ fontSize:"20px", marginTop:"2px", flexShrink:0 }}>{icon}</div>
         <div style={{ flex:1 }}>
-          <div style={{ color:"rgba(212,175,55,0.6)", fontSize:"10px", letterSpacing:"2px", fontFamily:"'Cinzel',serif", marginBottom:"5px" }}>{label}</div>
-          <div style={{ color:"#f0ead6", fontSize:"15px", letterSpacing:"0.3px" }}>
-            {value || <span style={{ color:"rgba(240,234,214,0.25)", fontStyle:"italic" }}>Not provided</span>}
+          <div style={{ color:"rgba(55,138,221,0.6)", fontSize:"10px", letterSpacing:"0.5px", textTransform:"uppercase", fontFamily:"'DM Sans',system-ui,sans-serif", marginBottom:"5px" }}>{label}</div>
+          <div style={{ color:"rgba(255,255,255,0.9)", fontSize:"15px", letterSpacing:"0.3px" }}>
+            {value || <span style={{ color:"rgba(255,255,255,0.25)", fontStyle:"italic" }}>Not provided</span>}
           </div>
         </div>
       </div>
@@ -544,12 +544,12 @@ export default function App() {
 
     const navItem = (id, label, icon) => (
       <button onClick={() => setActivePanel(id)} style={{
-        display:"flex", alignItems:"center", gap:"12px", width:"100%",
-        padding:"12px 16px", background: activePanel === id ? "rgba(212,175,55,0.12)" : "transparent",
-        border:"none", borderLeft: activePanel === id ? "2px solid #d4af37" : "2px solid transparent",
-        color: activePanel === id ? "#d4af37" : "rgba(240,234,214,0.45)",
-        fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
-        cursor:"pointer", transition:"all 0.25s", textTransform:"uppercase", textAlign:"left",
+        display:"flex", alignItems:"center", gap:"10px", width:"100%",
+        padding:"10px 16px", background: activePanel === id ? "rgba(55,138,221,0.1)" : "transparent",
+        border:"none", borderLeft: activePanel === id ? "2px solid #378ADD" : "2px solid transparent",
+        color: activePanel === id ? "#378ADD" : "rgba(255,255,255,0.45)",
+        fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"12px", fontWeight: activePanel === id ? "500" : "400",
+        cursor:"pointer", transition:"all 0.2s", textAlign:"left",
       }}>
         <span style={{ fontSize:"16px" }}>{icon}</span>
         <span className="sidebar-label">{label}</span>
@@ -557,7 +557,7 @@ export default function App() {
     );
 
     return (
-      <div style={{ height:"100vh", background:"radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'Cormorant Garamond',serif", overflow:"hidden" }}>
+      <div style={{ height:"100vh", background:"radial-gradient(ellipse at 20% 50%,#0d1520 0%,#0d0d0f 60%,#080810 100%)", display:"flex", flexDirection:"column", fontFamily:"'DM Sans',system-ui,sans-serif", overflow:"hidden" }}>
         <style>{globalStyle}</style>
         {toast && <div className="toast">* {toast}</div>}
 
@@ -567,7 +567,7 @@ export default function App() {
               <DecorLines />
               <div style={{ marginBottom:"28px" }}>
                 <h2 style={{ ...hdg, fontSize:"22px", marginBottom:"4px" }}>Edit Profile</h2>
-                <p style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", fontStyle:"italic" }}>Update your personal information</p>
+                <p style={{ color:"rgba(255,255,255,0.4)", fontSize:"13px", fontStyle:"italic" }}>Update your personal information</p>
               </div>
               <ErrorBox msg={error} />
               <Row>
@@ -591,10 +591,10 @@ export default function App() {
           </div>
         )}
 
-        <div className="app-topbar" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 32px", borderBottom:"1px solid rgba(212,175,55,0.1)", background:"rgba(0,0,0,0.2)", flexShrink:0 }}>
-          <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"20px", letterSpacing:"6px" }}>VAULTE</div>
+        <div className="app-topbar" style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 32px", borderBottom:"1px solid rgba(55,138,221,0.1)", background:"rgba(0,0,0,0.2)", flexShrink:0 }}>
+          <div style={{ fontFamily:"'DM Sans',system-ui,sans-serif", color:"rgba(255,255,255,0.9)", fontSize:"16px", fontWeight:"500", letterSpacing:"-0.3px" }}>vaulte</div>
           <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
-            <div className="app-topbar-name" style={{ fontFamily:"'Cinzel',serif", color:"rgba(212,175,55,0.5)", fontSize:"10px", letterSpacing:"2px" }}>
+            <div className="app-topbar-name" style={{ fontFamily:"'DM Sans',system-ui,sans-serif", color:"rgba(255,255,255,0.4)", fontSize:"12px" }}>
               {profile.firstName} {profile.lastName}
             </div>
             <button className="btn-ghost" style={{ padding:"8px 20px", fontSize:"10px" }} onClick={handleLogout}>Sign Out</button>
@@ -603,13 +603,13 @@ export default function App() {
 
         <div className="app-body" style={{ display:"flex", flex:1, minHeight:0, overflow:"hidden" }}>
 
-          <div className="app-sidebar" style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
-            <div className="sidebar-nav-section" style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
+          <div className="app-sidebar" style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(55,138,221,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
+            <div className="sidebar-nav-section" style={{ padding:"0 16px 16px", color:"rgba(55,138,221,0.4)", fontSize:"9px", letterSpacing:"0.8px", fontFamily:"'DM Sans',system-ui,sans-serif", textTransform:"uppercase" }}>Navigation</div>
             {navItem("home",      "Home",       "~")}
             {navItem("account",   "My Account", "*")}
             {navItem("nutrition", "Nutrition",  "N")}
             {navItem("routine",   "Routine",    "R")}
-            <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
+            <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(55,138,221,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
           </div>
@@ -626,20 +626,20 @@ export default function App() {
                       backgroundPosition:"center top",
                       filter:"brightness(0.45) saturate(0.8)",
                     }} />
-                  : <div style={{ position:"absolute", inset:0, background:"linear-gradient(160deg,#0d0d0f 60%,#1a1408)" }} />
+                  : <div style={{ position:"absolute", inset:0, background:"linear-gradient(160deg,#0d0d0f 60%,#0d1520)" }} />
                 }
                 <div style={{
                   position:"absolute", inset:0,
                   background:"linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(10,10,12,0.7) 60%, rgba(10,10,12,0.95) 100%)",
                 }} />
                 <div style={{ position:"relative", zIndex:1, padding:"56px 56px 48px", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%" }}>
-                  <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"4px", marginBottom:"20px", textTransform:"uppercase" }}>
+                  <div style={{ color:"rgba(55,138,221,0.6)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"11px", letterSpacing:"0.3px", marginBottom:"16px" }}>
                     {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
                   </div>
-                  <h1 style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"52px", fontWeight:"400", letterSpacing:"4px", lineHeight:"1.1", marginBottom:"16px", textShadow:"0 4px 24px rgba(0,0,0,0.8)" }}>
+                  <h1 style={{ fontFamily:"'DM Sans',system-ui,sans-serif", color:"rgba(255,255,255,0.92)", fontSize:"44px", fontWeight:"500", letterSpacing:"-0.5px", lineHeight:"1.1", marginBottom:"14px", textShadow:"0 4px 24px rgba(0,0,0,0.8)" }}>
                     Welcome, {profile.firstName}.
                   </h1>
-                  <p style={{ color:"rgba(240,234,214,0.45)", fontSize:"15px", fontStyle:"italic", letterSpacing:"1px", textShadow:"0 2px 8px rgba(0,0,0,0.8)" }}>
+                  <p style={{ color:"rgba(255,255,255,0.45)", fontSize:"15px", fontStyle:"italic", letterSpacing:"1px", textShadow:"0 2px 8px rgba(0,0,0,0.8)" }}>
                     Good to have you back.
                   </p>
                 </div>
@@ -662,23 +662,23 @@ export default function App() {
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"32px" }} className="fade-up">
                   <div>
-                    <div style={{ color:"rgba(212,175,55,0.4)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"3px", marginBottom:"8px" }}>PROFILE</div>
+                    <div style={{ color:"rgba(55,138,221,0.6)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"10px", letterSpacing:"0.8px", textTransform:"uppercase", marginBottom:"8px" }}>Profile</div>
                     <h2 style={{ ...hdg, fontSize:"26px", marginBottom:0 }}>My Account</h2>
                   </div>
                   <button className="btn-ghost" onClick={openEdit}>Edit Profile</button>
                 </div>
 
-                <div style={{ padding:"24px 28px", background:"linear-gradient(135deg,rgba(212,175,55,0.1),rgba(212,175,55,0.03))", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"8px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"20px" }} className="fade-up-2">
-                  <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#c9a84c,#b8962e)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Cinzel',serif", fontSize:"20px", color:"#0d0d0f", fontWeight:"600", flexShrink:0 }}>
+                <div style={{ padding:"24px 28px", background:"linear-gradient(135deg,rgba(55,138,221,0.1),rgba(55,138,221,0.03))", border:"1px solid rgba(55,138,221,0.25)", borderRadius:"8px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"20px" }} className="fade-up-2">
+                  <div style={{ width:"60px", height:"60px", borderRadius:"50%", background:"linear-gradient(135deg,#378ADD,#2B7BC8)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"20px", color:"#fff", fontWeight:"500", flexShrink:0 }}>
                     {profile.firstName?.[0]}{profile.lastName?.[0]}
                   </div>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontFamily:"'Cinzel',serif", color:"#d4af37", fontSize:"18px", letterSpacing:"2px" }}>{profile.firstName} {profile.lastName}</div>
-                    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"rgba(212,175,55,0.1)", border:"1px solid rgba(212,175,55,0.25)", borderRadius:"20px", padding:"3px 10px", margin:"6px 0" }}>
-                      <span style={{ color:"rgba(212,175,55,0.5)", fontSize:"9px" }}>+</span>
-                      <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"2px", color:"rgba(212,175,55,0.7)" }}>{profile.uid}</span>
+                    <div style={{ fontFamily:"'DM Sans',system-ui,sans-serif", color:"rgba(255,255,255,0.92)", fontSize:"18px", fontWeight:"500", letterSpacing:"-0.2px" }}>{profile.firstName} {profile.lastName}</div>
+                    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"rgba(55,138,221,0.1)", border:"1px solid rgba(55,138,221,0.25)", borderRadius:"20px", padding:"3px 10px", margin:"6px 0" }}>
+                      <span style={{ color:"rgba(55,138,221,0.5)", fontSize:"9px" }}>+</span>
+                      <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"9px", letterSpacing:"0.3px", color:"rgba(55,138,221,0.7)" }}>{profile.uid}</span>
                     </div>
-                    <div style={{ color:"rgba(240,234,214,0.4)", fontSize:"13px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
+                    <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"13px", fontStyle:"italic" }}>Member since {profile.createdAt}</div>
                   </div>
                   <div style={{ flexShrink:0, textAlign:"center" }}>
                     <input type="file" accept="image/*" id="photo-upload" style={{ display:"none" }} onChange={async e => {
@@ -708,12 +708,12 @@ export default function App() {
                             backgroundImage:`url(${profile.photoURL})`,
                             backgroundSize:"cover",
                             backgroundPosition:"center",
-                            border:"2px solid rgba(212,175,55,0.4)",
+                            border:"2px solid rgba(55,138,221,0.4)",
                             boxShadow:"0 4px 16px rgba(0,0,0,0.3)"
                           }} />
-                        : <div style={{ width:"200px", height:"200px", borderRadius:"12px", border:"2px dashed rgba(212,175,55,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(212,175,55,0.03)" }}>
+                        : <div style={{ width:"200px", height:"200px", borderRadius:"12px", border:"2px dashed rgba(55,138,221,0.3)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", transition:"border-color 0.3s", background:"rgba(55,138,221,0.03)" }}>
                             <span style={{ fontSize:"40px" }}>[ photo ]</span>
-                            <span style={{ fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", color:"rgba(212,175,55,0.4)", textAlign:"center" }}>CLICK TO<br/>ADD PHOTO</span>
+                            <span style={{ fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"9px", letterSpacing:"1px", color:"rgba(55,138,221,0.4)", textAlign:"center" }}>CLICK TO<br/>ADD PHOTO</span>
                           </div>
                       }
                     </label>
@@ -728,7 +728,7 @@ export default function App() {
                           showToast("PHOTO REMOVED");
                         } catch(err) { console.error(err); }
                       }}
-                        style={{ marginTop:"8px", background:"none", border:"none", color:"rgba(200,80,80,0.5)", fontFamily:"'Cinzel',serif", fontSize:"9px", letterSpacing:"1px", cursor:"pointer", textTransform:"uppercase" }}>
+                        style={{ marginTop:"8px", background:"none", border:"none", color:"rgba(200,80,80,0.55)", fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:"10px", cursor:"pointer" }}>
                         Remove Photo
                       </button>
                     )}
