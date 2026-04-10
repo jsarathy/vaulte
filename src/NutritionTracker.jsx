@@ -6,60 +6,16 @@ import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS } f
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
-import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
+import { C, FONT, border } from "./constants/design.jsx";
 
-import RecipeModal   from "./components/RecipeModal";
-import ChatPopup     from "./components/ChatPopup";
-import LogTab        from "./tabs/LogTab";
-import CompareTab    from "./tabs/CompareTab";
-import AddEntry      from "./tabs/AddEntry";
-import WeightTracker from "./tabs/WeightTracker";
-
-// ── Calendar Sidebar ─────────────────────────────────────────────────────────
-function CalendarSidebar({ allDays, currentDate, calYear, calMonth, setCalYear, setCalMonth, switchDay }) {
-  const todayStr = new Date().toISOString().split("T")[0];
-  const loggedSet = new Set(allDays.map(d => d.date));
-  const loggedKcal = {};
-  allDays.forEach(d => { loggedKcal[d.date] = getDayTotals(d).foodKcal; });
-  const dows = ["M","T","W","T","F","S","S"];
-  const prevMonth = () => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); };
-  const nextMonth = () => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); };
-  const label = new Date(calYear, calMonth, 1).toLocaleString("default", { month:"long", year:"numeric" });
-  const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7;
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < firstDow; i++) cells.push(<div key={"bl"+i} />);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const mm = String(calMonth+1).padStart(2,"0"), dd = String(d).padStart(2,"0");
-    const ds = `${calYear}-${mm}-${dd}`;
-    const isLogged = loggedSet.has(ds), isActive = ds === currentDate, isToday = ds === todayStr;
-    const kcal = loggedKcal[ds];
-    cells.push(
-      <div key={ds} onClick={() => switchDay(ds)} title={kcal ? `${Math.round(kcal)} kcal` : ""}
-        style={{ textAlign:"center", fontSize:"11px", padding:"4px 1px", borderRadius:"4px", cursor:"pointer", lineHeight:1.2, fontFamily:FONT.mono,
-          background: isActive ? C.blue : isLogged ? C.blueBg : "transparent",
-          color: isActive ? "#fff" : isLogged ? C.blueText : isToday ? C.blue : C.muted,
-          fontWeight: isActive || isLogged ? "500" : "400",
-          outline: isToday && !isActive ? `1px solid ${C.blue}` : "none", outlineOffset:"-1px" }}>
-        {d}
-        {kcal ? <span style={{ fontSize:"7px", display:"block", opacity:0.8 }}>{Math.round(kcal)}</span> : null}
-      </div>
-    );
-  }
-  return (
-    <div style={{ padding:"12px 10px" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"8px" }}>
-        <button onClick={prevMonth} style={{ background:"transparent", border:"none", cursor:"pointer", color:C.muted, display:"flex", alignItems:"center", padding:"2px" }}><IconChevronLeft size={12}/></button>
-        <span style={{ fontSize:"11px", fontWeight:"500", color:C.text }}>{label}</span>
-        <button onClick={nextMonth} style={{ background:"transparent", border:"none", cursor:"pointer", color:C.muted, display:"flex", alignItems:"center", padding:"2px" }}><IconChevronRight size={12}/></button>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"1px", marginBottom:"2px" }}>
-        {dows.map((d,i) => <div key={i} style={{ textAlign:"center", fontSize:"9px", fontWeight:"500", color:C.hint, paddingBottom:"3px" }}>{d}</div>)}
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:"1px" }}>{cells}</div>
-    </div>
-  );
-}
+import CalendarSidebar from "./components/CalendarSidebar";
+import HRChart        from "./components/HRChart";
+import RecipeModal    from "./components/RecipeModal";
+import ChatPopup      from "./components/ChatPopup";
+import LogTab         from "./tabs/LogTab";
+import CompareTab     from "./tabs/CompareTab";
+import AddEntry       from "./tabs/AddEntry";
+import WeightTracker  from "./tabs/WeightTracker";
 
 // ── Polar Log Modal ──────────────────────────────────────────────────────────
 function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData, currentDate, setPolarSessions, onClose }) {
@@ -79,81 +35,6 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
   const existing = allDays.find(d=>d.date===sessionDate);
   const mealOptions = existing ? ensureMealSlots(existing).meals : DEFAULT_MEAL_SLOTS;
 
-  // Build SVG sparkline from hr_samples
-  const HRChart = () => {
-    const samples = s.hr_samples;
-    if (!samples || samples.length < 2) return null;
-    const W = 368, H = 80, PAD = 4;
-    const valid = samples.filter(v => v != null);
-    const minHR = Math.min(...valid) - 5;
-    const maxHR = Math.max(...valid) + 5;
-    // Downsample to max 200 points for rendering
-    const step = Math.max(1, Math.floor(samples.length / 200));
-    const pts = [];
-    for (let i = 0; i < samples.length; i += step) {
-      const v = samples[i];
-      if (v == null) continue;
-      const x = PAD + ((i / (samples.length - 1)) * (W - PAD * 2));
-      const y = PAD + ((1 - (v - minHR) / (maxHR - minHR)) * (H - PAD * 2));
-      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-    }
-    const polyline = pts.join(" ");
-    // HR zones (rough): <60% = blue, 60-70% = green, 70-80% = yellow, 80-90% = orange, >90% = red
-    const totalMin = Math.round(s.duration_min || 0);
-    const rateS = s.recording_rate_s || 5;
-    const zones = { z1:0, z2:0, z3:0, z4:0, z5:0 };
-    const hrMax = s.hr_max || 180;
-    samples.forEach(v => {
-      if (v == null) return;
-      const pct = v / hrMax;
-      if (pct < 0.6) zones.z1 += rateS;
-      else if (pct < 0.7) zones.z2 += rateS;
-      else if (pct < 0.8) zones.z3 += rateS;
-      else if (pct < 0.9) zones.z4 += rateS;
-      else zones.z5 += rateS;
-    });
-    const totalS = Object.values(zones).reduce((a,b)=>a+b,0) || 1;
-    const zoneColors = ["#B5D4F4","#C0DD97","#FAC775","#F0997B","#E24B4A"];
-    const zoneLabels = ["Z1","Z2","Z3","Z4","Z5"];
-    const zoneSecs = [zones.z1,zones.z2,zones.z3,zones.z4,zones.z5];
-
-    return (
-      <div style={{ marginBottom:"14px" }}>
-        <div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"6px",display:"flex",justifyContent:"space-between",alignItems:"baseline" }}>
-          <span>Heart rate · {samples.length * rateS / 60 | 0} min recorded</span>
-          <span style={{ fontFamily:FONT.mono }}>{Math.min(...valid)}–{Math.max(...valid)} bpm</span>
-        </div>
-        <div style={{ background:C.bg,borderRadius:"6px",border:`0.5px solid ${C.border}`,padding:"6px 8px" }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%",height:"70px",display:"block" }}>
-            {/* zero-line at avg */}
-            {s.hr_avg && (() => {
-              const y = PAD + ((1 - (s.hr_avg - minHR) / (maxHR - minHR)) * (H - PAD*2));
-              return <line x1={PAD} y1={y} x2={W-PAD} y2={y} stroke={C.blueMid} strokeWidth="0.5" strokeDasharray="3,3"/>;
-            })()}
-            <polyline points={polyline} fill="none" stroke={C.blue} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
-            {/* min/max labels */}
-            <text x={PAD+2} y={PAD+8} fontSize="8" fill={C.hint} fontFamily="DM Mono, monospace">{Math.round(maxHR)} bpm</text>
-            <text x={PAD+2} y={H-PAD-2} fontSize="8" fill={C.hint} fontFamily="DM Mono, monospace">{Math.round(minHR)} bpm</text>
-          </svg>
-          {/* Zone bar */}
-          <div style={{ display:"flex",height:"6px",borderRadius:"3px",overflow:"hidden",marginTop:"4px" }}>
-            {zoneSecs.map((sec,i) => (
-              <div key={i} style={{ flex:sec/totalS,background:zoneColors[i],minWidth:sec>0?"1px":"0" }}/>
-            ))}
-          </div>
-          <div style={{ display:"flex",gap:"8px",marginTop:"5px" }}>
-            {zoneSecs.map((sec,i) => sec > 0 && (
-              <div key={i} style={{ display:"flex",alignItems:"center",gap:"3px",fontSize:"9px",color:C.muted }}>
-                <div style={{ width:"7px",height:"7px",borderRadius:"1px",background:zoneColors[i],flexShrink:0 }}/>
-                <span>{zoneLabels[i]} {Math.round(sec/60)}m</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center" }}>
       <div style={{ background:"#fff",borderRadius:"10px",width:"440px",maxWidth:"95vw",border:`0.5px solid ${C.border}`,fontFamily:FONT.sans }}>
@@ -165,7 +46,7 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px",marginBottom:"14px" }}>
             {stats.map(([lbl,val])=>(<div key={lbl} style={{ background:C.bg,borderRadius:"6px",padding:"8px 10px",border:`0.5px solid ${C.border}` }}><div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"2px" }}>{lbl}</div><div style={{ fontWeight:"500",fontSize:"13px",color:C.text,fontFamily:FONT.mono }}>{val}</div></div>))}
           </div>
-          <HRChart />
+          <HRChart session={s} />
           <div style={{ marginBottom:"14px" }}>
             <div style={{ fontSize:"10px",color:C.hint,textTransform:"uppercase",letterSpacing:"0.4px",marginBottom:"5px" }}>Log to meal slot</div>
             <select value={localMealId} onChange={e=>{ setLocalMealId(e.target.value); setErr(""); }}
@@ -213,23 +94,59 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
 
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function NutritionTracker({ userId }) {
-  const [allDays,setAllDays]=useState([]);const [currentDate,setCurrentDate]=useState(null);const [currentDayData,setCurrentDayData]=useState(null);
-  const [activeTab,setActiveTab]=useState("log");const [loading,setLoading]=useState(true);
-  const [calYear,setCalYear]=useState(()=>new Date().getFullYear());const [calMonth,setCalMonth]=useState(()=>new Date().getMonth());
-  const [recipeModal,setRecipeModal]=useState(null);const [userRecipes,setUserRecipes]=useState([]);
-  const [polarConnected,setPolarConnected]=useState(false);const [polarSessions,setPolarSessions]=useState([]);
-  const [polarSyncing,setPolarSyncing]=useState(false);const [polarLastSync,setPolarLastSync]=useState(null);
-  const [polarSyncMsg,setPolarSyncMsg]=useState(null);const [polarLogModal,setPolarLogModal]=useState(null);
-  const [weightLog,setWeightLog]=useState([]);const [weightPlanConfig,setWeightPlanConfig]=useState(DEFAULT_PLAN_CONFIG);
-  const [editingPlan,setEditingPlan]=useState(false);const [editCfg,setEditCfg]=useState(DEFAULT_PLAN_CONFIG);
-  const [chatMessages,setChatMessages]=useState([]);const [chatInput,setChatInput]=useState("");
-  const [chatMealId,setChatMealId]=useState("__chat__");const [chatDate,setChatDate]=useState(()=>new Date().toISOString().split("T")[0]);
-  const [chatLoading,setChatLoading]=useState(false);const [justChatHistory,setJustChatHistory]=useState([]);const [chatOpen,setChatOpen]=useState(false);
-  const CHAT_CONTEXT_LIMIT=30;
-  const [addDate,setAddDate]=useState(()=>new Date().toISOString().split("T")[0]);const [addMealId,setAddMealId]=useState("");const [addMealName,setAddMealName]=useState("");
-  const [addItem,setAddItem]=useState({name:"",kcal:"",fat:"",sat_fat:"",carbs:"",sugar:"",fibre:"",net_carbs:"",protein:""});const [addMsg,setAddMsg]=useState(null);
-  const [compareSlots,setCompareSlots]=useState([null,null,null,null,null]);const [compareData,setCompareData]=useState([null,null,null,null,null]);
-  const [calcSex,setCalcSex]=useState("m");const [calcAge,setCalcAge]=useState(60);const [calcHeight,setCalcHeight]=useState(165);const [calcWeight,setCalcWeight]=useState(84);const [calcProtein,setCalcProtein]=useState(1.4);const [calcFatPct,setCalcFatPct]=useState(30);
+  // Nav / days
+  const [allDays,setAllDays]           = useState([]);
+  const [currentDate,setCurrentDate]   = useState(null);
+  const [currentDayData,setCurrentDayData] = useState(null);
+
+  // UI / tabs / calendar
+  const [activeTab,setActiveTab]       = useState("log");
+  const [loading,setLoading]           = useState(true);
+  const [calYear,setCalYear]           = useState(()=>new Date().getFullYear());
+  const [calMonth,setCalMonth]         = useState(()=>new Date().getMonth());
+  const [recipeModal,setRecipeModal]   = useState(null);
+  const [userRecipes,setUserRecipes]   = useState([]);
+
+  // Polar integration
+  const [polarConnected,setPolarConnected]   = useState(false);
+  const [polarSessions,setPolarSessions]     = useState([]);
+  const [polarSyncing,setPolarSyncing]       = useState(false);
+  const [polarLastSync,setPolarLastSync]     = useState(null);
+  const [polarSyncMsg,setPolarSyncMsg]       = useState(null);
+  const [polarLogModal,setPolarLogModal]     = useState(null);
+
+  // Weight plan
+  const [weightLog,setWeightLog]             = useState([]);
+  const [weightPlanConfig,setWeightPlanConfig] = useState(DEFAULT_PLAN_CONFIG);
+  const [editingPlan,setEditingPlan]         = useState(false);
+  const [editCfg,setEditCfg]               = useState(DEFAULT_PLAN_CONFIG);
+
+  // Chat
+  const [chatMessages,setChatMessages]       = useState([]);
+  const [chatInput,setChatInput]             = useState("");
+  const [chatMealId,setChatMealId]           = useState("__chat__");
+  const [chatDate,setChatDate]               = useState(()=>new Date().toISOString().split("T")[0]);
+  const [chatLoading,setChatLoading]         = useState(false);
+  const [justChatHistory,setJustChatHistory] = useState([]);
+  const [chatOpen,setChatOpen]               = useState(false);
+  const CHAT_CONTEXT_LIMIT = 30;
+
+  // Add-entry form
+  const [addDate,setAddDate]     = useState(()=>new Date().toISOString().split("T")[0]);
+  const [addMealId,setAddMealId] = useState("");
+  const [addMealName,setAddMealName] = useState("");
+  const [addItem,setAddItem]     = useState({name:"",kcal:"",fat:"",sat_fat:"",carbs:"",sugar:"",fibre:"",net_carbs:"",protein:""});
+  const [addMsg,setAddMsg]       = useState(null);
+
+  // Compare / calculator
+  const [compareSlots,setCompareSlots] = useState([null,null,null,null,null]);
+  const [compareData,setCompareData]   = useState([null,null,null,null,null]);
+  const [calcSex,setCalcSex]           = useState("m");
+  const [calcAge,setCalcAge]           = useState(60);
+  const [calcHeight,setCalcHeight]     = useState(165);
+  const [calcWeight,setCalcWeight]     = useState(84);
+  const [calcProtein,setCalcProtein]   = useState(1.4);
+  const [calcFatPct,setCalcFatPct]     = useState(30);
 
   useEffect(()=>{
     if(!userId){setLoading(false);return;}
@@ -264,7 +181,7 @@ export default function NutritionTracker({ userId }) {
   const switchDay=async(date)=>{setCurrentDate(date);let data=allDays.find(d=>d.date===date)||null;if(!data)data=await loadDay(userId,date);setCurrentDayData(ensureMealSlots(data));setChatDate(date);setChatMealId("__chat__");};
   const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));if(dayData.date===currentDate)setCurrentDayData(dayData);};
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
-  const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}const proj=generateWeightProjection(cfg);const actuals={};weightLog.forEach(r=>{if(r.actual!=null)actuals[r.week]=r.actual;});setWeightLog(proj.map(r=>({...r,actual:actuals[r.week]??null})));};
+  const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){setPolarSyncMsg({ok:false,text:"Failed to save plan: "+e.message});setTimeout(()=>setPolarSyncMsg(null),6000);}const proj=generateWeightProjection(cfg);const actuals={};weightLog.forEach(r=>{if(r.actual!=null)actuals[r.week]=r.actual;});setWeightLog(proj.map(r=>({...r,actual:actuals[r.week]??null})));};
   const persistChatHistory=async(history)=>{if(!userId)return;try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history,updatedAt:new Date().toISOString()});}catch(e){}};
   const clearChat=async()=>{setJustChatHistory([]);setChatMessages([]);if(userId)try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history:[],updatedAt:new Date().toISOString()});}catch(e){}};
   const sendChat=async()=>{const text=chatInput.trim();if(!text||chatLoading)return;setChatInput("");setChatLoading(true);const userMsg={id:genId(),type:"user",text};const thinkMsg={id:genId(),type:"claude",text:"…"};setChatMessages(prev=>[...prev,userMsg,thinkMsg]);try{if(chatMealId==="__chat__"){const newHistory=[...justChatHistory,{role:"user",content:text}];const reply=await claudeChat(newHistory.slice(-CHAT_CONTEXT_LIMIT));const updatedHistory=[...newHistory,{role:"assistant",content:reply}].slice(-CHAT_CONTEXT_LIMIT);setJustChatHistory(updatedHistory);await persistChatHistory(updatedHistory);setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,text:reply}:m));}else{const items=await claudeParseFood(text);const mealName=(allDays.find(d=>d.date===chatDate)||currentDayData)?.meals?.find(m=>m.id===chatMealId)?.name||"Meal";setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,type:"preview",items,mealId:chatMealId,mealName,confirmed:false}:m));}}catch(err){setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,type:"error",text:err.message}:m));}setChatLoading(false);};
@@ -274,6 +191,11 @@ export default function NutritionTracker({ userId }) {
   if(loading) return <div style={{ padding:"40px",textAlign:"center",color:C.muted,fontFamily:FONT.sans }}>Loading your log…</div>;
 
   const TABS=[["log","Daily log"],["compare","Compare"],["add","Add entry"],["weight","Weight"]];
+
+  // Calendar sidebar data (computed per render, cheap)
+  const ntLoggedSet = new Set(allDays.map(d => d.date));
+  const ntLoggedKcal = {};
+  allDays.forEach(d => { ntLoggedKcal[d.date] = getDayTotals(d).foodKcal; });
 
   return (
     <div className="nt-root" style={{ background:C.bg,color:C.text,height:"calc(100vh - 110px)",display:"flex",flexDirection:"column",borderRadius:"10px",overflow:"hidden",border:`0.5px solid ${C.border}` }}>
@@ -299,7 +221,7 @@ export default function NutritionTracker({ userId }) {
         {/* Sidebar */}
         <div style={{ width:"190px",flexShrink:0,background:C.surface,borderRight:`0.5px solid ${C.border}`,display:"flex",flexDirection:"column",overflow:"hidden" }}>
           <div style={{ flex:1,overflowY:"auto" }}>
-            <CalendarSidebar allDays={allDays} currentDate={currentDate} calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} switchDay={switchDay}/>
+            <CalendarSidebar calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} selectedDate={currentDate} onSelectDate={switchDay} loggedSet={ntLoggedSet} loggedKcal={ntLoggedKcal}/>
           </div>
           {allDays.length>0&&(()=>{
             const last7=allDays.slice(0,7);

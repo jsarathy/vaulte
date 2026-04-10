@@ -1,6 +1,6 @@
 // src/api/firestore.js — all Firestore read/write helpers
 import { db } from "../firebase";
-import { doc, setDoc, getDoc, getDocs, deleteDoc, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, deleteDoc, collection, query, where, orderBy } from "firebase/firestore";
 import { genId, makeMeals } from "../constants/helpers";
 import { INITIAL_RECIPES } from "../constants/recipes";
 
@@ -26,10 +26,18 @@ export async function deleteRecipe(uid, id) {
 
 export async function loadAllDays(uid) {
   try {
-    const snap = await getDocs(collection(db, "users", uid, "nutrition_days"));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+    const q = query(
+      collection(db, "users", uid, "nutrition_days"),
+      where("date", ">=", cutoffStr),
+      orderBy("date", "desc")
+    );
+    const snap = await getDocs(q);
     const days = [];
     snap.forEach(d => days.push(d.data()));
-    return days.sort((a,b) => b.date.localeCompare(a.date));
+    return days;
   } catch (err) { console.error("loadAllDays error:", err); return []; }
 }
 

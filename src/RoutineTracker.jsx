@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "./firebase";
 import { doc, getDoc, setDoc, getDocs, collection } from "firebase/firestore";
 import { C, FONT, border } from "./constants/design.jsx";
-import { IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
+import CalendarSidebar from "./components/CalendarSidebar";
 
 // ── Task definitions ──────────────────────────────────────────────────────────
 const TASKS = [
@@ -54,50 +54,6 @@ function fmtColHeader(dateStr) {
 
 function isSunday(dateStr) {
   return new Date(dateStr + "T12:00:00").getDay() === 0;
-}
-
-// ── Calendar sidebar ──────────────────────────────────────────────────────────
-function CalendarSidebar({ loggedDates, anchor, setAnchor, calYear, calMonth, setCalYear, setCalMonth }) {
-  const today = todayStr();
-  const dows = ["M","T","W","T","F","S","S"];
-  const label = new Date(calYear, calMonth, 1).toLocaleString("default", { month:"long", year:"numeric" });
-  const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7;
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const prevMonth = () => { if (calMonth===0){setCalMonth(11);setCalYear(y=>y-1);}else setCalMonth(m=>m-1); };
-  const nextMonth = () => { if (calMonth===11){setCalMonth(0);setCalYear(y=>y+1);}else setCalMonth(m=>m+1); };
-
-  const cells = [];
-  for (let i=0;i<firstDow;i++) cells.push(<div key={"b"+i}/>);
-  for (let d=1;d<=daysInMonth;d++) {
-    const mm=String(calMonth+1).padStart(2,"0"), dd=String(d).padStart(2,"0");
-    const ds=`${calYear}-${mm}-${dd}`;
-    const isAnchor=ds===anchor, isToday=ds===today, hasLog=loggedDates.has(ds);
-    cells.push(
-      <div key={ds} onClick={()=>setAnchor(ds)}
-        style={{ textAlign:"center",fontSize:"11px",padding:"4px 1px",borderRadius:"4px",cursor:"pointer",
-          fontFamily:FONT.mono,lineHeight:1.2,
-          background:isAnchor?C.blue:hasLog?C.greenBg:"transparent",
-          color:isAnchor?"#fff":hasLog?C.greenText:isToday?C.blue:C.muted,
-          fontWeight:isAnchor||hasLog?"500":"400",
-          outline:isToday&&!isAnchor?`1px solid ${C.blue}`:"none",outlineOffset:"-1px" }}>
-        {d}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding:"12px 10px" }}>
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"8px" }}>
-        <button onClick={prevMonth} style={{ background:"transparent",border:"none",cursor:"pointer",color:C.muted,display:"flex",alignItems:"center" }}><IconChevronLeft size={12}/></button>
-        <span style={{ fontSize:"11px",fontWeight:"500",color:C.text }}>{label}</span>
-        <button onClick={nextMonth} style={{ background:"transparent",border:"none",cursor:"pointer",color:C.muted,display:"flex",alignItems:"center" }}><IconChevronRight size={12}/></button>
-      </div>
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"1px",marginBottom:"3px" }}>
-        {dows.map((d,i)=><div key={i} style={{ textAlign:"center",fontSize:"9px",fontWeight:"500",color:C.hint,paddingBottom:"3px" }}>{d}</div>)}
-      </div>
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"1px" }}>{cells}</div>
-    </div>
-  );
 }
 
 // ── Time Picker Modal ─────────────────────────────────────────────────────────
@@ -337,9 +293,11 @@ export default function RoutineTracker({ userId }) {
         {/* Sidebar */}
         <div style={{ width:"190px",flexShrink:0,background:"#fff",borderRight:`0.5px solid ${C.border}`,overflowY:"auto" }}>
           <CalendarSidebar
-            loggedDates={loggedDates}
-            anchor={anchor} setAnchor={date => { setAnchor(date); setCalYear(+date.slice(0,4)); setCalMonth(+date.slice(5,7)-1); }}
             calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth}
+            selectedDate={anchor}
+            onSelectDate={date => { setAnchor(date); setCalYear(+date.slice(0,4)); setCalMonth(+date.slice(5,7)-1); }}
+            loggedSet={loggedDates}
+            loggedColor={{ bg: C.greenBg, text: C.greenText }}
           />
           <div style={{ borderTop:`0.5px solid ${C.border}`,padding:"10px 12px" }}>
             <div style={{ fontSize:"10px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.4px",color:C.hint,marginBottom:"6px" }}>Week ending</div>

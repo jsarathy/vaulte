@@ -1,5 +1,5 @@
 // src/tabs/AddEntry.jsx
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
@@ -77,6 +77,11 @@ export default function AddEntry({
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoItems, setPhotoItems] = useState([]);
   const [photoError, setPhotoError] = useState("");
+
+  // Revoke the compressed-version blob URL when it changes or on unmount
+  useEffect(() => {
+    return () => { if (photoPreview) URL.revokeObjectURL(photoPreview); };
+  }, [photoPreview]);
 
   const handlePhotoLog = async (e) => {
     const raw = e.target.files?.[0];
