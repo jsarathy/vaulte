@@ -262,7 +262,7 @@ export default function NutritionTracker({ userId }) {
   },[userId]);
 
   const switchDay=async(date)=>{setCurrentDate(date);let data=allDays.find(d=>d.date===date)||null;if(!data)data=await loadDay(userId,date);setCurrentDayData(ensureMealSlots(data));setChatDate(date);setChatMealId("__chat__");};
-  const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));setCurrentDayData(dayData);};
+  const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));if(dayData.date===currentDate)setCurrentDayData(dayData);};
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
   const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}const proj=generateWeightProjection(cfg);const actuals={};weightLog.forEach(r=>{if(r.actual!=null)actuals[r.week]=r.actual;});setWeightLog(proj.map(r=>({...r,actual:actuals[r.week]??null})));};
   const persistChatHistory=async(history)=>{if(!userId)return;try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history,updatedAt:new Date().toISOString()});}catch(e){}};

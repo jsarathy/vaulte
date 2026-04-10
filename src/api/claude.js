@@ -1,9 +1,18 @@
 // src/api/claude.js — All Claude API helpers
 
+import { auth } from "../firebase";
+
+// Retrieve the current user's Firebase ID token for server-side verification.
+// Returns an empty object if there is no signed-in user (should not happen in practice).
+async function authHeader() {
+  const token = await auth.currentUser?.getIdToken();
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
 export async function claudeParseFood(text) {
   const res = await fetch("/api/claude", {
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json", ...await authHeader()},
     body: JSON.stringify({
       model:"claude-sonnet-4-20250514",
       max_tokens:1000,
@@ -32,7 +41,7 @@ Use accurate nutritional database values. Round to 1 decimal place. Return ONLY 
 export async function claudeCreateRecipe(description) {
   const res = await fetch("/api/claude", {
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json", ...await authHeader()},
     body: JSON.stringify({
       model:"claude-sonnet-4-20250514",
       max_tokens:1000,
@@ -63,7 +72,7 @@ nutrition is PER SERVING. Use accurate nutritional database values. Return ONLY 
 export async function claudeChat(messages) {
   const res = await fetch("/api/claude", {
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json", ...await authHeader()},
     body: JSON.stringify({
       model:"claude-sonnet-4-20250514",
       max_tokens:1000,
