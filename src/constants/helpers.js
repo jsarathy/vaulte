@@ -55,6 +55,7 @@ export function getDayTotals(dayData) {
 
 // Merge any missing DEFAULT_MEAL_SLOTS into an existing day without changing existing meal IDs.
 // Safe to call on any day loaded from Firestore — only adds, never removes.
+// Custom meals (names not in DEFAULT_MEAL_SLOTS) keep their original position.
 export function ensureMealSlots(day) {
   if (!day) return day;
   const existing = day.meals || [];
@@ -63,17 +64,20 @@ export function ensureMealSlots(day) {
     .filter(s => !existingNames.has(s.name))
     .map(s => ({ id:genId(), name:s.name, is_exercise:s.is_exercise, items:[] }));
   if (missing.length === 0) return { ...day, meals: existing.map(m => ({ ...m, items: m.items || [] })) };
-  // Insert new slots in DEFAULT order, interleaved with existing ones
+  // Insert each missing default slot immediately after the last existing meal
+  // whose default-order index is lower. Custom meals are never moved.
   const allNames = DEFAULT_MEAL_SLOTS.map(s => s.name);
-  const merged = [...existing.map(m => ({ ...m, items: m.items || [] })), ...missing]
-    .sort((a, b) => {
-      const ai = allNames.indexOf(a.name), bi = allNames.indexOf(b.name);
-      if (ai === -1 && bi === -1) return 0;
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-  return { ...day, meals: merged };
+  let result = existing.map(m => ({ ...m, items: m.items || [] }));
+  for (const slot of missing) {
+    const slotIdx = allNames.indexOf(slot.name);
+    let insertAfter = -1;
+    for (let i = 0; i < result.length; i++) {
+      const ri = allNames.indexOf(result[i].name);
+      if (ri !== -1 && ri < slotIdx) insertAfter = i;
+    }
+    result.splice(insertAfter + 1, 0, slot);
+  }
+  return { ...day, meals: result };
 }
 
 // Parse ISO 8601 duration → minutes e.g. "PT1H30M45S" → 90.75
