@@ -495,8 +495,8 @@ export default function App() {
       <button onClick={() => setActivePanel(id)} style={{
         display:"flex", alignItems:"center", gap:"12px", width:"100%",
         padding:"14px 18px", background: activePanel === id ? "rgba(212,175,55,0.12)" : "transparent",
-        border:"none", borderLeft: activePanel === id ? "2px solid #d4af37" : "2px solid transparent",
-        color: activePanel === id ? "#d4af37" : "rgba(240,234,214,0.45)",
+        border:"none", borderLeft: activePanel === id ? "2px solid #ffcf3f" : "2px solid transparent",
+        color: activePanel === id ? "#ffcf3f" : "#ffffff",
         fontFamily:"'Cinzel',serif", fontSize:"26px", letterSpacing:"1px",
         cursor:"pointer", transition:"all 0.25s", textTransform:"uppercase", textAlign:"left",
       }}>
