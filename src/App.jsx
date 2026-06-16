@@ -566,21 +566,19 @@ export default function App() {
           <div className="app-main" style={{ flex:1, padding: activePanel === "home" ? "0" : "48px", overflowY: activePanel === "home" ? "hidden" : "auto", position:"relative" }}>
 
             {activePanel === "home" && (
-              <div className="fade-up" style={{ position:"absolute", inset:0, overflow:"hidden" }}>
-                {profile.photoURL
-                  ? <div style={{
-                      position:"absolute", inset:0,
-                      backgroundImage:`url(${profile.photoURL})`,
-                      backgroundSize:"cover",
-                      backgroundPosition:"center top",
-                      filter:"brightness(0.45) saturate(0.8)",
-                    }} />
-                  : <div style={{ position:"absolute", inset:0, background:"linear-gradient(160deg,#0d0d0f 60%,#1a1408)" }} />
-                }
-                <div style={{
-                  position:"absolute", inset:0,
-                  background:"linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(10,10,12,0.7) 60%, rgba(10,10,12,0.95) 100%)",
-                }} />
+              <div className="fade-up" style={{ position:"absolute", inset:0, overflow:"hidden", background:"linear-gradient(160deg,#0d0d0f 60%,#1a1408)" }}>
+                {profile.photoURL && (
+                  <div style={{
+                    position:"absolute", top:"32px", right:"32px",
+                    width:"2in", height:"2in",
+                    backgroundImage:`url(${profile.photoURL})`,
+                    backgroundSize:"cover",
+                    backgroundPosition:"center",
+                    borderRadius:"8px",
+                    border:"1px solid rgba(212,175,55,0.3)",
+                    boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
+                  }} />
+                )}
                 <div style={{ position:"relative", zIndex:1, padding:"56px 56px 48px", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%" }}>
                   <div style={{ color:"rgba(212,175,55,0.5)", fontFamily:"'Cinzel',serif", fontSize:"10px", letterSpacing:"4px", marginBottom:"20px", textTransform:"uppercase" }}>
                     {new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
