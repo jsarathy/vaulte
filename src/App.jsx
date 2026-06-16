@@ -494,13 +494,13 @@ export default function App() {
     const navItem = (id, label, icon) => (
       <button onClick={() => setActivePanel(id)} style={{
         display:"flex", alignItems:"center", gap:"12px", width:"100%",
-        padding:"12px 16px", background: activePanel === id ? "rgba(212,175,55,0.12)" : "transparent",
+        padding:"14px 18px", background: activePanel === id ? "rgba(212,175,55,0.12)" : "transparent",
         border:"none", borderLeft: activePanel === id ? "2px solid #d4af37" : "2px solid transparent",
         color: activePanel === id ? "#d4af37" : "rgba(240,234,214,0.45)",
-        fontFamily:"'Cinzel',serif", fontSize:"11px", letterSpacing:"2px",
+        fontFamily:"'Cinzel',serif", fontSize:"26px", letterSpacing:"1px",
         cursor:"pointer", transition:"all 0.25s", textTransform:"uppercase", textAlign:"left",
       }}>
-        <span style={{ fontSize:"16px" }}>{icon}</span>
+        <span style={{ fontSize:"26px" }}>{icon}</span>
         <span className="sidebar-label">{label}</span>
       </button>
     );
@@ -552,8 +552,8 @@ export default function App() {
 
         <div className="app-body" style={{ display:"flex", flex:1, minHeight:0, overflow:"hidden" }}>
 
-          <div className="app-sidebar" style={{ width:"220px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
-            <div className="sidebar-nav-section" style={{ padding:"0 16px 16px", color:"rgba(212,175,55,0.3)", fontSize:"9px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
+          <div className="app-sidebar" style={{ width:"300px", flexShrink:0, borderRight:"1px solid rgba(212,175,55,0.1)", padding:"32px 0", display:"flex", flexDirection:"column", gap:"4px" }}>
+            <div className="sidebar-nav-section" style={{ padding:"0 18px 16px", color:"rgba(212,175,55,0.3)", fontSize:"11px", letterSpacing:"3px", fontFamily:"'Cinzel',serif" }}>NAVIGATION</div>
             {navItem("home",      "Home",       "~")}
             {navItem("account",   "My Account", "*")}
             {navItem("nutrition", "Nutrition",  "N")}
