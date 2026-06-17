@@ -6,32 +6,27 @@ import { C, FONT, border } from "./constants/design.jsx";
 import { IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
 
 // ── Task definitions ──────────────────────────────────────────────────────────
-const TASKS = [
-  { id:"warm_water",   name:"Start with Warm Water",      time:"06:15" },
+const ROUTINE_TASKS = [
+  { id:"coffee",       name:"Coffee",              time:"07:30" },
+  { id:"morning",      name:"Morning",             time:"10:00" },
+  { id:"garden",       name:"Gardening / Chores",  time:"12:00" },
+  { id:"lunch",        name:"Lunch",               time:"14:00" },
+  { id:"post_lunch",   name:"Post-Lunch",          time:"17:00" },
+  { id:"dinner",       name:"Dinner",              time:"20:00" },
+  { id:"late_evening", name:"Late-Evening",        time:"22:00" },
+];
+
+const MEDS_TASKS = [
   { id:"thyronorm",    name:"Thyronorm",                   time:null    },
-  { id:"coffee",       name:"Coffee",                      time:"07:00" },
-  { id:"session1",     name:"Session 1: Theory (45 min)", time:"08:00" },
-  { id:"exercise",     name:"Exercise @ Home (45 min)",   time:"09:00" },
-  { id:"session2",     name:"Session 2: Theory (45 min)", time:"10:00" },
-  { id:"garden",       name:"Garden / Chores",             time:"11:00" },
   { id:"esomeprazole", name:"Esomeprazole",                time:"11:45" },
-  { id:"hygiene",      name:"Personal Hygiene",            time:"11:45" },
-  { id:"lunch_prep",   name:"Lunch Prep",                  time:"12:30" },
-  { id:"lunch",        name:"Lunch",                       time:"13:15" },
   { id:"probiotic",    name:"Probiotic / Vits / Aspirin",  time:null    },
-  { id:"biz_check",    name:"Biz Check",                   time:"14:00" },
-  { id:"session3",     name:"Session 3: Hands on",         time:"15:30" },
-  { id:"session4",     name:"Session 4: Project + Tea",    time:"16:30" },
-  { id:"walk_bike",    name:"Walk / Bike",                 time:"17:30" },
-  { id:"dinner_prep",  name:"Dinner prep",                 time:"18:30" },
   { id:"pregastar",    name:"Pregastar",                   time:"19:00" },
-  { id:"dinner",       name:"Dinner",                      time:"19:15" },
-  { id:"art_reading",  name:"Art / Reading",               time:"19:45" },
   { id:"statin",       name:"Statin / Allergy Med",        time:"21:45" },
-  { id:"wind_down",    name:"Wind down",                   time:"21:45" },
-  { id:"bedtime",      name:"Bedtime",                     time:"22:15" },
   { id:"vit_d",        name:"Vit D",                       time:null, sunday:true },
 ];
+
+// Combined list — used for keyboard navigation, stats, and shared lookups.
+const TASKS = [...ROUTINE_TASKS, ...MEDS_TASKS];
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 const todayStr = () => new Date().toISOString().split("T")[0];
@@ -184,10 +179,10 @@ export default function RoutineTracker({ userId }) {
   const [log, setLog] = useState({});       // { date: { taskId: { done, time? } } }
   const [loading, setLoading] = useState(true);
   const [focusedCell, setFocusedCell] = useState(null); // "taskId|date"
-  const [timePickerCell, setTimePickerCell] = useState(null);
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const gridRef = useRef(null);
+  const logRef = useRef({});
 
   const days = getLast7Days(anchor);
 
@@ -208,110 +203,146 @@ export default function RoutineTracker({ userId }) {
     }).catch(e => { console.error("Routine load error:", e); setLoading(false); });
   }, [anchor, userId]);
 
-  // ── Save entry ──
-  const saveEntry = useCallback(async (date, taskId, value) => {
-    const newLog = {
-      ...log,
-      [date]: { ...log[date], [taskId]: value }
-    };
-    setLog(newLog);
+  // ── Keep a live mirror of log for blur-time saves ──
+  useEffect(() => { logRef.current = log; }, [log]);
+
+  // ── Persist a day's entries to Firestore (called on blur) ──
+  const persistDay = useCallback(async (date) => {
     try {
       await setDoc(doc(db, "users", userId, "routine_log", date), {
-        entries: newLog[date],
+        entries: logRef.current[date] || {},
         date,
         updatedAt: new Date().toISOString(),
       });
     } catch (e) { console.error("Routine save error:", e); }
-  }, [log, userId]);
+  }, [userId]);
 
-  // ── Toggle cell (Enter) ──
-  const toggleCell = useCallback(async (taskId, date) => {
-    const task = TASKS.find(t => t.id === taskId);
-    if (task?.sunday && !isSunday(date)) return; // skip non-Sundays for Vit D
-    const current = log[date]?.[taskId];
-    const next = current?.done ? null : { done: true };
-    await saveEntry(date, taskId, next);
-  }, [log, saveEntry]);
-
-  // ── Set time ──
-  const setTime = useCallback(async (taskId, date, time) => {
-    await saveEntry(date, taskId, { done: true, time });
-    setTimePickerCell(null);
-  }, [saveEntry]);
-
-  // ── Focus helpers ──
-  const focusCell = (taskId, date) => {
-    const el = gridRef.current?.querySelector(`[data-cell="${taskId}|${date}"]`);
-    el?.focus();
+  // ── Update a cell's text locally (persisted on blur) ──
+  const updateCellText = (date, taskId, text) => {
+    setLog(prev => ({ ...prev, [date]: { ...prev[date], [taskId]: { text } } }));
   };
 
-  // ── Keyboard on grid ──
-  const handleGridKeyDown = (e) => {
-    if (!focusedCell || timePickerCell) return;
-    const [taskId, date] = focusedCell.split("|");
-    const tIdx = TASKS.findIndex(t => t.id === taskId);
-    const dIdx = days.indexOf(date);
-    if (e.key === "Enter") {
-      e.preventDefault();
-      toggleCell(taskId, date);
-    } else if (e.key === "t" || e.key === "T") {
-      e.preventDefault();
-      const task = TASKS.find(t => t.id === taskId);
-      if (!task?.sunday || isSunday(date)) setTimePickerCell(focusedCell);
-    } else if (e.key === "ArrowUp" && tIdx > 0) {
-      e.preventDefault(); focusCell(TASKS[tIdx-1].id, date);
-    } else if (e.key === "ArrowDown" && tIdx < TASKS.length - 1) {
-      e.preventDefault(); focusCell(TASKS[tIdx+1].id, date);
-    } else if (e.key === "ArrowLeft" && dIdx > 0) {
-      e.preventDefault(); focusCell(taskId, days[dIdx-1]);
-    } else if (e.key === "ArrowRight" && dIdx < days.length - 1) {
-      e.preventDefault(); focusCell(taskId, days[dIdx+1]);
-    }
-  };
+  // A slot counts as filled if it has text (or a legacy "done" check).
+  const hasText = (e) => !!(e && ((typeof e.text === "string" && e.text.trim()) || e.done));
 
-  // ── Cell renderer ──
+  // ── Cell renderer — free-text box for what you actually did ──
   const renderCell = (task, date) => {
-    const isSun = isSunday(date);
-    if (task.sunday && !isSun) {
-      return <span style={{ color:C.border, fontSize:"11px" }}>—</span>;
+    if (task.sunday && !isSunday(date)) {
+      return <div style={{ display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:C.border,fontSize:"14px" }}>—</div>;
     }
-    const entry = log[date]?.[task.id];
-    if (!entry?.done) return null;
-    if (entry.time) {
-      return <span style={{ fontFamily:FONT.mono, fontSize:"11px", fontWeight:"500", color:C.blueText }}>{entry.time}</span>;
-    }
+    const cellKey = `${task.id}|${date}`;
+    const value = log[date]?.[task.id]?.text || "";
     return (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke={C.greenText} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="2.5 8.5 6 12 13.5 4.5"/>
-      </svg>
+      <textarea
+        data-cell={cellKey}
+        value={value}
+        onChange={(e) => updateCellText(date, task.id, e.target.value)}
+        onFocus={() => setFocusedCell(cellKey)}
+        onBlur={() => { setFocusedCell(prev => prev === cellKey ? null : prev); persistDay(date); }}
+        style={{
+          width:"100%", height:"100%", minHeight:"56px", boxSizing:"border-box",
+          border:"none", outline:"none", resize:"none", background:"transparent",
+          padding:"8px 10px", fontFamily:FONT.sans, fontSize:"14px", lineHeight:"1.45",
+          color:C.text, display:"block",
+        }}
+      />
     );
   };
 
   // ── Completion stats for today ──
   const todayLog = log[today] || {};
   const todayApplicable = TASKS.filter(t => !t.sunday || isSunday(today));
-  const todayDone = todayApplicable.filter(t => todayLog[t.id]?.done).length;
+  const todayDone = todayApplicable.filter(t => hasText(todayLog[t.id])).length;
 
   const loggedDates = new Set(
-    Object.entries(log).filter(([_, entries]) => Object.values(entries).some(e => e?.done)).map(([d]) => d)
+    Object.entries(log).filter(([_, entries]) => Object.values(entries).some(e => hasText(e))).map(([d]) => d)
   );
 
   if (loading) return <div style={{ padding:"40px",textAlign:"center",color:C.muted,fontFamily:FONT.sans }}>Loading routine…</div>;
 
   const COL_TASK = "180px", COL_TIME = "52px", COL_DAY = "1fr";
 
+  const renderTable = (taskList, showHead = true) => {
+    const rowH = `${(100 / taskList.length).toFixed(4)}%`;
+    return (
+    <table style={{ borderCollapse:"collapse",minWidth:"700px",width:"100%",height:"100%",tableLayout:"fixed" }}>
+      <colgroup>
+        <col style={{ width:COL_TASK }}/>
+        <col style={{ width:COL_TIME }}/>
+        {days.map(d => <col key={d} style={{ width:COL_DAY }}/>)}
+      </colgroup>
+      {showHead && (
+        <thead>
+          <tr style={{ background:C.bg,position:"sticky",top:0,zIndex:10 }}>
+            <th style={{ padding:"8px 12px",textAlign:"left",fontSize:"13px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.5px",color:C.hint,borderBottom:`0.5px solid ${C.border}`,position:"sticky",left:0,background:C.bg,zIndex:11 }}>
+              Task
+            </th>
+            <th style={{ padding:"8px 6px",textAlign:"center",fontSize:"13px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.5px",color:C.hint,borderBottom:`0.5px solid ${C.border}` }}>
+              Due
+            </th>
+            {days.map(date => {
+              const isToday = date === today;
+              return (
+                <th key={date} style={{
+                  padding:"6px 4px",textAlign:"center",fontSize:"13px",fontWeight:"500",color:isToday?C.blueText:C.muted,
+                  borderBottom:`0.5px solid ${C.border}`,
+                  background:isToday?C.blueBg:C.bg,
+                  whiteSpace:"nowrap",
+                }}>
+                  {fmtColHeader(date)}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+      )}
+      <tbody>
+        {taskList.map((task) => {
+          const isSection = task.id === "session1" || task.id === "session2" || task.id === "session3" || task.id === "session4";
+          return (
+            <tr key={task.id} style={{ background:"#fff" }}
+              onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+              onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+              {/* Task name — sticky left */}
+              <td style={{ padding:"0 12px",height:rowH,fontSize:"15px",fontWeight:isSection?"500":"400",color:isSection?C.blueText:C.text,
+                borderBottom:`0.5px solid ${C.border}`,position:"sticky",left:0,background:"inherit",zIndex:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>
+                {task.name}
+                {task.sunday && <span style={{ marginLeft:"5px",fontSize:"11px",color:C.hint,fontFamily:FONT.mono }}>SUN</span>}
+              </td>
+              {/* Scheduled time */}
+              <td style={{ padding:"0 6px",textAlign:"center",borderBottom:`0.5px solid ${C.border}` }}>
+                {task.time && <span style={{ fontFamily:FONT.mono,fontSize:"13px",color:C.hint }}>{task.time}</span>}
+              </td>
+              {/* Day cells — free-text boxes */}
+              {days.map((date) => {
+                const cellKey = `${task.id}|${date}`;
+                const isFocused = focusedCell === cellKey;
+                const isToday = date === today;
+                return (
+                  <td key={date}
+                    style={{
+                      height:rowH, padding:0, verticalAlign:"top",
+                      borderBottom:`0.5px solid ${C.border}`,
+                      borderLeft:`0.5px solid ${C.border}`,
+                      background: isFocused ? C.blueBg : isToday ? "#fafcff" : "inherit",
+                      outline: isFocused ? `1.5px solid ${C.blue}` : "none",
+                      outlineOffset:"-1.5px",
+                      transition:"background 0.1s",
+                    }}>
+                    {renderCell(task, date)}
+                  </td>
+                );
+              })}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+    );
+  };
+
   return (
     <div className="nt-root" style={{ background:C.bg,height:"calc(100vh - 110px)",display:"flex",flexDirection:"column",borderRadius:"10px",overflow:"hidden",border:`0.5px solid ${C.border}` }}>
-      {timePickerCell && (() => {
-        const [taskId, date] = timePickerCell.split("|");
-        const task = TASKS.find(t => t.id === taskId);
-        const existing = log[date]?.[taskId];
-        return <TimePicker
-          initialTime={existing?.time || task?.time || null}
-          onConfirm={time => setTime(taskId, date, time)}
-          onCancel={() => setTimePickerCell(null)}
-        />;
-      })()}
 
       {/* Header */}
       <div style={{ background:"#fff",borderBottom:`0.5px solid ${C.border}`,padding:"0 16px",height:"44px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0 }}>
@@ -321,13 +352,13 @@ export default function RoutineTracker({ userId }) {
         </div>
         <div style={{ display:"flex",alignItems:"center",gap:"12px" }}>
           <div style={{ fontSize:"11px",color:C.muted }}>
-            Today: <span style={{ fontFamily:FONT.mono,fontWeight:"500",color:C.text }}>{todayDone}/{todayApplicable.length}</span> done
+            Today: <span style={{ fontFamily:FONT.mono,fontWeight:"500",color:C.text }}>{todayDone}/{todayApplicable.length}</span> filled
           </div>
           <div style={{ width:"100px",height:"4px",background:C.bg,borderRadius:"2px",overflow:"hidden" }}>
             <div style={{ height:"100%",width:`${(todayDone/todayApplicable.length)*100}%`,background:C.greenText,borderRadius:"2px",transition:"width 0.3s" }}/>
           </div>
           <div style={{ fontSize:"11px",color:C.hint }}>
-            Enter = ✓ · T = set time · ↑↓←→ navigate
+            Type what you did — saves when you click away
           </div>
         </div>
       </div>
@@ -350,89 +381,23 @@ export default function RoutineTracker({ userId }) {
           </div>
         </div>
 
-        {/* Grid */}
-        <div ref={gridRef} onKeyDown={handleGridKeyDown}
-          style={{ flex:1,overflowX:"auto",overflowY:"auto",background:"#fff" }}>
-          <table style={{ borderCollapse:"collapse",minWidth:"700px",width:"100%",tableLayout:"fixed" }}>
-            <colgroup>
-              <col style={{ width:COL_TASK }}/>
-              <col style={{ width:COL_TIME }}/>
-              {days.map(d => <col key={d} style={{ width:COL_DAY }}/>)}
-            </colgroup>
-            <thead>
-              <tr style={{ background:C.bg,position:"sticky",top:0,zIndex:10 }}>
-                <th style={{ padding:"8px 12px",textAlign:"left",fontSize:"10px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.5px",color:C.hint,borderBottom:`0.5px solid ${C.border}`,position:"sticky",left:0,background:C.bg,zIndex:11 }}>
-                  Task
-                </th>
-                <th style={{ padding:"8px 6px",textAlign:"center",fontSize:"10px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.5px",color:C.hint,borderBottom:`0.5px solid ${C.border}` }}>
-                  Due
-                </th>
-                {days.map(date => {
-                  const isToday = date === today;
-                  const isAnchor = date === anchor;
-                  return (
-                    <th key={date} style={{
-                      padding:"6px 4px",textAlign:"center",fontSize:"10px",fontWeight:"500",color:isToday?C.blueText:C.muted,
-                      borderBottom:`0.5px solid ${C.border}`,
-                      background:isToday?C.blueBg:C.bg,
-                      whiteSpace:"nowrap",
-                    }}>
-                      {fmtColHeader(date)}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {TASKS.map((task, tIdx) => {
-                const isSection = task.id === "session1" || task.id === "session2" || task.id === "session3" || task.id === "session4";
-                return (
-                  <tr key={task.id} style={{ background:"#fff" }}
-                    onMouseEnter={e=>e.currentTarget.style.background=C.bg}
-                    onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-                    {/* Task name — sticky left */}
-                    <td style={{ padding:"0 12px",height:"34px",fontSize:"12px",fontWeight:isSection?"500":"400",color:isSection?C.blueText:C.text,
-                      borderBottom:`0.5px solid ${C.border}`,position:"sticky",left:0,background:"inherit",zIndex:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>
-                      {task.name}
-                      {task.sunday && <span style={{ marginLeft:"5px",fontSize:"9px",color:C.hint,fontFamily:FONT.mono }}>SUN</span>}
-                    </td>
-                    {/* Scheduled time */}
-                    <td style={{ padding:"0 6px",textAlign:"center",borderBottom:`0.5px solid ${C.border}` }}>
-                      {task.time && <span style={{ fontFamily:FONT.mono,fontSize:"10px",color:C.hint }}>{task.time}</span>}
-                    </td>
-                    {/* Day cells */}
-                    {days.map((date, dIdx) => {
-                      const cellKey = `${task.id}|${date}`;
-                      const isFocused = focusedCell === cellKey;
-                      const isToday = date === today;
-                      const entry = log[date]?.[task.id];
-                      const isDone = !!entry?.done;
-                      const isNA = task.sunday && !isSunday(date);
-                      return (
-                        <td key={date}
-                          data-cell={cellKey}
-                          tabIndex={isNA ? -1 : 0}
-                          onFocus={() => setFocusedCell(cellKey)}
-                          onBlur={() => setFocusedCell(prev => prev === cellKey ? null : prev)}
-                          onClick={() => !isNA && toggleCell(task.id, date)}
-                          style={{
-                            height:"34px",textAlign:"center",verticalAlign:"middle",
-                            borderBottom:`0.5px solid ${C.border}`,
-                            background: isFocused ? C.blueBg : isToday ? "#fafcff" : "inherit",
-                            outline: isFocused ? `1.5px solid ${C.blue}` : "none",
-                            outlineOffset:"-1.5px",
-                            cursor: isNA ? "default" : "pointer",
-                            transition:"background 0.1s",
-                          }}>
-                          {renderCell(task, date)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Grid — routine (top) + meds (bottom 25%) */}
+        <div ref={gridRef}
+          style={{ flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"#fff" }}>
+          {/* Routine — top ~75% */}
+          <div style={{ flex:3,minHeight:0,overflowX:"auto",overflowY:"auto" }}>
+            {renderTable(ROUTINE_TASKS, true)}
+          </div>
+          {/* Meds — bottom ~25% */}
+          <div style={{ flex:1,minHeight:0,display:"flex",flexDirection:"column",borderTop:`0.5px solid ${C.borderMid}` }}>
+            <div style={{ flexShrink:0,height:"28px",padding:"0 12px",background:C.bg,borderBottom:`0.5px solid ${C.border}`,display:"flex",alignItems:"center",gap:"7px" }}>
+              <div style={{ width:"7px",height:"7px",borderRadius:"50%",background:C.blueText }}/>
+              <span style={{ fontSize:"10px",fontWeight:"500",textTransform:"uppercase",letterSpacing:"0.5px",color:C.muted }}>Meds</span>
+            </div>
+            <div style={{ flex:1,minHeight:0,overflowX:"auto",overflowY:"auto" }}>
+              {renderTable(MEDS_TASKS, false)}
+            </div>
+          </div>
         </div>
       </div>
     </div>
