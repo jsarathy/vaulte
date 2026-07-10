@@ -36,6 +36,14 @@ function extractFinalText(data) {
   return textBlocks.length ? textBlocks[textBlocks.length - 1].text : "";
 }
 
+// Throws with the real API error message instead of silently returning empty content.
+function assertOk(res, data) {
+  if (!res.ok || data.error) {
+    const msg = data.error?.message || data.error?.type || `API request failed (${res.status})`;
+    throw new Error(msg);
+  }
+}
+
 export async function claudeCreateRecipe(description) {
   const res = await fetch("/api/claude", {
     method:"POST",
@@ -64,9 +72,15 @@ nutrition is PER SERVING. Use accurate nutritional database values. Your final m
     })
   });
   const data = await res.json();
+  assertOk(res, data);
   let raw = extractFinalText(data).trim();
+  if (!raw) throw new Error("Claude returned no text content — check the browser console/network tab for the raw response.");
   if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Response wasn't valid JSON: ${raw.slice(0, 200)}`);
+  }
 }
 
 export async function claudeChat(messages, userRecipes = []) {

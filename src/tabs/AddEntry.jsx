@@ -758,7 +758,7 @@ Use realistic values. For portions use a typical serving size.`;
                         const recipe = await claudeCreateRecipe(builderInput);
                         recipe.id = genId();
                         setBuilderPreview(recipe);
-                      } catch { setBuilderError("Could not parse recipe. Try adding more detail about ingredients and quantities."); }
+                      } catch (err) { setBuilderError(err.message || "Could not parse recipe. Try adding more detail about ingredients and quantities."); }
                       setBuilderLoading(false);
                     }} style={{ background:builderLoading||!builderInput.trim()?"#ccc":"#378ADD", color:"#fff", border:"none", borderRadius:"4px", padding:"9px 18px", cursor:builderLoading||!builderInput.trim()?"not-allowed":"pointer", fontSize:"13px", fontWeight:"bold" }}>
                       {builderLoading?"⏳ Generating…":"Generate Recipe →"}
