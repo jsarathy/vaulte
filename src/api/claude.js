@@ -1,5 +1,37 @@
 // src/api/claude.js — All Claude API helpers
 
+// Grabs the model's final text block — needed because when web_search is used,
+// content[0] may be a tool-use/tool-result block rather than text.
+function extractFinalText(data) {
+  const textBlocks = (data.content || []).filter(b => b.type === "text");
+  return textBlocks.length ? textBlocks[textBlocks.length - 1].text : "";
+}
+
+// res.json() throws a cryptic "Unexpected token" error if the body isn't JSON —
+// which happens when the platform itself fails (timeout, crash) before our
+// serverless function code runs, returning an HTML/plain-text error page instead
+// of a JSON body. This reads the body as text first so we can say what actually happened.
+async function safeJson(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      res.status === 504 || /timed?\s?out/i.test(text)
+        ? "The request timed out — this can happen with web search on a longer lookup. Try a more specific description, or increase maxDuration in vercel.json."
+        : `Server returned a non-JSON response (status ${res.status}): ${text.slice(0, 150) || "empty body"}`
+    );
+  }
+}
+
+// Throws with the real API error message instead of silently returning empty content.
+function assertOk(res, data) {
+  if (!res.ok || data.error) {
+    const msg = data.error?.message || data.error?.type || `API request failed (${res.status})`;
+    throw new Error(msg);
+  }
+}
+
 export async function claudeParseFood(text) {
   const res = await fetch("/api/claude", {
     method:"POST",
@@ -23,25 +55,11 @@ Use accurate nutritional database values. Round to 1 decimal place. Return ONLY 
       messages:[{role:"user", content:text}]
     })
   });
-  const data = await res.json();
-  let raw = data.content?.[0]?.text?.trim() || "";
+  const data = await safeJson(res);
+  assertOk(res, data);
+  let raw = extractFinalText(data).trim();
   if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
   return JSON.parse(raw);
-}
-
-// Grabs the model's final text block — needed because when web_search is used,
-// content[0] may be a tool-use/tool-result block rather than text.
-function extractFinalText(data) {
-  const textBlocks = (data.content || []).filter(b => b.type === "text");
-  return textBlocks.length ? textBlocks[textBlocks.length - 1].text : "";
-}
-
-// Throws with the real API error message instead of silently returning empty content.
-function assertOk(res, data) {
-  if (!res.ok || data.error) {
-    const msg = data.error?.message || data.error?.type || `API request failed (${res.status})`;
-    throw new Error(msg);
-  }
 }
 
 export async function claudeCreateRecipe(description) {
@@ -71,7 +89,7 @@ nutrition is PER SERVING. Use accurate nutritional database values. Your final m
       messages:[{role:"user", content:description}]
     })
   });
-  const data = await res.json();
+  const data = await safeJson(res);
   assertOk(res, data);
   let raw = extractFinalText(data).trim();
   if (!raw) throw new Error("Claude returned no text content — check the browser console/network tab for the raw response.");
@@ -107,6 +125,7 @@ export async function claudeChat(messages, userRecipes = []) {
       messages
     })
   });
-  const data = await res.json();
-  return data.content?.[0]?.text || "";
+  const data = await safeJson(res);
+  assertOk(res, data);
+  return extractFinalText(data);
 }
