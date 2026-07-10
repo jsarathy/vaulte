@@ -32,14 +32,38 @@ function assertOk(res, data) {
   }
 }
 
-export async function claudeParseFood(text) {
+// Forces JSON-only output by prefilling the assistant's turn with the opening
+// bracket ("{" or "[") instead of just instructing "return only JSON" in the
+// system prompt. Without this, Claude sometimes explains its reasoning first
+// (e.g. "Let me calculate...") and the real JSON either never arrives or gets
+// cut off by max_tokens before it's reached. Prefilling removes that option —
+// the continuation has nowhere to go but straight into the JSON body.
+// Not usable when `tools` are set, since Claude needs freedom to call a tool
+// instead of immediately continuing as text.
+async function requestJsonPrefilled(body, prefill) {
   const res = await fetch("/api/claude", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:1000,
-      system:`You are a precise nutrition analysis assistant. The user will describe food they ate.
+      ...body,
+      messages: [...body.messages, { role:"assistant", content: prefill }]
+    })
+  });
+  const data = await safeJson(res);
+  assertOk(res, data);
+  const raw = (prefill + extractFinalText(data)).trim();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Response wasn't valid JSON: ${raw.slice(0, 200)}`);
+  }
+}
+
+export async function claudeParseFood(text) {
+  return requestJsonPrefilled({
+    model:"claude-sonnet-4-6",
+    max_tokens:1000,
+    system:`You are a precise nutrition analysis assistant. The user will describe food they ate.
 Return ONLY a JSON array of food items — no other text, no markdown, no explanation whatsoever.
 Each item must have exactly these fields:
 - name (string): descriptive name including quantity/weight e.g. "Walnuts (30g)"
@@ -52,14 +76,8 @@ Each item must have exactly these fields:
 - net_carbs (number): carbs minus fibre
 - protein (number): protein in grams
 Use accurate nutritional database values. Round to 1 decimal place. Return ONLY valid JSON array.`,
-      messages:[{role:"user", content:text}]
-    })
-  });
-  const data = await safeJson(res);
-  assertOk(res, data);
-  let raw = extractFinalText(data).trim();
-  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
-  return JSON.parse(raw);
+    messages:[{role:"user", content:text}]
+  }, "[");
 }
 
 export async function claudeCreateRecipe(description) {
@@ -102,32 +120,52 @@ nutrition is PER SERVING. Use accurate nutritional database values. Your final m
 }
 
 export async function claudeRecalculateNutrition(recipe) {
-  const res = await fetch("/api/claude", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:500,
-      system:`You are a precise nutrition analysis assistant. The user will give you a recipe's ingredients and serving count, possibly hand-edited. Recalculate the nutrition PER SERVING from scratch based on exactly what's given — don't reuse any nutrition values you might infer were there before.
+  return requestJsonPrefilled({
+    model:"claude-sonnet-4-6",
+    max_tokens:600,
+    system:`You are a precise nutrition analysis assistant. The user will give you a recipe's ingredients and serving count, possibly hand-edited. Recalculate the nutrition PER SERVING from scratch based on exactly what's given — don't reuse any nutrition values you might infer were there before.
 Return ONLY a JSON object with exactly these fields, no markdown, no explanation:
 { "kcal": number, "fat": number, "sat_fat": number, "carbs": number, "sugar": number, "fibre": number, "net_carbs": number, "protein": number }
 Use accurate nutritional database values. Return ONLY valid JSON.`,
-      messages:[{role:"user", content: JSON.stringify({
-        servings: recipe.servings,
-        ingredients: recipe.ingredients
-      })}]
-    })
-  });
-  const data = await safeJson(res);
-  assertOk(res, data);
-  let raw = extractFinalText(data).trim();
-  if (!raw) throw new Error("Claude returned no text content.");
-  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(`Response wasn't valid JSON: ${raw.slice(0, 200)}`);
-  }
+    messages:[{role:"user", content: JSON.stringify({
+      servings: recipe.servings,
+      ingredients: recipe.ingredients
+    })}]
+  }, "{");
+}
+
+export async function claudeRegenerateRecipe(recipe) {
+  return requestJsonPrefilled({
+    model:"claude-sonnet-4-6",
+    max_tokens:2000,
+    system:`You are a recipe and nutrition expert. The user has a recipe draft they've hand-edited — treat their name, servings, ingredients, steps, and notes as the source of truth, not something to second-guess.
+Refine it: rewrite the method steps if needed so they match the current ingredient list (e.g. if an ingredient was added, removed, or its amount changed, update the steps accordingly), and recalculate the nutrition per serving from scratch based on the current ingredients and servings — don't reuse any nutrition values that might already be present.
+Return ONLY a JSON object as your final message — no markdown, no explanation, no text before or after the JSON. The object must have exactly these fields:
+{
+  "name": string,
+  "description": string (one sentence),
+  "source": string,
+  "servings": number,
+  "prep_time": string,
+  "cook_time": string,
+  "ingredients": [ { "amount": string, "item": string } ],
+  "steps": [ string ],
+  "notes": string,
+  "nutrition": { "kcal": number, "fat": number, "sat_fat": number, "carbs": number, "sugar": number, "fibre": number, "net_carbs": number, "protein": number }
+}
+nutrition is PER SERVING. Your final message must contain ONLY the JSON object and nothing else.`,
+    messages:[{role:"user", content: JSON.stringify({
+      name: recipe.name,
+      description: recipe.description,
+      source: recipe.source,
+      servings: recipe.servings,
+      prep_time: recipe.prep_time,
+      cook_time: recipe.cook_time,
+      ingredients: recipe.ingredients,
+      steps: recipe.steps,
+      notes: recipe.notes
+    })}]
+  }, "{");
 }
 
 export async function claudeChat(messages, userRecipes = []) {
