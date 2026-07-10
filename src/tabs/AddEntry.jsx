@@ -745,7 +745,7 @@ Use realistic values. For portions use a typical serving size.`;
               {!builderPreview ? (
                 <>
                   <p style={{ color:"#6b7280", fontSize:"13px", marginBottom:"12px", lineHeight:1.5 }}>
-                    Describe your recipe in natural language — ingredients, quantities, cooking method, how many servings. Claude will generate the full recipe with nutrition per serving.
+                    Describe your recipe — a full ingredient list, or just a dish name if you want Claude to look one up for you. Claude will generate the full recipe with nutrition per serving, which you can then edit before saving.
                   </p>
                   <textarea value={builderInput} onChange={e=>setBuilderInput(e.target.value)}
                     placeholder="e.g. Pinto bean stew — 606g cooked pinto beans, 102g onion, 6 green chillies, 3 tbsp sesame oil, 200g chopped tomatoes, salt and hing. Sauté onion and chillies, add tomatoes, add beans, simmer 15 min. Makes 4 portions of ~225g each."
@@ -768,40 +768,79 @@ Use realistic values. For portions use a typical serving size.`;
               ) : (
                 <>
                   <div style={{ background:"#E8F5E9", border:"1px solid #A5D6A7", borderRadius:"6px", padding:"10px 14px", marginBottom:"14px", fontSize:"13px", color:"#2E7D32" }}>
-                    ✓ Recipe generated — review and save below
+                    ✓ Recipe found — edit anything below, then save
                   </div>
                   <div style={{ marginBottom:"10px" }}>
-                    <div style={{ fontWeight:"bold", fontSize:"16px", color:"#185FA5", marginBottom:"2px" }}>{builderPreview.name}</div>
-                    <div style={{ fontSize:"12px", color:"#6b7280", marginBottom:"8px" }}>{builderPreview.description}</div>
-                    <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"10px" }}>
-                      {builderPreview.servings&&<span style={{ background:"#E6F1FB", color:"#185FA5", borderRadius:"20px", padding:"2px 10px", fontSize:"11px", fontWeight:"bold" }}>🍽 Serves {builderPreview.servings}</span>}
-                      {builderPreview.prep_time&&<span style={{ background:"#E6F1FB", color:"#185FA5", borderRadius:"20px", padding:"2px 10px", fontSize:"11px", fontWeight:"bold" }}>⏱ Prep: {builderPreview.prep_time}</span>}
-                      {builderPreview.cook_time&&<span style={{ background:"#E6F1FB", color:"#185FA5", borderRadius:"20px", padding:"2px 10px", fontSize:"11px", fontWeight:"bold" }}>🍳 Cook: {builderPreview.cook_time}</span>}
+                    <input value={builderPreview.name||""} placeholder="Recipe name"
+                      onChange={e=>setBuilderPreview(p=>({...p,name:e.target.value}))}
+                      style={{ width:"100%", fontWeight:"bold", fontSize:"16px", color:"#185FA5", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"6px 8px", marginBottom:"6px", boxSizing:"border-box" }}/>
+                    <textarea value={builderPreview.description||""} placeholder="One-line description"
+                      onChange={e=>setBuilderPreview(p=>({...p,description:e.target.value}))}
+                      style={{ width:"100%", fontSize:"12px", color:"#6b7280", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"6px 8px", marginBottom:"8px", resize:"vertical", minHeight:"36px", boxSizing:"border-box" }}/>
+                    <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px" }}>
+                      <label style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", color:"#185FA5", fontWeight:"bold" }}>
+                        🍽 Serves
+                        <input type="number" min="1" value={builderPreview.servings??""}
+                          onChange={e=>setBuilderPreview(p=>({...p,servings:Number(e.target.value)||""}))}
+                          style={{ width:"48px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
+                      </label>
+                      <label style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", color:"#185FA5", fontWeight:"bold" }}>
+                        ⏱ Prep
+                        <input value={builderPreview.prep_time||""} placeholder="10 minutes"
+                          onChange={e=>setBuilderPreview(p=>({...p,prep_time:e.target.value}))}
+                          style={{ width:"80px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
+                      </label>
+                      <label style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", color:"#185FA5", fontWeight:"bold" }}>
+                        🍳 Cook
+                        <input value={builderPreview.cook_time||""} placeholder="25 minutes"
+                          onChange={e=>setBuilderPreview(p=>({...p,cook_time:e.target.value}))}
+                          style={{ width:"80px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
+                      </label>
                     </div>
-                    {builderPreview.nutrition && (
-                      <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"12px" }}>
-                        {[["kcal","kcal"],["fat","Fat"],["sat_fat","Sat F"],["carbs","Carbs"],["sugar","Sugar"],["fibre","Fibre"],["net_carbs","Net C"],["protein","Prot"]].map(([k,l]) => (
-                          <div key={k} style={{ textAlign:"center", background:"#E6F1FB", borderRadius:"4px", padding:"4px 2px" }}>
-                            <div style={{ fontWeight:"bold", color:"#185FA5", fontSize:"13px" }}>{builderPreview.nutrition[k]||0}</div>
-                            <div style={{ fontSize:"9px", color:"#6b7280" }}>{l}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Ingredients</div>
-                    <ul style={{ listStyle:"none", padding:0, marginBottom:"10px" }}>
-                      {builderPreview.ingredients?.map((ing,i) => (
-                        <li key={i} style={{ padding:"3px 0", borderBottom:"1px solid #F0F4F8", display:"flex", gap:"10px", fontSize:"12px" }}>
-                          <span style={{ fontWeight:"bold", color:"#185FA5", minWidth:"60px" }}>{ing.amount}</span>
-                          <span>{ing.item}</span>
-                        </li>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"12px" }}>
+                      {[["kcal","kcal"],["fat","Fat"],["sat_fat","Sat F"],["carbs","Carbs"],["sugar","Sugar"],["fibre","Fibre"],["net_carbs","Net C"],["protein","Prot"]].map(([k,l]) => (
+                        <div key={k} style={{ textAlign:"center", background:"#E6F1FB", borderRadius:"4px", padding:"4px 2px" }}>
+                          <input type="number" value={(builderPreview.nutrition||{})[k]??0}
+                            onChange={e=>setBuilderPreview(p=>({...p,nutrition:{...(p.nutrition||{}),[k]:Number(e.target.value)||0}}))}
+                            style={{ width:"100%", textAlign:"center", fontWeight:"bold", color:"#185FA5", fontSize:"13px", border:"none", background:"transparent" }}/>
+                          <div style={{ fontSize:"9px", color:"#6b7280" }}>{l}</div>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+                    <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Ingredients</div>
+                    {(builderPreview.ingredients||[]).map((ing,i) => (
+                      <div key={i} style={{ display:"flex", gap:"6px", alignItems:"center", padding:"3px 0", borderBottom:"1px solid #F0F4F8" }}>
+                        <input value={ing.amount||""} placeholder="amount"
+                          onChange={e=>setBuilderPreview(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?{...x,amount:e.target.value}:x)}))}
+                          style={{ width:"70px", fontWeight:"bold", color:"#185FA5", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"12px" }}/>
+                        <input value={ing.item||""} placeholder="ingredient"
+                          onChange={e=>setBuilderPreview(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?{...x,item:e.target.value}:x)}))}
+                          style={{ flex:1, border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"12px" }}/>
+                        <button onClick={()=>setBuilderPreview(p=>({...p,ingredients:p.ingredients.filter((_,j)=>j!==i)}))}
+                          style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"14px", padding:"0 4px" }}>×</button>
+                      </div>
+                    ))}
+                    <button onClick={()=>setBuilderPreview(p=>({...p,ingredients:[...(p.ingredients||[]),{amount:"",item:""}]}))}
+                      style={{ background:"none", border:"1px dashed #378ADD", color:"#378ADD", borderRadius:"4px", padding:"4px 10px", fontSize:"11px", cursor:"pointer", marginTop:"6px", marginBottom:"14px" }}>+ Add ingredient</button>
+
                     <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Method</div>
-                    <ol style={{ paddingLeft:"20px", marginBottom:"10px" }}>
-                      {builderPreview.steps?.map((s,i) => <li key={i} style={{ fontSize:"12px", padding:"3px 0", lineHeight:1.5 }}>{s}</li>)}
-                    </ol>
-                    {builderPreview.notes && <div style={{ background:"#FFF8E1", borderLeft:"3px solid #F57F17", padding:"8px 12px", borderRadius:"0 4px 4px 0", fontSize:"12px", color:"#5D4037" }}>{builderPreview.notes}</div>}
+                    {(builderPreview.steps||[]).map((s,i) => (
+                      <div key={i} style={{ display:"flex", gap:"6px", alignItems:"flex-start", padding:"3px 0" }}>
+                        <span style={{ fontSize:"11px", color:"#6b7280", padding:"7px 0" }}>{i+1}.</span>
+                        <textarea value={s}
+                          onChange={e=>setBuilderPreview(p=>({...p,steps:p.steps.map((x,j)=>j===i?e.target.value:x)}))}
+                          style={{ flex:1, fontSize:"12px", lineHeight:1.5, border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"5px 7px", resize:"vertical", minHeight:"32px", boxSizing:"border-box" }}/>
+                        <button onClick={()=>setBuilderPreview(p=>({...p,steps:p.steps.filter((_,j)=>j!==i)}))}
+                          style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"14px", padding:"7px 4px" }}>×</button>
+                      </div>
+                    ))}
+                    <button onClick={()=>setBuilderPreview(p=>({...p,steps:[...(p.steps||[]),""]}))}
+                      style={{ background:"none", border:"1px dashed #378ADD", color:"#378ADD", borderRadius:"4px", padding:"4px 10px", fontSize:"11px", cursor:"pointer", marginTop:"6px", marginBottom:"14px" }}>+ Add step</button>
+
+                    <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Notes</div>
+                    <textarea value={builderPreview.notes||""} placeholder="Optional notes"
+                      onChange={e=>setBuilderPreview(p=>({...p,notes:e.target.value}))}
+                      style={{ width:"100%", fontSize:"12px", color:"#5D4037", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"6px 8px", resize:"vertical", minHeight:"40px", boxSizing:"border-box" }}/>
                   </div>
                   <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end", marginTop:"14px", borderTop:"0.5px solid #e5e7eb", paddingTop:"14px" }}>
                     <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Regenerate</button>
