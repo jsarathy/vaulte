@@ -95,7 +95,7 @@ export default function AddEntry({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           max_tokens: 1000,
           messages: [{
             role: "user",
@@ -218,7 +218,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   try {
                     const res = await fetch("/api/claude", {
                       method:"POST", headers:{"Content-Type":"application/json"},
-                      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:10,
+                      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:10,
                         messages:[{role:"user", content:`Is "${name}" a single whole-food ingredient (apple, milk, chicken breast) or a cooked/prepared dish (stew, curry, pasta)? Reply with exactly one word: INGREDIENT or DISH`}] })
                     });
                     const data = await res.json();
@@ -701,7 +701,7 @@ Reply with ONLY a JSON object, no markdown, no explanation:
 Use realistic values. For portions use a typical serving size.`;
                     const res = await fetch("/api/claude", {
                       method:"POST", headers:{"Content-Type":"application/json"},
-                      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:200,
+                      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:200,
                         messages:[{role:"user", content:prompt}] })
                     });
                     const data = await res.json();
@@ -1055,7 +1055,7 @@ Reply with ONLY a JSON object, no markdown:
 {"kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}`;
                           const res = await fetch("/api/claude", {
                             method:"POST", headers:{"Content-Type":"application/json"},
-                            body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:200,
+                            body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:200,
                               messages:[{role:"user", content:prompt}] })
                           });
                           const data = await res.json();

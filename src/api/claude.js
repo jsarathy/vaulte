@@ -37,7 +37,7 @@ export async function claudeParseFood(text) {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
-      model:"claude-sonnet-4-20250514",
+      model:"claude-sonnet-4-6",
       max_tokens:1000,
       system:`You are a precise nutrition analysis assistant. The user will describe food they ate.
 Return ONLY a JSON array of food items — no other text, no markdown, no explanation whatsoever.
@@ -67,7 +67,7 @@ export async function claudeCreateRecipe(description) {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
-      model:"claude-sonnet-4-20250514",
+      model:"claude-sonnet-4-6",
       max_tokens:2000,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
       system:`You are a recipe and nutrition expert. The user will describe a recipe or dish they want.
@@ -119,7 +119,7 @@ export async function claudeChat(messages, userRecipes = []) {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
-      model:"claude-sonnet-4-20250514",
+      model:"claude-sonnet-4-6",
       max_tokens:1000,
       system:`You are a helpful nutrition and health assistant. Answer naturally and conversationally.${recipesContext}`,
       messages
