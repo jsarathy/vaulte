@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
-import { claudeCreateRecipe } from "../api/claude";
+import { claudeCreateRecipe, claudeRecalculateNutrition } from "../api/claude";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import { db } from "../firebase";
@@ -54,6 +54,7 @@ export default function AddEntry({
   const [builderLoading, setBuilderLoading] = useState(false);
   const [builderPreview, setBuilderPreview] = useState(null);
   const [builderError, setBuilderError] = useState("");
+  const [recalcLoading, setRecalcLoading] = useState(false);
   // Unified quantity modal — replaces old ingredientModal
   const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
   const [qtyValue, setQtyValue] = useState("1");
@@ -797,7 +798,7 @@ Use realistic values. For portions use a typical serving size.`;
                           style={{ width:"80px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
                       </label>
                     </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"12px" }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"6px" }}>
                       {[["kcal","kcal"],["fat","Fat"],["sat_fat","Sat F"],["carbs","Carbs"],["sugar","Sugar"],["fibre","Fibre"],["net_carbs","Net C"],["protein","Prot"]].map(([k,l]) => (
                         <div key={k} style={{ textAlign:"center", background:"#E6F1FB", borderRadius:"4px", padding:"4px 2px" }}>
                           <input type="number" value={(builderPreview.nutrition||{})[k]??0}
@@ -806,6 +807,19 @@ Use realistic values. For portions use a typical serving size.`;
                           <div style={{ fontSize:"9px", color:"#6b7280" }}>{l}</div>
                         </div>
                       ))}
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
+                      <button disabled={recalcLoading} onClick={async()=>{
+                        setRecalcLoading(true); setBuilderError("");
+                        try {
+                          const nutrition = await claudeRecalculateNutrition(builderPreview);
+                          setBuilderPreview(p=>({...p, nutrition}));
+                        } catch (err) { setBuilderError(err.message || "Could not recalculate nutrition."); }
+                        setRecalcLoading(false);
+                      }} style={{ background:"none", border:"1px solid #185FA5", color:"#185FA5", borderRadius:"4px", padding:"4px 10px", fontSize:"11px", cursor:recalcLoading?"not-allowed":"pointer" }}>
+                        {recalcLoading ? "⏳ Recalculating…" : "↻ Recalculate nutrition from ingredients above"}
+                      </button>
+                      {builderError && <div style={{ color:"#c62828", fontSize:"12px" }}>{builderError}</div>}
                     </div>
                     <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Ingredients</div>
                     {(builderPreview.ingredients||[]).map((ing,i) => (
@@ -843,7 +857,7 @@ Use realistic values. For portions use a typical serving size.`;
                       style={{ width:"100%", fontSize:"12px", color:"#5D4037", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"6px 8px", resize:"vertical", minHeight:"40px", boxSizing:"border-box" }}/>
                   </div>
                   <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end", marginTop:"14px", borderTop:"0.5px solid #e5e7eb", paddingTop:"14px" }}>
-                    <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Regenerate</button>
+                    <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Start over</button>
                     <button onClick={async()=>{
                       await saveRecipe(userId, builderPreview);
                       setUserRecipes(prev=>[...prev,builderPreview].sort((a,b)=>a.name.localeCompare(b.name)));

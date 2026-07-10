@@ -101,6 +101,35 @@ nutrition is PER SERVING. Use accurate nutritional database values. Your final m
   }
 }
 
+export async function claudeRecalculateNutrition(recipe) {
+  const res = await fetch("/api/claude", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      model:"claude-sonnet-4-6",
+      max_tokens:500,
+      system:`You are a precise nutrition analysis assistant. The user will give you a recipe's ingredients and serving count, possibly hand-edited. Recalculate the nutrition PER SERVING from scratch based on exactly what's given — don't reuse any nutrition values you might infer were there before.
+Return ONLY a JSON object with exactly these fields, no markdown, no explanation:
+{ "kcal": number, "fat": number, "sat_fat": number, "carbs": number, "sugar": number, "fibre": number, "net_carbs": number, "protein": number }
+Use accurate nutritional database values. Return ONLY valid JSON.`,
+      messages:[{role:"user", content: JSON.stringify({
+        servings: recipe.servings,
+        ingredients: recipe.ingredients
+      })}]
+    })
+  });
+  const data = await safeJson(res);
+  assertOk(res, data);
+  let raw = extractFinalText(data).trim();
+  if (!raw) throw new Error("Claude returned no text content.");
+  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Response wasn't valid JSON: ${raw.slice(0, 200)}`);
+  }
+}
+
 export async function claudeChat(messages, userRecipes = []) {
   const recipesContext = userRecipes.length > 0
     ? `\n\nThe user has the following saved recipes available. Use this list to answer any questions about their recipes (ingredients, nutrition, steps, etc.) instead of saying you don't have access to them:\n${JSON.stringify(
