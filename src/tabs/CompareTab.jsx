@@ -6,16 +6,16 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
   const todayStr = new Date().toISOString().split("T")[0];
   const BMR = calcSex==="m" ? 10*calcWeight+6.25*calcHeight-5*calcAge+5 : 10*calcWeight+6.25*calcHeight-5*calcAge-161;
 
-  const inp = { width:"100%", padding:"5px 8px", border:`0.5px solid ${C.borderMid}`, borderRadius:"5px", fontSize:"12px", fontFamily:FONT.sans, outline:"none", background:"#fff", height:"30px" };
-  const lbl = { fontSize:"10px", fontWeight:"500", textTransform:"uppercase", letterSpacing:"0.4px", color:C.hint, marginBottom:"4px", display:"block" };
+  const inp = { width:"100%", padding:"5px 8px", border:`0.5px solid ${C.borderMid}`, borderRadius:"5px", fontSize:"14px", fontFamily:FONT.sans, outline:"none", background:"#fff", height:"34px" };
+  const lbl = { fontSize:"11px", fontWeight:"500", textTransform:"uppercase", letterSpacing:"0.4px", color:C.hint, marginBottom:"4px", display:"block" };
 
   return (
     <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
       {/* Left: day comparison */}
       <div style={{ flex:1, overflowY:"auto", padding:"14px 16px" }}>
         <div style={{ marginBottom:"12px" }}>
-          <div style={{ fontSize:"14px",fontWeight:"500",color:C.text,marginBottom:"2px" }}>Compare days</div>
-          <div style={{ fontSize:"11px",color:C.muted }}>Click a date to swap it out</div>
+          <div style={{ fontSize:"17px",fontWeight:"600",color:C.text,marginBottom:"3px" }}>Compare days</div>
+          <div style={{ fontSize:"13px",color:C.muted }}>Click a date to swap it out</div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(5,minmax(0,1fr))", gap:"7px" }}>
           {compareSlots.map((date,idx)=>{
@@ -25,17 +25,17 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
               <div key={idx} style={{ background:"#fff",border:`0.5px solid ${C.border}`,borderRadius:"8px",overflow:"hidden" }}>
                 <div onClick={()=>{ const nd=prompt("Date (YYYY-MM-DD):",date||todayStr); if(!nd)return; const found=allDays.find(d=>d.date===nd); const ns=[...compareSlots];ns[idx]=nd;const nd2=[...compareData];nd2[idx]=found||null;setCompareSlots(ns);setCompareData(nd2); }}
                   style={{ padding:"7px 8px",cursor:"pointer",background:C.bg,borderBottom:`0.5px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between" }}>
-                  <span style={{ fontSize:"11px",fontWeight:"500",color:C.text }}>{date?formatDateShort(date):"— pick —"}</span>
+                  <span style={{ fontSize:"13px",fontWeight:"500",color:C.text }}>{date?formatDateShort(date):"— pick —"}</span>
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={C.hint} strokeWidth="1.5"><path d="M2 3.5l3 3 3-3"/></svg>
                 </div>
                 <div style={{ padding:"8px 10px" }}>
                   {!data
                     ? <div style={{ textAlign:"center",color:C.border,fontSize:"18px",fontWeight:"500",padding:"8px 0 2px",fontFamily:FONT.mono }}>—</div>
                     : <>
-                        <div style={{ fontFamily:FONT.mono,fontSize:"20px",fontWeight:"500",color:C.text,textAlign:"center",padding:"6px 0 1px",letterSpacing:"-0.5px" }}>{fmt(t.foodKcal)}</div>
-                        <div style={{ fontSize:"10px",color:C.hint,textAlign:"center",marginBottom:"8px" }}>kcal</div>
+                        <div style={{ fontFamily:FONT.mono,fontSize:"23px",fontWeight:"500",color:C.text,textAlign:"center",padding:"6px 0 1px",letterSpacing:"-0.5px" }}>{fmt(t.foodKcal)}</div>
+                        <div style={{ fontSize:"12px",color:C.hint,textAlign:"center",marginBottom:"8px" }}>kcal</div>
                         {[["Fat",t.fat],["Carbs",t.carbs],["Net C",t.net_carbs],["Fibre",t.fibre],["Protein",t.protein],["Sugar",t.sugar]].map(([label,val])=>(
-                          <div key={label} style={{ display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:`0.5px solid ${C.border}`,fontSize:"11px" }}>
+                          <div key={label} style={{ display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`0.5px solid ${C.border}`,fontSize:"13px" }}>
                             <span style={{ color:C.hint }}>{label}</span>
                             <span style={{ fontWeight:"500",color:C.text,fontFamily:FONT.mono }}>{fmt(val)}g</span>
                           </div>
@@ -50,8 +50,8 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
       </div>
 
       {/* Right: Reference Diet Calculator */}
-      <div style={{ width:"260px",flexShrink:0,background:"#fff",borderLeft:`0.5px solid ${C.border}`,overflowY:"auto",padding:"14px" }}>
-        <div style={{ fontSize:"12px",fontWeight:"500",color:C.text,marginBottom:"12px",paddingBottom:"8px",borderBottom:`0.5px solid ${C.border}` }}>Reference calculator</div>
+      <div style={{ width:"290px",flexShrink:0,background:"#fff",borderLeft:`0.5px solid ${C.border}`,overflowY:"auto",padding:"14px" }}>
+        <div style={{ fontSize:"14px",fontWeight:"600",color:C.text,marginBottom:"12px",paddingBottom:"8px",borderBottom:`0.5px solid ${C.border}` }}>Reference calculator</div>
         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px",marginBottom:"8px" }}>
           {[
             ["Sex",<select key="sex" value={calcSex} onChange={e=>setCalcSex(e.target.value)} style={inp}><option value="m">Male</option><option value="f">Female</option></select>],
@@ -73,7 +73,7 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
             <option value="25">25%</option><option value="30">30%</option><option value="35">35%</option><option value="40">40%</option>
           </select>
         </div>
-        <div style={{ textAlign:"center",fontSize:"11px",color:C.muted,marginBottom:"10px" }}>
+        <div style={{ textAlign:"center",fontSize:"13px",color:C.muted,marginBottom:"10px" }}>
           BMR <span style={{ fontFamily:FONT.mono,fontWeight:"500",color:C.text }}>{Math.round(BMR).toLocaleString()}</span> kcal · Mifflin-St Jeor
         </div>
         <div style={{ display:"flex",flexDirection:"column",gap:"5px" }}>
@@ -83,11 +83,11 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
             return (
               <div key={i} style={{ border:`0.5px solid ${i===0?C.blue:C.border}`,borderRadius:"6px",padding:"7px 9px",background:i===0?C.blueBg:"#fff" }}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"2px" }}>
-                  <span style={{ fontSize:"11px",fontWeight:"500",color:i===0?C.blueText:C.text }}>{lvl.label}</span>
-                  <span style={{ fontFamily:FONT.mono,fontSize:"12px",fontWeight:"500",color:i===0?C.blue:C.text }}>{td.toLocaleString()}</span>
+                  <span style={{ fontSize:"13px",fontWeight:"500",color:i===0?C.blueText:C.text }}>{lvl.label}</span>
+                  <span style={{ fontFamily:FONT.mono,fontSize:"14px",fontWeight:"500",color:i===0?C.blue:C.text }}>{td.toLocaleString()}</span>
                 </div>
-                <div style={{ fontSize:"10px",color:C.hint }}>{lvl.desc}</div>
-                <div style={{ fontSize:"10px",color:C.muted,fontFamily:FONT.mono,marginTop:"2px" }}>P:{m.protein_g}g F:{m.fat_g}g C:{m.carbs_g}g</div>
+                <div style={{ fontSize:"12px",color:C.hint }}>{lvl.desc}</div>
+                <div style={{ fontSize:"12px",color:C.muted,fontFamily:FONT.mono,marginTop:"3px" }}>P:{m.protein_g}g F:{m.fat_g}g C:{m.carbs_g}g</div>
               </div>
             );
           })}

@@ -10,7 +10,7 @@ export default function WeightTracker({
   editingPlan, setEditingPlan,
   editCfg, setEditCfg,
   savePlanConfig,
-  renphoSyncing, renphoMsg, syncRenpho,
+  renphoSyncing, renphoMsg, syncRenpho, purgeBefore,
 }) {
   const cfg = weightPlanConfig;
   const proj = weightLog;
@@ -53,6 +53,16 @@ export default function WeightTracker({
     return +(startKg - wkLoss * ((t - t0) / (7 * DAY))).toFixed(2);
   };
 
+  // Sync cutoff: measurements before this are rejected by the sync route and
+  // can be purged from the log. Falls back to the plan start date.
+  const syncFrom = cfg.syncFromDate || cfg.startDate || null;
+  const stalePre = weightLog.filter(r => r.date && syncFrom && r.date < syncFrom).length;
+  const handlePurge = async () => {
+    if (!syncFrom) return;
+    if (!window.confirm(`Delete ${stalePre} record${stalePre!==1?"s":""} dated before ${syncFrom}? This cannot be undone.`)) return;
+    await purgeBefore(syncFrom);
+  };
+
   let milestones = [];
   try { milestones = deriveMilestones(cfg, proj) || []; } catch (e) { milestones = []; }
 
@@ -76,6 +86,13 @@ export default function WeightTracker({
               padding:"4px 10px", fontSize:"11px", fontWeight:"bold", cursor:renphoSyncing?"default":"pointer" }}>
             {renphoSyncing?"Syncing…":"⟳ Sync Renpho"}
           </button>
+          {stalePre > 0 && (
+            <button onClick={handlePurge}
+              style={{ background:"#fff", border:"0.5px solid #c62828", color:"#c62828", borderRadius:"4px",
+                padding:"4px 10px", fontSize:"11px", fontWeight:"bold", cursor:"pointer" }}>
+              🗑 Purge {stalePre} pre-{syncFrom}
+            </button>
+          )}
           {renphoMsg && (
             <span style={{ fontSize:"11px", color:renphoMsg.ok?"#2E7D32":"#c62828" }}>{renphoMsg.text}</span>
           )}
@@ -274,11 +291,16 @@ export default function WeightTracker({
                 <div><span style={lbl}>Reset (wks)</span>{num("resetWeeks",56)}</div>
                 <div><span style={lbl}>Loss (kg/wk)</span>{num("weeklyLossKg",56,0.05)}</div>
                 <div><span style={lbl}>Maint. kcal</span>{num("maintenanceCaloriesKcal",60)}</div>
+                <div style={{ gridColumn:"span 2" }}><span style={lbl}>Sync from (ignore earlier)</span>
+                  <input type="date" value={editCfg.syncFromDate||editCfg.startDate||""}
+                    onChange={e=>setE("syncFromDate",e.target.value)} style={inp({width:"110px"})}/>
+                </div>
               </div>
             ) : (
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"3px 12px", marginBottom:"10px" }}>
                 {[["Phase 1",`${cfg.phase1Weeks} weeks`],["Reset Phase",`${cfg.resetWeeks} weeks`],
-                  ["Weekly Loss",`${cfg.weeklyLossKg} kg/week`],["Maintenance",`${cfg.maintenanceCaloriesKcal.toLocaleString()} kcal`]].map(([k,v])=>(
+                  ["Weekly Loss",`${cfg.weeklyLossKg} kg/week`],["Maintenance",`${cfg.maintenanceCaloriesKcal.toLocaleString()} kcal`],
+                  ["Sync From",syncFrom||"—"]].map(([k,v])=>(
                   <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
                     <span style={{ color:"#6b7280" }}>{k}</span>
                     <span style={{ color:"#185FA5", fontWeight:"600" }}>{v}</span>
@@ -304,30 +326,6 @@ export default function WeightTracker({
               ))}
             </div>
 
-            {/* Plateau Levers */}
-            <div style={{ fontSize:"10px", fontWeight:"bold", color:"#378ADD", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>⚡ Plateau Levers — pull one at a time</div>
-            {editingPlan ? (
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px" }}>
-                <div><span style={lbl}>Lever 1 — Extend PM to (min)</span>{num("lever1PmMin",60)}</div>
-                <div><span style={lbl}>Lever 2 — Drop calories to (kcal)</span>{num("lever2CaloriesKcal",70)}</div>
-              </div>
-            ) : (
-              <div>
-                {[
-                  ["Lever 1",`Extend PM to ${cfg.lever1PmMin} min`,"Easiest — no intensity change needed"],
-                  ["Lever 2",`Drop to ${cfg.lever2CaloriesKcal.toLocaleString()} kcal/day`,"Recalculate at new bodyweight first"],
-                  ["Lever 3","2-week diet break at maintenance","Resets leptin & adaptive thermogenesis"],
-                ].map(([lbl2,action,note])=>(
-                  <div key={lbl2} style={{ padding:"4px 0", borderBottom:"1px solid #F0F4F8" }}>
-                    <div style={{ display:"flex", gap:"6px" }}>
-                      <span style={{ fontWeight:"bold", color:"#185FA5", minWidth:"46px" }}>{lbl2}</span>
-                      <span style={{ color:"#185FA5" }}>{action}</span>
-                    </div>
-                    <div style={{ color:"#6b7280", paddingLeft:"52px", marginTop:"1px" }}>{note}</div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

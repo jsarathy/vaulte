@@ -4,6 +4,7 @@ import { db } from "./firebase";
 import { doc, getDoc, setDoc, getDocs, collection } from "firebase/firestore";
 import { C, FONT, border } from "./constants/design.jsx";
 import { IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
+import { MEDS_TASKS } from "./constants/meds";
 
 // ── Task definitions ──────────────────────────────────────────────────────────
 const ROUTINE_TASKS = [
@@ -16,14 +17,7 @@ const ROUTINE_TASKS = [
   { id:"late_evening", name:"Late-Evening",        time:"22:00" },
 ];
 
-const MEDS_TASKS = [
-  { id:"thyronorm",    name:"Thyronorm",                   time:null    },
-  { id:"esomeprazole", name:"Esomeprazole",                time:"11:45" },
-  { id:"probiotic",    name:"Probiotic / Vits / Aspirin",  time:null    },
-  { id:"pregastar",    name:"Pregastar",                   time:"19:00" },
-  { id:"statin",       name:"Statin / Allergy Med",        time:"21:45" },
-  { id:"vit_d",        name:"Vit D",                       time:null, sunday:true },
-];
+// MEDS_TASKS now lives in constants/meds.js — shared with the Daily log sidebar.
 
 // Combined list — used for keyboard navigation, stats, and shared lookups.
 const TASKS = [...ROUTINE_TASKS, ...MEDS_TASKS];
