@@ -10,14 +10,51 @@ export default function WeightTracker({
   editingPlan, setEditingPlan,
   editCfg, setEditCfg,
   savePlanConfig,
+  renphoSyncing, renphoMsg, syncRenpho,
 }) {
   const cfg = weightPlanConfig;
   const proj = weightLog;
+  const CUM_LOSS_BASELINE_KG = 86.45;
+
+  // Persist one field of one row (date-keyed) and update local state.
+  const saveField = async (i, key, val) => {
+    const row = weightLog[i];
+    if (!row?.date) return;
+    const updatedRow = { ...row, [key]: val };
+    setWeightLog(weightLog.map((r,j) => j===i ? updatedRow : r));
+    try { await setDoc(doc(db,"users",userId,"weight_log",row.date), updatedRow); }
+    catch (e) { console.error("weight row save failed", e); }
+  };
+  const toNum = v => { const t=String(v).trim(); if(t==="") return null; const n=Number(t); return Number.isFinite(n)?n:null; };
   const bmi = (cfg.startWeightKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
   const tBmiLo = (cfg.targetWeightMinKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
   const tBmiHi = (cfg.targetWeightMaxKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
-  const dailyDeficit = Math.round(cfg.weeklyLossKg * 7700 / 7);
-  const milestones = deriveMilestones(cfg, proj);
+  // ── Phase 1 projection, derived from Plan Structure + Start Date ──
+  const DAY = 86400000;
+  const p1Start  = Number.isFinite(Date.parse(cfg.startDate)) ? new Date(Date.parse(cfg.startDate)) : null;
+  const p1Weeks  = Number(cfg.phase1Weeks) || 0;
+  const wkLoss   = Number(cfg.weeklyLossKg) || 0;
+  const startKg  = Number(cfg.startWeightKg);
+  const planOK   = !!p1Start && p1Weeks > 0 && Number.isFinite(startKg);
+  const projSeries = planOK
+    ? Array.from({ length: p1Weeks + 1 }, (_, w) => {
+        const d = new Date(p1Start.getTime() + w * 7 * DAY);
+        return { week:w, t:d.getTime(), date:d.toISOString().split("T")[0],
+                 projected:+(startKg - wkLoss * w).toFixed(2) };
+      })
+    : [];
+  // Interpolated plan weight for any date inside Phase 1; null outside it.
+  const projectedAt = (dateStr) => {
+    if (!planOK) return null;
+    const t = Date.parse(dateStr);
+    if (!Number.isFinite(t)) return null;
+    const t0 = projSeries[0].t, tEnd = projSeries[projSeries.length-1].t;
+    if (t < t0 || t > tEnd) return null;
+    return +(startKg - wkLoss * ((t - t0) / (7 * DAY))).toFixed(2);
+  };
+
+  let milestones = [];
+  try { milestones = deriveMilestones(cfg, proj) || []; } catch (e) { milestones = []; }
 
   const inp = (extra={}) => ({ padding:"3px 6px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"11px", color:"#185FA5", background:"#F7FAFD", ...extra });
   const lbl = { fontSize:"10px", color:"#6b7280", display:"block", marginBottom:"2px" };
@@ -32,49 +69,65 @@ export default function WeightTracker({
 
       {/* ── LEFT: Weekly Log Table (55%) ── */}
       <div style={{ flex:"0 0 55%", minWidth:0 }}>
-        <div style={{ fontSize:"15px", fontWeight:"bold", color:"#185FA5", marginBottom:"10px" }}>⚖️ Weekly Weight Log</div>
+        <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"10px" }}>
+          <div style={{ fontSize:"15px", fontWeight:"bold", color:"#185FA5" }}>⚖️ Weight Log</div>
+          <button onClick={syncRenpho} disabled={renphoSyncing}
+            style={{ background:renphoSyncing?"#9ca3af":"#378ADD", border:"none", color:"#fff", borderRadius:"4px",
+              padding:"4px 10px", fontSize:"11px", fontWeight:"bold", cursor:renphoSyncing?"default":"pointer" }}>
+            {renphoSyncing?"Syncing…":"⟳ Sync Renpho"}
+          </button>
+          {renphoMsg && (
+            <span style={{ fontSize:"11px", color:renphoMsg.ok?"#2E7D32":"#c62828" }}>{renphoMsg.text}</span>
+          )}
+        </div>
         <div style={{ background:"#fff", borderRadius:"8px", border:"0.5px solid #e5e7eb", overflow:"auto", maxHeight:"calc(100vh - 220px)" }}>
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px" }}>
             <thead>
               <tr style={{ background:"#185FA5", color:"#fff", position:"sticky", top:0 }}>
-                {["Wk","Date","Phase","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].map(h => (
-                  <th key={h} style={{ padding:"7px 8px", textAlign:["Wk","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].includes(h)?"right":"left", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
+                {["Wk","Date","Dose","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].map(h => (
+                  <th key={h} style={{ padding:"7px 8px", textAlign:"center", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {weightLog.map((row,i) => {
-                const vsProj = row.actual!=null?(row.actual-row.projected).toFixed(1):null;
-                const cumLoss = row.actual!=null?(cfg.startWeightKg-row.actual).toFixed(1):null;
-                const isReset = row.phase==="RESET";
-                const isP3 = row.phase==="Phase 3 — Resume";
-                const rowBg = isReset?"#FFF8E1":isP3?"#F3F8FF":i%2===0?"#fff":"#F7FAFD";
-                const rowDateParts = row.date.split(" ");
-                const rowDate = rowDateParts.length>=3?new Date(`${rowDateParts[1]} ${rowDateParts[0]}, ${rowDateParts[2]}`):null;
-                const isPast = rowDate?rowDate<=new Date():false;
+                const planProj = projectedAt(row.date);
+                const effProj = row.projected!=null ? row.projected : planProj;
+                const vsProj = (row.actual!=null && effProj!=null)?(row.actual-effProj).toFixed(1):null;
+                const cumLoss = row.actual!=null?(CUM_LOSS_BASELINE_KG-row.actual).toFixed(1):null;
+                const rowBg = i%2===0?"#fff":"#F7FAFD";
+                const rowDate = row.date?new Date(row.date):null;
+                const isPast = (rowDate && !isNaN(rowDate))?rowDate<=new Date():false;
                 const isCurrent = row.actual!=null&&(i===weightLog.length-1||weightLog[i+1]?.actual==null);
                 return (
-                  <tr key={row.week} style={{ background:isCurrent?"#E3F2FD":rowBg }}>
-                    <td style={{ padding:"5px 8px", textAlign:"right", color:"#6b7280", fontSize:"11px" }}>{row.week}</td>
+                  <tr key={row.date||i} style={{ background:isCurrent?"#E3F2FD":rowBg }}>
+                    <td style={{ padding:"5px 8px", textAlign:"right" }}>
+                      <input type="number"
+                        value={row.week??""}
+                        placeholder="—"
+                        onChange={e => saveField(i,"week",toNum(e.target.value))}
+                        style={{ width:"38px", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"11px", textAlign:"right", background:"#fff", color:"#6b7280" }}/>
+                    </td>
                     <td style={{ padding:"5px 8px", color:"#185FA5", whiteSpace:"nowrap", fontWeight:isPast?"600":"normal" }}>{row.date}</td>
                     <td style={{ padding:"5px 8px" }}>
-                      <span style={{ fontSize:"10px", padding:"1px 6px", borderRadius:"10px", fontWeight:"bold",
-                        background:isReset?"#FFF3CD":isP3?"#E3F2FD":"#E8F5E9",
-                        color:isReset?"#795548":isP3?"#185FA5":"#2E7D32" }}>
-                        {isReset?"RESET":isP3?"P3":"P1"}
-                      </span>
+                      <input type="text"
+                        value={row.dose??""}
+                        placeholder="—"
+                        onChange={e => saveField(i,"dose",e.target.value)}
+                        style={{ width:"100%", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px", background:"#fff", color:"#1a2a3a", boxSizing:"border-box" }}/>
                     </td>
-                    <td style={{ padding:"5px 8px", textAlign:"right", color:"#6b7280" }}>{row.projected.toFixed(1)}</td>
+                    <td style={{ padding:"5px 8px", textAlign:"right" }}>
+                      <input type="number" step="0.1"
+                        value={row.projected??""}
+                        placeholder={planProj!=null?planProj.toFixed(1):"—"}
+                        onChange={e => saveField(i,"projected",toNum(e.target.value))}
+                        style={{ width:"60px", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px", textAlign:"right", background:"#fff", color:"#6b7280" }}/>
+                    </td>
                     <td style={{ padding:"5px 8px", textAlign:"right" }}>
                       <input type="number" step="0.1" min="30" max="200"
                         value={row.actual??""}
                         placeholder={isPast?"—":""}
-                        onChange={async e => {
-                          const val = e.target.value===""?null:parseFloat(e.target.value);
-                          const updated = weightLog.map((r,j)=>j===i?{...r,actual:val}:r);
-                          setWeightLog(updated);
-                          await setDoc(doc(db,"users",userId,"weight_log",String(row.week)),{...row,actual:val});
-                        }}
+                        onChange={e => saveField(i,"actual",toNum(e.target.value))}
                         style={{ width:"60px", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px", textAlign:"right",
                           background:row.actual!=null?"#E8F5E9":"#fff", fontWeight:row.actual!=null?"bold":"normal",
                           color:row.actual!=null?"#2E7D32":"#1a2a3a" }}/>
@@ -99,39 +152,58 @@ export default function WeightTracker({
         <div style={{ fontSize:"15px", fontWeight:"bold", color:"#185FA5", marginBottom:"10px" }}>📉 Trajectory</div>
         <div style={{ background:"#fff", borderRadius:"8px", border:"0.5px solid #e5e7eb", padding:"12px", marginBottom:"12px" }}>
           {(()=>{
+            const acts = weightLog.filter(r => r.actual != null && Number.isFinite(Date.parse(r.date)))
+                                  .map(r => ({ t: Date.parse(r.date), v: r.actual, date: r.date }))
+                                  .sort((a,b) => a.t - b.t);
+            if (!planOK && acts.length < 2) {
+              return <div style={{ height:"200px", display:"flex", alignItems:"center", justifyContent:"center", color:"#9ca3af", fontSize:"12px" }}>
+                Set a start date and Phase 1 plan to see the projection
+              </div>;
+            }
+
             const W=380, H=200, PAD={top:12,right:12,bottom:32,left:38};
             const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
-            const allProj=weightLog.map(r=>r.projected);
-            const allActual=weightLog.filter(r=>r.actual!=null).map(r=>r.actual);
-            const minW=Math.min(...allProj,...allActual,cfg.targetWeightMinKg)-1;
-            const maxW=Math.max(...allProj,...allActual)+1;
-            const n=weightLog.length;
-            const xS=i=>PAD.left+(i/(n-1))*cW;
-            const yS=v=>PAD.top+cH-((v-minW)/(maxW-minW))*cH;
-            const resetStart=weightLog.findIndex(r=>r.phase==="RESET");
-            const p3Start=weightLog.findIndex(r=>r.phase==="Phase 3 — Resume");
-            const projPath=weightLog.map((r,i)=>`${i===0?"M":"L"}${xS(i).toFixed(1)},${yS(r.projected).toFixed(1)}`).join(" ");
-            const actualPts=weightLog.reduce((acc,r,i)=>r.actual!=null?[...acc,[i,r.actual]]:acc,[]);
-            const actualPath=actualPts.map(([i,v],j)=>`${j===0?"M":"L"}${xS(i).toFixed(1)},${yS(v).toFixed(1)}`).join(" ");
-            const tZoneY1=yS(cfg.targetWeightMaxKg), tZoneY2=yS(cfg.targetWeightMinKg);
-            const yTicks=[]; for(let w=Math.ceil(minW);w<=Math.floor(maxW);w+=2) yTicks.push(w);
-            const months=[];
-            weightLog.forEach((r,i)=>{ const p=r.date.split(" "); if(p[0]==="01"||p[0]==="09") months.push({i,label:p[1]?.slice(0,3)||""}); });
+
+            const tMin = Math.min(...[...projSeries.map(p=>p.t), ...acts.map(a=>a.t)]);
+            const tMax = Math.max(...[...projSeries.map(p=>p.t), ...acts.map(a=>a.t)]);
+            const span = tMax - tMin || 1;
+
+            const vals = [...projSeries.map(p=>p.projected), ...acts.map(a=>a.v)];
+            let minW = Math.min(...vals) - 1, maxW = Math.max(...vals) + 1;
+            if (Number.isFinite(cfg.targetWeightMinKg)) minW = Math.min(minW, cfg.targetWeightMinKg - 1);
+            if (maxW - minW < 2) { minW -= 1; maxW += 1; }
+
+            const xS = t => PAD.left + ((t - tMin) / span) * cW;
+            const yS = v => PAD.top + cH - ((v - minW) / (maxW - minW)) * cH;
+
+            const projPath = projSeries.map((p,i)=>`${i===0?"M":"L"}${xS(p.t).toFixed(1)},${yS(p.projected).toFixed(1)}`).join(" ");
+            const actPath  = acts.map((a,i)=>`${i===0?"M":"L"}${xS(a.t).toFixed(1)},${yS(a.v).toFixed(1)}`).join(" ");
+
+            const tzHi = Number.isFinite(cfg.targetWeightMaxKg) ? yS(cfg.targetWeightMaxKg) : null;
+            const tzLo = Number.isFinite(cfg.targetWeightMinKg) ? yS(cfg.targetWeightMinKg) : null;
+
+            const yTicks=[]; const stepY = (maxW-minW)>12?2:1;
+            for(let w=Math.ceil(minW); w<=Math.floor(maxW); w+=stepY) yTicks.push(w);
+
+            const fmt = t => new Date(t).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
+            const xTicks = projSeries.filter((_,i)=> i % Math.max(1, Math.ceil(projSeries.length/5)) === 0);
+
             return (
               <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:"block"}}>
-                {resetStart>0&&p3Start>resetStart&&<rect x={xS(resetStart)} y={PAD.top} width={xS(p3Start)-xS(resetStart)} height={cH} fill="#FFF8E1" opacity="0.7"/>}
-                {p3Start>0&&<rect x={xS(p3Start)} y={PAD.top} width={xS(n-1)-xS(p3Start)} height={cH} fill="#EBF3FB" opacity="0.5"/>}
-                <rect x={PAD.left} y={tZoneY1} width={cW} height={tZoneY2-tZoneY1} fill="#C8E6C9" opacity="0.4"/>
-                <text x={PAD.left+3} y={tZoneY1-2} fontSize="8" fill="#2E7D32">Target {cfg.targetWeightMinKg}–{cfg.targetWeightMaxKg} kg</text>
+                {tzHi!=null && tzLo!=null &&
+                  <rect x={PAD.left} y={tzHi} width={cW} height={Math.max(0,tzLo-tzHi)} fill="#C8E6C9" opacity="0.4"/>}
+                {tzHi!=null &&
+                  <text x={PAD.left+3} y={tzHi-2} fontSize="8" fill="#2E7D32">Target {cfg.targetWeightMinKg}–{cfg.targetWeightMaxKg} kg</text>}
+
                 {yTicks.map(w=><line key={w} x1={PAD.left} x2={PAD.left+cW} y1={yS(w)} y2={yS(w)} stroke="#e5e7eb" strokeWidth="0.5"/>)}
-                {yTicks.map(w=><text key={w} x={PAD.left-4} y={yS(w)+3} fontSize="8" fill="#6b7280" textAnchor="end">{w}</text>)}
-                {months.map(({i,label})=><text key={i} x={xS(i)} y={H-PAD.bottom+12} fontSize="8" fill="#6b7280" textAnchor="middle">{label}</text>)}
-                <path d={projPath} fill="none" stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>
-                {actualPath&&<path d={actualPath} fill="none" stroke="#378ADD" strokeWidth="2.5"/>}
-                {actualPts.map(([i,v])=><circle key={i} cx={xS(i)} cy={yS(v)} r="3" fill="#378ADD" stroke="#fff" strokeWidth="1"/>)}
-                <text x={xS(2)} y={PAD.top+10} fontSize="8" fill="#2E7D32" fontWeight="bold">P1</text>
-                {resetStart>0&&<text x={xS(resetStart+0.3)} y={PAD.top+10} fontSize="8" fill="#795548" fontWeight="bold">RST</text>}
-                {p3Start>0&&<text x={xS(p3Start+0.5)} y={PAD.top+10} fontSize="8" fill="#185FA5" fontWeight="bold">P3</text>}
+                {yTicks.map(w=><text key={"y"+w} x={PAD.left-4} y={yS(w)+3} fontSize="8" fill="#6b7280" textAnchor="end">{w}</text>)}
+                {xTicks.map(p=><text key={"x"+p.t} x={xS(p.t)} y={H-PAD.bottom+12} fontSize="8" fill="#6b7280" textAnchor="middle">{fmt(p.t)}</text>)}
+
+                {projPath && <path d={projPath} fill="none" stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>}
+                {actPath && <path d={actPath} fill="none" stroke="#378ADD" strokeWidth="2.5"/>}
+                {acts.map(a=><circle key={a.date} cx={xS(a.t)} cy={yS(a.v)} r="3" fill="#378ADD" stroke="#fff" strokeWidth="1"/>)}
+
+                {planOK && <text x={xS(projSeries[0].t)+2} y={PAD.top+9} fontSize="8" fill="#2E7D32" fontWeight="bold">Phase 1</text>}
                 <line x1={W-90} y1={H-8} x2={W-75} y2={H-8} stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/>
                 <text x={W-72} y={H-5} fontSize="8" fill="#6b7280">Projected</text>
                 <line x1={W-32} y1={H-8} x2={W-17} y2={H-8} stroke="#378ADD" strokeWidth="2.5"/>
@@ -189,53 +261,6 @@ export default function WeightTracker({
                   <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
                     <span style={{ color:"#6b7280" }}>{k}</span>
                     <span style={{ color:"#185FA5", fontWeight:"600" }}>{v}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Daily Exercise Plan */}
-            <div style={{ fontSize:"10px", fontWeight:"bold", color:"#378ADD", textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"6px" }}>🚴 Daily Exercise Plan</div>
-            {editingPlan ? (
-              <div style={{ marginBottom:"10px" }}>
-                <div style={{ marginBottom:"6px" }}>
-                  <span style={{ ...lbl, fontWeight:"bold", color:"#185FA5" }}>🌅 AM Session</span>
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"6px" }}>
-                    <div><span style={lbl}>Dur (min)</span>{num("amDurationMin",46)}</div>
-                    <div><span style={lbl}>HR Low</span>{num("amHRMin",46)}</div>
-                    <div><span style={lbl}>HR High</span>{num("amHRMax",46)}</div>
-                    <div><span style={lbl}>kcal Min</span>{num("amKcalMin",46)}</div>
-                    <div><span style={lbl}>kcal Max</span>{num("amKcalMax",46)}</div>
-                  </div>
-                </div>
-                <div style={{ marginBottom:"6px" }}>
-                  <span style={{ ...lbl, fontWeight:"bold", color:"#185FA5" }}>🌆 PM Session</span>
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"6px" }}>
-                    <div><span style={lbl}>Dur (min)</span>{num("pmDurationMin",46)}</div>
-                    <div><span style={lbl}>HR Low</span>{num("pmHRMin",46)}</div>
-                    <div><span style={lbl}>HR High</span>{num("pmHRMax",46)}</div>
-                    <div><span style={lbl}>kcal Min</span>{num("pmKcalMin",46)}</div>
-                    <div><span style={lbl}>kcal Max</span>{num("pmKcalMax",46)}</div>
-                  </div>
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"6px" }}>
-                  <div><span style={lbl}>Daily kcal</span>{num("dailyCaloriesKcal",56)}</div>
-                  <div><span style={lbl}>Protein Min g</span>{num("proteinMinG",56)}</div>
-                  <div><span style={lbl}>Protein Max g</span>{num("proteinMaxG",56)}</div>
-                  <div><span style={lbl}>Active days/wk</span>{num("activeDaysPerWeek",56,0.5)}</div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ marginBottom:"10px" }}>
-                {[
-                  ["🌅 AM Cycling",`${cfg.amDurationMin} min · HR ${cfg.amHRMin}–${cfg.amHRMax} bpm · ~${cfg.amKcalMin}–${cfg.amKcalMax} kcal`],
-                  ["🌆 PM Cycling",`${cfg.pmDurationMin} min · HR ${cfg.pmHRMin}–${cfg.pmHRMax} bpm · ~${cfg.pmKcalMin}–${cfg.pmKcalMax} kcal`],
-                  ["🍽 Calories",`${cfg.dailyCaloriesKcal.toLocaleString()} kcal/day · Protein ${cfg.proteinMinG}–${cfg.proteinMaxG} g`],
-                  ["📅 Active Days",`${cfg.activeDaysPerWeek} days/week · ~${dailyDeficit} kcal/day deficit`],
-                ].map(([k,v])=>(
-                  <div key={k} style={{ display:"flex", gap:"6px", padding:"3px 0", borderBottom:"1px solid #F0F4F8" }}>
-                    <span style={{ color:"#185FA5", fontWeight:"600", whiteSpace:"nowrap", minWidth:"88px" }}>{k}</span>
-                    <span style={{ color:"#6b7280" }}>{v}</span>
                   </div>
                 ))}
               </div>

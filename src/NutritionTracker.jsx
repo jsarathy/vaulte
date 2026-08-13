@@ -1,7 +1,7 @@
 // src/NutritionTracker.jsx
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
@@ -14,6 +14,54 @@ import LogTab        from "./tabs/LogTab";
 import CompareTab    from "./tabs/CompareTab";
 import AddEntry      from "./tabs/AddEntry";
 import WeightTracker from "./tabs/WeightTracker";
+
+// ── Weight Entry Modal ───────────────────────────────────────────────────────
+function WeightEntryModal({ entry, setEntry, onSave, onDelete }) {
+  if (!entry) return null;
+  const F = (label, key, placeholder) => (
+    <div style={{ marginBottom:"12px" }}>
+      <div style={{ fontSize:"11px", color:C.hint, marginBottom:"4px" }}>{label}</div>
+      <input value={entry[key]} placeholder={placeholder}
+        onChange={e => setEntry(p => ({ ...p, [key]: e.target.value }))}
+        style={{ width:"100%", padding:"7px 9px", fontSize:"13px", fontFamily:FONT.mono,
+          border:`0.5px solid ${C.border}`, borderRadius:"5px", background:C.surface, color:C.text, boxSizing:"border-box" }} />
+    </div>
+  );
+  return (
+    <div onClick={() => setEntry(null)}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:2000 }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background:C.bg, border:`0.5px solid ${C.border}`, borderRadius:"8px", padding:"18px 20px", width:"340px", fontFamily:FONT.sans }}>
+        <div style={{ fontSize:"14px", fontWeight:600, color:C.text, marginBottom:"14px" }}>{entry.existing?"Edit Weight Entry":"New Weight Entry"}</div>
+
+        <div style={{ marginBottom:"12px" }}>
+          <div style={{ fontSize:"11px", color:C.hint, marginBottom:"4px" }}>Date</div>
+          <div style={{ padding:"7px 9px", fontSize:"13px", fontFamily:FONT.mono, background:C.surface,
+            border:`0.5px solid ${C.border}`, borderRadius:"5px", color:C.muted }}>{entry.date}</div>
+        </div>
+
+        {F("Week", "week", "e.g. 1")}
+        {F("Dose", "dose", "free text")}
+        {F("Projected (kg)", "projected", "e.g. 84.0")}
+        {F("Actual (kg)", "actual", "e.g. 83.4")}
+
+        <div style={{ display:"flex", gap:"8px", marginTop:"16px" }}>
+          <button onClick={onSave}
+            style={{ flex:1, padding:"8px", fontSize:"12px", fontWeight:600, border:"none", borderRadius:"5px",
+              background:C.blue, color:"#fff", cursor:"pointer", fontFamily:FONT.sans }}>Save</button>
+          <button onClick={() => setEntry(null)}
+            style={{ flex:1, padding:"8px", fontSize:"12px", border:`0.5px solid ${C.border}`, borderRadius:"5px",
+              background:C.surface, color:C.text, cursor:"pointer", fontFamily:FONT.sans }}>Cancel</button>
+          {entry.existing && (
+            <button onClick={onDelete}
+              style={{ padding:"8px 10px", fontSize:"12px", border:`0.5px solid ${C.border}`, borderRadius:"5px",
+                background:C.surface, color:"#c0392b", cursor:"pointer", fontFamily:FONT.sans }}>Delete</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Calendar Sidebar ─────────────────────────────────────────────────────────
 function CalendarSidebar({ allDays, currentDate, calYear, calMonth, setCalYear, setCalMonth, switchDay }) {
@@ -222,6 +270,8 @@ export default function NutritionTracker({ userId }) {
   const [polarSyncMsg,setPolarSyncMsg]=useState(null);const [polarLogModal,setPolarLogModal]=useState(null);
   const [weightLog,setWeightLog]=useState([]);const [weightPlanConfig,setWeightPlanConfig]=useState(DEFAULT_PLAN_CONFIG);
   const [editingPlan,setEditingPlan]=useState(false);const [editCfg,setEditCfg]=useState(DEFAULT_PLAN_CONFIG);
+  const [weightEntry,setWeightEntry]=useState(null);
+  const [renphoSyncing,setRenphoSyncing]=useState(false);const [renphoMsg,setRenphoMsg]=useState(null);
   const [chatMessages,setChatMessages]=useState([]);const [chatInput,setChatInput]=useState("");
   const [chatMealId,setChatMealId]=useState("__chat__");const [chatDate,setChatDate]=useState(()=>new Date().toISOString().split("T")[0]);
   const [chatLoading,setChatLoading]=useState(false);const [justChatHistory,setJustChatHistory]=useState([]);const [chatOpen,setChatOpen]=useState(false);
@@ -241,10 +291,10 @@ export default function NutritionTracker({ userId }) {
         const cfgDoc=await getDoc(doc(db,"users",userId,"weight_plan","settings"));
         const cfg=cfgDoc.exists()?{...DEFAULT_PLAN_CONFIG,...cfgDoc.data()}:DEFAULT_PLAN_CONFIG;
         setWeightPlanConfig(cfg);setEditCfg(cfg);
-        const proj=generateWeightProjection(cfg);
+        // Table is built ONLY from real measurements in weight_log. No projection scaffold.
         const wSnap=await getDocs(collection(db,"users",userId,"weight_log"));
-        if(wSnap.empty){const seed=proj.map(r=>({...r,actual:r.week===1?cfg.startWeightKg:null}));await setDoc(doc(db,"users",userId,"weight_log","1"),seed[0]);setWeightLog(seed);}
-        else{const actuals={};wSnap.docs.forEach(d=>{const data=d.data();if(data.actual!=null)actuals[d.id]=data.actual;});setWeightLog(proj.map(r=>({...r,actual:actuals[String(r.week)]??null})));}
+        const rows=wSnap.docs.map(d=>({date:d.id,...d.data()})).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+        setWeightLog(rows);
         try{const chatDoc=await getDoc(doc(db,"users",userId,"claude_chat","conversation"));if(chatDoc.exists()){const{history}=chatDoc.data();if(Array.isArray(history)&&history.length>0){setJustChatHistory(history);setChatMessages(history.map(h=>({id:genId(),type:h.role==="user"?"user":"claude",text:h.content})));}}}catch(e){}
         const polarDoc=await getDoc(doc(db,"users",userId,"polar","connection"));if(polarDoc.exists()){const pd=polarDoc.data();setPolarConnected(pd.connected||false);setPolarLastSync(pd.last_sync_at||null);}
         const polarSnap=await getDocs(collection(db,"users",userId,"polar_sessions"));
@@ -264,7 +314,41 @@ export default function NutritionTracker({ userId }) {
   const switchDay=async(date)=>{setCurrentDate(date);let data=allDays.find(d=>d.date===date)||null;if(!data)data=await loadDay(userId,date);setCurrentDayData(ensureMealSlots(data));setChatDate(date);setChatMealId("__chat__");};
   const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));setCurrentDayData(dayData);};
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
-  const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}const proj=generateWeightProjection(cfg);const actuals={};weightLog.forEach(r=>{if(r.actual!=null)actuals[r.week]=r.actual;});setWeightLog(proj.map(r=>({...r,actual:actuals[r.week]??null})));};
+  const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}};
+  const openWeightEntry=(date)=>{const ex=weightLog.find(r=>r.date===date)||{};setWeightEntry({date,week:ex.week??"",dose:ex.dose??"",projected:ex.projected??"",actual:ex.actual??"",existing:!!ex.date});};
+  const onCalendarClick=(date)=>{if(activeTab==="weight")openWeightEntry(date);else switchDay(date);};
+  const num=(v)=>{const t=String(v).trim();if(t==="")return null;const n=Number(t);return Number.isFinite(n)?n:null;};
+  const saveWeightEntry=async()=>{if(!weightEntry||!userId)return;const{date,week,dose,projected,actual}=weightEntry;
+    const row={date,week:num(week),dose:String(dose).trim(),projected:num(projected),actual:num(actual)};
+    try{await setDoc(doc(db,"users",userId,"weight_log",date),row);}catch(e){console.error("weight save failed",e);return;}
+    setWeightLog(prev=>[...prev.filter(r=>r.date!==date),row].sort((a,b)=>(a.date||"").localeCompare(b.date||"")));
+    setWeightEntry(null);};
+  const deleteWeightEntry=async()=>{if(!weightEntry||!userId)return;const{date}=weightEntry;
+    try{await deleteDoc(doc(db,"users",userId,"weight_log",date));}catch(e){console.error("weight delete failed",e);return;}
+    setWeightLog(prev=>prev.filter(r=>r.date!==date));setWeightEntry(null);};
+  const syncRenpho=async()=>{
+    if(renphoSyncing||!userId)return;
+    setRenphoSyncing(true);setRenphoMsg(null);
+    try{
+      const res=await fetch("/api/renpho-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId})});
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Sync failed");
+      const recs=data.records||[];
+      if(recs.length===0){setRenphoMsg({ok:true,text:data.warning||"No measurements found."});}
+      else{
+        const existing=new Map(weightLog.map(r=>[r.date,r]));
+        // Sync wins on `actual`; manual week/dose/projected are preserved.
+        const merged=recs.map(rec=>({...(existing.get(rec.date)||{}),date:rec.date,actual:rec.weight}));
+        await Promise.all(merged.map(row=>setDoc(doc(db,"users",userId,"weight_log",row.date),row)));
+        const next=new Map(weightLog.map(r=>[r.date,r]));
+        merged.forEach(row=>next.set(row.date,row));
+        setWeightLog([...next.values()].sort((a,b)=>(a.date||"").localeCompare(b.date||"")));
+        setRenphoMsg({ok:true,text:`Synced ${merged.length} measurement${merged.length!==1?"s":""}.`});
+      }
+    }catch(err){setRenphoMsg({ok:false,text:err.message});}
+    setRenphoSyncing(false);
+    setTimeout(()=>setRenphoMsg(null),6000);
+  };
   const persistChatHistory=async(history)=>{if(!userId)return;try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history,updatedAt:new Date().toISOString()});}catch(e){}};
   const clearChat=async()=>{setJustChatHistory([]);setChatMessages([]);if(userId)try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history:[],updatedAt:new Date().toISOString()});}catch(e){}};
   const sendChat=async()=>{const text=chatInput.trim();if(!text||chatLoading)return;setChatInput("");setChatLoading(true);const userMsg={id:genId(),type:"user",text};const thinkMsg={id:genId(),type:"claude",text:"…"};setChatMessages(prev=>[...prev,userMsg,thinkMsg]);try{if(chatMealId==="__chat__"){const newHistory=[...justChatHistory,{role:"user",content:text}];const reply=await claudeChat(newHistory.slice(-CHAT_CONTEXT_LIMIT),userRecipes);const updatedHistory=[...newHistory,{role:"assistant",content:reply}].slice(-CHAT_CONTEXT_LIMIT);setJustChatHistory(updatedHistory);await persistChatHistory(updatedHistory);setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,text:reply}:m));}else{const items=await claudeParseFood(text);const mealName=(allDays.find(d=>d.date===chatDate)||currentDayData)?.meals?.find(m=>m.id===chatMealId)?.name||"Meal";setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,type:"preview",items,mealId:chatMealId,mealName,confirmed:false}:m));}}catch(err){setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,type:"error",text:err.message}:m));}setChatLoading(false);};
@@ -299,7 +383,7 @@ export default function NutritionTracker({ userId }) {
         {/* Sidebar */}
         <div style={{ width:"190px",flexShrink:0,background:C.surface,borderRight:`0.5px solid ${C.border}`,display:"flex",flexDirection:"column",overflow:"hidden" }}>
           <div style={{ flex:1,overflowY:"auto" }}>
-            <CalendarSidebar allDays={allDays} currentDate={currentDate} calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} switchDay={switchDay}/>
+            <CalendarSidebar allDays={allDays} currentDate={currentDate} calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} switchDay={onCalendarClick}/>
           </div>
           {allDays.length>0&&(()=>{
             const last7=allDays.slice(0,7);
@@ -323,8 +407,10 @@ export default function NutritionTracker({ userId }) {
           {activeTab==="log"&&<div style={{ flex:1,overflowY:"auto",padding:"14px 16px",background:C.bg }}><LogTab userId={userId} currentDate={currentDate} currentDayData={currentDayData} allDays={allDays} switchDay={switchDay} userRecipes={userRecipes} setRecipeModal={setRecipeModal} deleteItem={deleteItem} calcSex={calcSex} calcAge={calcAge} calcHeight={calcHeight} calcWeight={calcWeight} calcProtein={calcProtein} calcFatPct={calcFatPct}/></div>}
           {activeTab==="compare"&&<CompareTab compareSlots={compareSlots} setCompareSlots={setCompareSlots} compareData={compareData} setCompareData={setCompareData} allDays={allDays} calcSex={calcSex} calcAge={calcAge} calcHeight={calcHeight} calcWeight={calcWeight} setCalcSex={setCalcSex} setCalcAge={setCalcAge} setCalcHeight={setCalcHeight} setCalcWeight={setCalcWeight} calcProtein={calcProtein} setCalcProtein={setCalcProtein} calcFatPct={calcFatPct} setCalcFatPct={setCalcFatPct}/>}
           {activeTab==="add"&&<AddEntry userId={userId} allDays={allDays} currentDate={currentDate} currentDayData={currentDayData} setCurrentDayData={setCurrentDayData} userRecipes={userRecipes} setUserRecipes={setUserRecipes} addDate={addDate} setAddDate={setAddDate} addMealId={addMealId} setAddMealId={setAddMealId} addMealName={addMealName} setAddMealName={setAddMealName} addItem={addItem} setAddItem={setAddItem} addMsg={addMsg} setAddMsg={setAddMsg} polarConnected={polarConnected} polarSessions={polarSessions} setPolarSessions={setPolarSessions} polarSyncing={polarSyncing} polarLastSync={polarLastSync} polarSyncMsg={polarSyncMsg} syncPolar={syncPolar} setPolarLogModal={setPolarLogModal} persistDay={persistDay} setRecipeModal={setRecipeModal}/>}
-          {activeTab==="weight"&&<WeightTracker userId={userId} weightLog={weightLog} setWeightLog={setWeightLog} weightPlanConfig={weightPlanConfig} setWeightPlanConfig={setWeightPlanConfig} editingPlan={editingPlan} setEditingPlan={setEditingPlan} editCfg={editCfg} setEditCfg={setEditCfg} savePlanConfig={savePlanConfig}/>}
+          {activeTab==="weight"&&<WeightTracker userId={userId} weightLog={weightLog} setWeightLog={setWeightLog} renphoSyncing={renphoSyncing} renphoMsg={renphoMsg} syncRenpho={syncRenpho} weightPlanConfig={weightPlanConfig} setWeightPlanConfig={setWeightPlanConfig} editingPlan={editingPlan} setEditingPlan={setEditingPlan} editCfg={editCfg} setEditCfg={setEditCfg} savePlanConfig={savePlanConfig}/>}
         </div>
+
+        <WeightEntryModal entry={weightEntry} setEntry={setWeightEntry} onSave={saveWeightEntry} onDelete={deleteWeightEntry}/>
 
         <ChatPopup chatOpen={chatOpen} setChatOpen={setChatOpen} chatMessages={chatMessages} setChatMessages={setChatMessages} chatInput={chatInput} setChatInput={setChatInput} chatMealId={chatMealId} setChatMealId={setChatMealId} chatDate={chatDate} setChatDate={setChatDate} chatLoading={chatLoading} justChatHistory={justChatHistory} CHAT_CONTEXT_LIMIT={CHAT_CONTEXT_LIMIT} clearChat={clearChat} sendChat={sendChat} confirmLog={confirmLog} allDays={allDays} currentDayData={currentDayData}/>
       </div>
