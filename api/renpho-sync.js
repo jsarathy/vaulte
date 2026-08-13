@@ -132,6 +132,12 @@ function toISODate(ts) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
+  // Hard cutoff: measurements dated before this are rejected outright, so stale
+  // readings already sitting in the Renpho cloud can never re-enter the log.
+  const fromDate = typeof req.body?.fromDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.fromDate)
+    ? req.body.fromDate
+    : null;
+
   const email = process.env.RENPHO_EMAIL;
   const password = process.env.RENPHO_PASSWORD;
   if (!email || !password) {
@@ -168,10 +174,12 @@ export default async function handler(req, res) {
 
     // Weight only, for now. One record per calendar day: latest reading wins.
     const byDate = new Map();
+    let rejected = 0;
     for (const m of raw) {
       const date = toISODate(m.timeStamp ?? m.timestamp ?? m.created_at);
       const weight = Number(m.weight);
       if (!date || !Number.isFinite(weight) || weight <= 0) continue;
+      if (fromDate && date < fromDate) { rejected++; continue; }
       const ts = Number(m.timeStamp ?? m.timestamp ?? 0);
       const prev = byDate.get(date);
       if (!prev || ts >= prev.ts) byDate.set(date, { date, weight: +weight.toFixed(2), ts });
@@ -181,7 +189,7 @@ export default async function handler(req, res) {
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(({ date, weight }) => ({ date, weight }));
 
-    return res.status(200).json({ records, count: records.length, rawCount: raw.length });
+    return res.status(200).json({ records, count: records.length, rawCount: raw.length, rejected, fromDate });
   } catch (err) {
     console.error("renpho-sync error:", err);
     return res.status(502).json({ error: err.message || "Renpho sync failed" });

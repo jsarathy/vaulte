@@ -61,6 +61,34 @@ export default function AddEntry({
   const [qtyUnit, setQtyUnit] = useState("portion");
   const [qtyLoading, setQtyLoading] = useState(false);
   const [qtyError, setQtyError] = useState("");
+  // ── Saved-recipe matching ──────────────────────────────────────────────────
+  // Normalised exact match only: lowercase, trim, collapse internal whitespace.
+  // Substring matching is deliberately NOT used here — "chicken curry" must not
+  // silently resolve to "Thai Chicken Curry" and attach the wrong macros.
+  // Partial names are served by the dropdown, where the user picks explicitly.
+  const normName = (v) => String(v ?? "").toLowerCase().trim().replace(/\s+/g, " ");
+  const hasUsableMacros = (r) => {
+    const n = r?.nutrition;
+    if (!n) return false;
+    return ["kcal","protein","fat","carbs"].some(k => Number(n[k]) > 0);
+  };
+  // Returns a saved recipe only if it matches exactly AND carries real macros;
+  // a macro-less recipe falls through so generation can still fill the gap.
+  const findSavedRecipe = (name) => {
+    const q = normName(name);
+    if (!q) return null;
+    const hit = userRecipes.find(r => normName(r.name) === q);
+    return hit && hasUsableMacros(hit) ? hit : null;
+  };
+  const openPortionModal = (recipe) => {
+    setShowDropdown(false);
+    setRecipePortionModal({ recipe });
+    setRecipePortionQty("1");
+    setRecipePortionUnit("portion");
+    setRecipePortionScaled(null);
+    setRecipePortionError("");
+  };
+
   // Recipe portion modal — lets user scale macros before adding a saved recipe
   const [recipePortionModal, setRecipePortionModal] = useState(null); // { recipe }
   const [recipePortionQty, setRecipePortionQty] = useState("1");
@@ -200,8 +228,8 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 const val = e.target.value;
                 setAddItem({...addItem, name:val});
                 if (val.length > 1) {
-                  const q = val.toLowerCase();
-                  const matches = userRecipes.filter(r=>r.name.toLowerCase().includes(q));
+                  const q = normName(val);
+                  const matches = userRecipes.filter(r=>normName(r.name).includes(q));
                   setNameDropdown(matches);
                   setShowDropdown(matches.length > 0);
                 } else setShowDropdown(false);
@@ -215,6 +243,9 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   // If already has nutrition (filled from recipe dropdown), skip
                   const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
                   if (hasNutrition) return;
+                  // Already saved? Use it — no classification call, no recipe builder.
+                  const saved = findSavedRecipe(name);
+                  if (saved) { openPortionModal(saved); return; }
                   // Classify: ingredient → qty modal (grams), dish → recipe builder
                   try {
                     const res = await fetch("/api/claude", {
@@ -241,18 +272,11 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 if (e.key !== "Enter") return;
                 const name = addItem.name.trim();
                 if (!name) return;
-                // Exact or best match in saved recipes → open portion modal
-                const q = name.toLowerCase();
-                const exact = userRecipes.find(r => r.name.toLowerCase() === q)
-                           || userRecipes.find(r => r.name.toLowerCase().includes(q));
-                if (exact) {
+                // Normalised exact match in saved recipes → open portion modal
+                const saved = findSavedRecipe(name);
+                if (saved) {
                   e.preventDefault();
-                  setShowDropdown(false);
-                  setRecipePortionModal({ recipe: exact });
-                  setRecipePortionQty("1");
-                  setRecipePortionUnit("portion");
-                  setRecipePortionScaled(null);
-                  setRecipePortionError("");
+                  openPortionModal(saved);
                 }
                 // If no match, let onBlur handle ingredient/dish classification as before
               }}
@@ -264,14 +288,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
               <div style={{ position:"absolute", top:"100%", left:0, right:0, background:"#fff", border:"0.5px solid #e5e7eb", borderRadius:"0 0 6px 6px", boxShadow:"0 4px 12px rgba(0,0,0,0.1)", zIndex:100, maxHeight:"180px", overflowY:"auto" }}>
                 {nameDropdown.map(r => (
                   <div key={r.id}
-                    onMouseDown={() => {
-                      setShowDropdown(false);
-                      setRecipePortionModal({ recipe: r });
-                      setRecipePortionQty("1");
-                      setRecipePortionUnit("portion");
-                      setRecipePortionScaled(null);
-                      setRecipePortionError("");
-                    }}
+                    onMouseDown={() => openPortionModal(r)}
                     style={{ padding:"8px 12px", cursor:"pointer", borderBottom:"1px solid #F0F4F8", fontSize:"12px" }}
                     onMouseOver={e=>e.currentTarget.style.background="#F0F4F8"}
                     onMouseOut={e=>e.currentTarget.style.background="#fff"}>
