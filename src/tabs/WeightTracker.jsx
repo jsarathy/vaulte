@@ -1,10 +1,28 @@
 // src/tabs/WeightTracker.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { db } from "../firebase";
 import { doc, setDoc } from "firebase/firestore";
 import {
   buildProjectionSeries, projectedWeightAt, waistForWeight, deriveMilestones,
 } from "../constants/weightPlan";
+
+// Friendly names/units for Renpho's raw field names. Unknown keys fall back to a
+// prettified version of the key, so new metrics still get a tab.
+const RENPHO_METRICS = {
+  bmi:{label:"BMI",unit:""}, bodyfat:{label:"Body fat",unit:"%"}, bodyFat:{label:"Body fat",unit:"%"},
+  water:{label:"Body water",unit:"%"}, bodyWater:{label:"Body water",unit:"%"},
+  muscle:{label:"Muscle mass",unit:"kg"}, muscleMass:{label:"Muscle mass",unit:"kg"},
+  skeletalMuscle:{label:"Skeletal muscle",unit:"%"}, sinew:{label:"Skeletal muscle",unit:"%"},
+  bone:{label:"Bone mass",unit:"kg"}, boneMass:{label:"Bone mass",unit:"kg"},
+  bmr:{label:"BMR",unit:"kcal"}, visfat:{label:"Visceral fat",unit:""}, visceralFat:{label:"Visceral fat",unit:""},
+  subfat:{label:"Subcutaneous fat",unit:"%"}, subcutaneousFat:{label:"Subcutaneous fat",unit:"%"},
+  protein:{label:"Protein",unit:"%"}, bodyage:{label:"Metabolic age",unit:"yrs"}, bodyAge:{label:"Metabolic age",unit:"yrs"},
+  fatFreeWeight:{label:"Fat-free weight",unit:"kg"}, lbm:{label:"Lean body mass",unit:"kg"},
+  heartRate:{label:"Heart rate",unit:"bpm"}, cardiacIndex:{label:"Cardiac index",unit:""},
+};
+const metricLabel = k => RENPHO_METRICS[k]?.label
+  ?? k.replace(/_/g," ").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/^./, c=>c.toUpperCase());
+const metricUnit = k => RENPHO_METRICS[k]?.unit ?? "";
 
 export default function WeightTracker({
   userId,
@@ -19,12 +37,36 @@ export default function WeightTracker({
 
   // Trajectory panel: double-click to fill the screen, Esc to collapse.
   const [chartFull, setChartFull] = useState(false);
-  const [chartMetric, setChartMetric] = useState("weight"); // "weight" | "waist"
+  const [chartMetric, setChartMetric] = useState("weight"); // "weight" | "waist" | a Renpho metric key
   useEffect(() => {
     if (!chartFull) return;
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); setChartFull(false); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, [chartFull]);
+
+  // Expanded chart scrolls horizontally; on open, bring the latest reading into view.
+  const chartScrollRef = useRef(null);
+  const lastActXRef = useRef(null);
+  useEffect(() => {
+    if (!chartFull) return;
+    requestAnimationFrame(() => {
+      const el = chartScrollRef.current;
+      if (el && lastActXRef.current != null) el.scrollLeft = Math.max(0, lastActXRef.current - el.clientWidth * 0.75);
+    });
+  }, [chartFull, chartMetric]);
+
+  // Measure the expanded chart area so the drawing fits its height exactly
+  // (otherwise the date axis is clipped) and re-flows when the window is resized.
+  const [chartBox, setChartBox] = useState({ w:0, h:0 });
+  const [hoverPt, setHoverPt] = useState(null); // expanded view only: { t, v }
+  useEffect(() => { if (!chartFull) setHoverPt(null); }, [chartFull, chartMetric]);
+  useEffect(() => {
+    if (!chartFull || !chartScrollRef.current || typeof ResizeObserver === "undefined") return;
+    const el = chartScrollRef.current;
+    const ro = new ResizeObserver(() => setChartBox({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [chartFull]);
 
   const cumBaseline = Number.isFinite(Number(cfg.cumLossBaselineKg)) ? Number(cfg.cumLossBaselineKg) : 86.45;
@@ -93,14 +135,18 @@ export default function WeightTracker({
     return new Date(t + Number(wk)*7*86400000).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"2-digit"});
   };
 
-  // Weight / Waist toggle for the trajectory chart.
+  // Metric tabs: Weight and Waist (with projections) plus one per Renpho metric that has data.
+  const renphoKeys = [...new Set(weightLog.flatMap(r => Object.keys(r.renpho || {})))]
+    .filter(k => k.toLowerCase() !== "weight")
+    .sort((a,b) => metricLabel(a).localeCompare(metricLabel(b)));
+  const metricTabs = [["weight","Weight"],["waist","Waist"], ...renphoKeys.map(k => [k, metricLabel(k)])];
   const metricPill = (
     <div onDoubleClick={e=>e.stopPropagation()}
-      style={{ display:"inline-flex", border:"0.5px solid #cfe0f0", borderRadius:"999px", overflow:"hidden", background:"#F7FAFD" }}>
-      {[["weight","Weight"],["waist","Waist"]].map(([v,label])=>(
+      style={{ display:"flex", flexWrap:"wrap", gap:"4px" }}>
+      {metricTabs.map(([v,label])=>(
         <button key={v} onClick={e=>{ e.stopPropagation(); setChartMetric(v); }}
-          style={{ border:"none", cursor:"pointer", padding:"3px 14px", fontSize:"11px", fontWeight:"bold",
-            background: chartMetric===v ? "#185FA5" : "transparent",
+          style={{ border:"0.5px solid #cfe0f0", borderRadius:"999px", cursor:"pointer", padding:"3px 12px", fontSize:"11px", fontWeight:"bold",
+            background: chartMetric===v ? "#185FA5" : "#F7FAFD",
             color: chartMetric===v ? "#fff" : "#6b7280" }}>{label}</button>
       ))}
     </div>
@@ -236,32 +282,49 @@ export default function WeightTracker({
           )}
           {(()=>{
             const isWaist = chartMetric === "waist";
-            const actKey = isWaist ? "waistActual" : "actual";
-            const acts = weightLog.filter(r => r[actKey] != null && Number.isFinite(Date.parse(r.date)))
-                                  .map(r => ({ t: Date.parse(r.date), v: r[actKey], date: r.date }))
+            const isPlan = chartMetric === "weight" || isWaist; // only these have a projection
+            const valOf = r => chartMetric === "weight" ? r.actual : isWaist ? r.waistActual : r.renpho?.[chartMetric];
+            const unit = chartMetric === "weight" ? "kg" : isWaist ? "cm" : metricUnit(chartMetric);
+            const acts = weightLog.filter(r => valOf(r) != null && Number.isFinite(Date.parse(r.date)))
+                                  .map(r => ({ t: Date.parse(r.date), v: Number(valOf(r)), date: r.date }))
                                   .sort((a,b) => a.t - b.t);
             const projOf = p => (isWaist ? p.waist : p.projected);
-            const projPts = projSeries.filter(p => projOf(p) != null);
+            const projPts = isPlan ? projSeries.filter(p => projOf(p) != null) : [];
             if (projPts.length < 2 && acts.length < 2) {
               return <div style={{ height:chartFull?"70vh":"200px", display:"flex", alignItems:"center", justifyContent:"center", color:"#9ca3af", fontSize:"12px" }}>
-                {chartMetric==="waist" ? "Add waist measurements, or set the curve anchors and start waist" : "Set a start date, start weight and curve anchors to see the projection"}
+                {!isPlan ? "Needs at least two readings — sync Renpho to fill this in"
+                  : isWaist ? "Add waist measurements, or set the curve anchors and start waist" : "Set a start date, start weight and curve anchors to see the projection"}
               </div>;
             }
-
-            // k scales the whole drawing when the panel is expanded.
-            const k = chartFull ? 3 : 1;
-            const W=380*k, H=200*k, PAD={top:12*k,right:12*k,bottom:32*k,left:38*k};
-            const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
-            const fs = 8*k, sw = 1.5*k;
 
             const tMin = Math.min(...[...projPts.map(p=>p.t), ...acts.map(a=>a.t)]);
             const tMax = Math.max(...[...projPts.map(p=>p.t), ...acts.map(a=>a.t)]);
             const span = tMax - tMin || 1;
+            const days = Math.max(1, span / 86400000);
+
+            // Compact: fixed 380x200 drawing scaled to the panel.
+            // Expanded: drawn in real pixels, at least MIN_DAY_PX per day, scrolling sideways,
+            // so daily readings always get room to separate.
+            const MIN_DAY_PX = 12;
+            const k = chartFull ? 1.6 : 1;
+            const PAD={top:12*k,right:16*k,bottom:50*k,left:40*k}; // bottom room for 45° dates
+            const vw = chartBox.w || (typeof window !== "undefined" ? window.innerWidth - 48 : 1200);
+            const vh = chartBox.h || (typeof window !== "undefined" ? window.innerHeight - 150 : 600);
+            const W = chartFull ? Math.max(vw, PAD.left + PAD.right + days * MIN_DAY_PX) : 380;
+            const H = chartFull ? Math.max(300, vh - 22) : 230; // 22px leaves room for the scrollbar
+            const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
+            const fs = 8*k, sw = 1.5*k;
+
+            // Dot size follows the gap between consecutive days, so dots shrink rather than overlap.
+            const dayPx = cW / days;
+            const r = Math.min(3*k, Math.max(0.6, dayPx * 0.4));
+            const actSW = Math.min(2.5*k, Math.max(0.6, r * 0.7));
 
             const vals = [...projPts.map(projOf), ...acts.map(a=>a.v)];
-            let minW = Math.min(...vals) - 1, maxW = Math.max(...vals) + 1;
-            if (!isWaist && Number.isFinite(cfg.targetWeightMinKg)) minW = Math.min(minW, cfg.targetWeightMinKg - 1);
-            if (maxW - minW < 2) { minW -= 1; maxW += 1; }
+            const vPad = isPlan ? 1 : Math.max((Math.max(...vals) - Math.min(...vals)) * 0.15, Math.abs(Math.max(...vals)) * 0.01, 0.1);
+            let minW = Math.min(...vals) - vPad, maxW = Math.max(...vals) + vPad;
+            if (chartMetric==="weight" && Number.isFinite(cfg.targetWeightMinKg)) minW = Math.min(minW, cfg.targetWeightMinKg - 1);
+            if (isPlan && maxW - minW < 2) { minW -= 1; maxW += 1; }
 
             const xS = t => PAD.left + ((t - tMin) / span) * cW;
             const yS = v => PAD.top + cH - ((v - minW) / (maxW - minW)) * cH;
@@ -270,38 +333,89 @@ export default function WeightTracker({
 
             const actPath  = acts.map((a,i)=>`${i===0?"M":"L"}${xS(a.t).toFixed(1)},${yS(a.v).toFixed(1)}`).join(" ");
 
-            const tzHi = (!isWaist && Number.isFinite(cfg.targetWeightMaxKg)) ? yS(cfg.targetWeightMaxKg) : null;
-            const tzLo = (!isWaist && Number.isFinite(cfg.targetWeightMinKg)) ? yS(cfg.targetWeightMinKg) : null;
+            const tzHi = (chartMetric==="weight" && Number.isFinite(cfg.targetWeightMaxKg)) ? yS(cfg.targetWeightMaxKg) : null;
+            const tzLo = (chartMetric==="weight" && Number.isFinite(cfg.targetWeightMinKg)) ? yS(cfg.targetWeightMinKg) : null;
 
-            const yTicks=[]; const stepY = (maxW-minW)>12?2:1;
-            for(let w=Math.ceil(minW); w<=Math.floor(maxW); w+=stepY) yTicks.push(w);
+            // "Nice" y step aiming for ~6–10 gridlines whatever the metric's scale (kg, %, kcal…).
+            const rawStep = (maxW - minW) / (chartFull ? 10 : 6);
+            const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+            const stepY = [1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=rawStep);
+            const yDec = Math.max(0, -Math.floor(Math.log10(stepY) + 1e-9));
+            const yTicks=[];
+            for(let w=Math.ceil(minW/stepY)*stepY; w<=maxW+1e-9; w+=stepY) yTicks.push(+w.toFixed(yDec+1));
 
-            const fmt = t => new Date(t).toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
-            const xTicks = projPts.filter((_,i)=> i % Math.max(1, Math.ceil(projPts.length/(chartFull?12:5))) === 0);
+            // Date axis: dd/mm/yyyy. Pick the finest step whose labels still have room,
+            // so more dates appear as the chart gets wider.
+            const DAY = 86400000;
+            const fmt = t => new Date(t).toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"});
+            const minLabelGap = fs * 2.2;
+            const step = [1,2,3,7,14,30,61,91,182,365].find(d => d * dayPx >= minLabelGap) || 365;
+            const xTicks = [];
+            for (let t = Math.ceil(tMin / DAY) * DAY; t <= tMax; t += step * DAY) xTicks.push(t);
+            const axisY = PAD.top + cH;
+            lastActXRef.current = acts.length ? xS(acts[acts.length-1].t) : null;
 
             return (
-              <svg width="100%" viewBox={`0 0 ${W} ${H}`}
+              <>
+              <div style={{ display:"flex", gap:"14px", justifyContent:"flex-end", fontSize:chartFull?"12px":"10px", color:"#6b7280", marginBottom:"4px" }}>
+                <span style={{ display:"flex", alignItems:"center", gap:"5px" }}><svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/></svg>Projected</span>
+                <span style={{ display:"flex", alignItems:"center", gap:"5px" }}><svg width="16" height="6"><line x1="0" y1="3" x2="16" y2="3" stroke="#378ADD" strokeWidth="2"/><circle cx="8" cy="3" r="2.5" fill="#378ADD"/></svg>Actual</span>
+              </div>
+              <style>{`
+                .vaulte-chart-scroll { scrollbar-width: auto; scrollbar-color: #9ca3af #f3f4f6; }
+                .vaulte-chart-scroll::-webkit-scrollbar { height: 16px; }
+                .vaulte-chart-scroll::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 8px; }
+                .vaulte-chart-scroll::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 8px; border: 3px solid #f3f4f6; }
+                .vaulte-chart-scroll::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+              `}</style>
+              <div ref={chartScrollRef} className={chartFull?"vaulte-chart-scroll":undefined}
+                style={chartFull?{overflowX:"auto",overflowY:"hidden",flex:1,minHeight:0}:undefined}>
+              <svg width={chartFull?W:"100%"} height={chartFull?H:undefined} viewBox={`0 0 ${W} ${H}`}
                 preserveAspectRatio="xMidYMid meet"
-                style={chartFull?{display:"block",flex:1,minHeight:0,maxHeight:"calc(100vh - 90px)"}:{display:"block"}}>
+                style={{display:"block"}}>
                 {tzHi!=null && tzLo!=null &&
                   <rect x={PAD.left} y={tzHi} width={cW} height={Math.max(0,tzLo-tzHi)} fill="#C8E6C9" opacity="0.4"/>}
                 {tzHi!=null &&
                   <text x={PAD.left+3*k} y={tzHi-2*k} fontSize={fs} fill="#2E7D32">Target {cfg.targetWeightMinKg}–{cfg.targetWeightMaxKg} kg</text>}
 
                 {yTicks.map(w=><line key={w} x1={PAD.left} x2={PAD.left+cW} y1={yS(w)} y2={yS(w)} stroke="#e5e7eb" strokeWidth={0.5*k}/>)}
-                {yTicks.map(w=><text key={"y"+w} x={PAD.left-4*k} y={yS(w)+3*k} fontSize={fs} fill="#6b7280" textAnchor="end">{w}</text>)}
-                <text x={PAD.left-4*k} y={PAD.top-3*k} fontSize={fs} fill="#9ca3af" textAnchor="end">{isWaist?"cm":"kg"}</text>
-                {xTicks.map(p=><text key={"x"+p.t} x={xS(p.t)} y={H-PAD.bottom+12*k} fontSize={fs} fill="#6b7280" textAnchor="middle">{fmt(p.t)}</text>)}
+                {yTicks.map(w=><text key={"y"+w} x={PAD.left-4*k} y={yS(w)+3*k} fontSize={fs} fill="#6b7280" textAnchor="end">{w.toFixed(yDec)}</text>)}
+                <text x={PAD.left-4*k} y={PAD.top-3*k} fontSize={fs} fill="#9ca3af" textAnchor="end">{unit}</text>
+                <line x1={PAD.left} x2={PAD.left+cW} y1={axisY} y2={axisY} stroke="#9ca3af" strokeWidth={0.75*k}/>
+                {xTicks.map(t=>{ const x=xS(t), y=axisY+9*k; return (
+                  <g key={"x"+t}>
+                    <line x1={x} x2={x} y1={axisY} y2={axisY+4*k} stroke="#9ca3af" strokeWidth={0.75*k}/>
+                    <text x={x} y={y} fontSize={fs} fill="#6b7280" textAnchor="end" transform={`rotate(-45 ${x} ${y})`}>{fmt(t)}</text>
+                  </g>); })}
 
                 {projPath && <path d={projPath} fill="none" stroke="#90CAF9" strokeWidth={sw} strokeDasharray={`${4*k},${3*k}`}/>}
-                {actPath && <path d={actPath} fill="none" stroke="#378ADD" strokeWidth={2.5*k}/>}
-                {acts.map(a=><circle key={a.date} cx={xS(a.t)} cy={yS(a.v)} r={3*k} fill="#378ADD" stroke="#fff" strokeWidth={1*k}/>)}
+                {actPath && <path d={actPath} fill="none" stroke="#378ADD" strokeWidth={actSW} opacity="0.6"/>}
+                {acts.map(a=><circle key={a.date} cx={xS(a.t)} cy={yS(a.v)} r={hoverPt?.t===a.t ? r*1.6 : r} fill="#378ADD" stroke="#fff" strokeWidth={Math.max(0.3, r*0.3)} style={{pointerEvents:"none"}}/>)}
 
-                <line x1={W-90*k} y1={H-8*k} x2={W-75*k} y2={H-8*k} stroke="#90CAF9" strokeWidth={sw} strokeDasharray={`${4*k},${3*k}`}/>
-                <text x={W-72*k} y={H-5*k} fontSize={fs} fill="#6b7280">Projected</text>
-                <line x1={W-32*k} y1={H-8*k} x2={W-17*k} y2={H-8*k} stroke="#378ADD" strokeWidth={2.5*k}/>
-                <text x={W-14*k} y={H-5*k} fontSize={fs} fill="#6b7280">Actual</text>
+                {/* Expanded view: invisible, day-wide hit areas + tooltip */}
+                {chartFull && acts.map(a=>(
+                  <circle key={"h"+a.date} cx={xS(a.t)} cy={yS(a.v)} r={Math.max(r*2, Math.min(dayPx/2, 14))}
+                    fill="transparent" style={{cursor:"pointer"}}
+                    onMouseEnter={()=>setHoverPt({t:a.t, v:a.v})} onMouseLeave={()=>setHoverPt(null)}/>
+                ))}
+                {chartFull && hoverPt && (()=>{
+                  const label = `${fmt(hoverPt.t)} · ${Number(hoverPt.v).toFixed(1)}${unit?` ${unit}`:""}`;
+                  const bw = label.length * fs * 0.58 + 16, bh = fs * 2;
+                  const px = xS(hoverPt.t), py = yS(hoverPt.v);
+                  const bx = Math.min(Math.max(px - bw/2, PAD.left), PAD.left + cW - bw);
+                  const above = py - bh - 12 >= PAD.top;
+                  const by = above ? py - bh - 12 : py + 12;
+                  return (
+                    <g style={{pointerEvents:"none"}}>
+                      <rect x={bx} y={by} width={bw} height={bh} rx={4} fill="#1f2937" opacity="0.92"/>
+                      <text x={bx + bw/2} y={by + bh/2 + fs*0.35} fontSize={fs} fill="#fff" textAnchor="middle" fontWeight="500">{label}</text>
+                    </g>
+                  );
+                })()}
+
               </svg>
+              </div>
+              </>
             );
           })()}
         </div>

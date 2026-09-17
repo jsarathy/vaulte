@@ -379,6 +379,26 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 borderRadius:"6px", padding:"8px", fontSize:"13px", fontWeight:"bold", cursor:"pointer" }}>
                 ✓ Log All {photoItems.length} Items
               </button>
+              <button onClick={() => {
+                const keys = ["kcal","fat","sat_fat","carbs","sugar","fibre","net_carbs","protein"];
+                const nutrition = Object.fromEntries(keys.map(k => [k,
+                  Math.round(photoItems.reduce((t,i)=>t+(Number(i[k])||0),0)*10)/10]));
+                setBuilderPreview({
+                  id: genId(),
+                  name: photoItems.length===1 ? photoItems[0].name : "",
+                  description: "Saved from photo",
+                  servings: 1,
+                  nutrition,
+                  ingredients: photoItems.map(i => ({ amount:"", item:i.name })),
+                  steps: [],
+                  notes: "",
+                });
+                setBuilderInput(""); setBuilderError(""); setRecipeBuilder(true);
+                setPhotoItems([]); setPhotoPreview(null);
+              }} style={{ marginTop:"6px", width:"100%", background:"transparent", color:"#185FA5", border:"1px solid #185FA5",
+                borderRadius:"6px", padding:"8px", fontSize:"13px", fontWeight:"bold", cursor:"pointer" }}>
+                📖 Save as Recipe
+              </button>
             </div>
           )}
         </div>

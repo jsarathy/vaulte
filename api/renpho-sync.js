@@ -119,6 +119,22 @@ async function fetchPaged(endpoint, tableName, uid, auth, pageSize = 50) {
   return out;
 }
 
+// Fields that describe the record rather than the body — never surfaced as metrics.
+const NON_METRIC = /(^id$|id$|Id$|ids$|time|stamp|date|created|updated|unit|type|flag|status|version|mac|^sn$|serial|scale|table|device|sex|gender|^age$|height|method|mode|^local|timezone|source|deleted|sync|^tz)/i;
+
+// Every finite, non-zero number on the record except bookkeeping fields.
+// Renpho reports 0 for anything the scale didn't measure, so zeros are dropped.
+function extractMetrics(m) {
+  const out = {};
+  for (const [k, v] of Object.entries(m || {})) {
+    if (NON_METRIC.test(k)) continue;
+    const n = typeof v === "string" && v.trim() !== "" ? Number(v) : v;
+    if (typeof n !== "number" || !Number.isFinite(n) || n === 0) continue;
+    out[k] = +n.toFixed(2);
+  }
+  return out;
+}
+
 // Renpho timestamps are epoch seconds on some records, ms on others.
 function toISODate(ts) {
   if (ts == null) return null;
@@ -172,7 +188,7 @@ export default async function handler(req, res) {
       raw.push(...recs);
     }
 
-    // Weight only, for now. One record per calendar day: latest reading wins.
+    // One record per calendar day: latest reading wins. All metrics ride along.
     const byDate = new Map();
     let rejected = 0;
     for (const m of raw) {
@@ -182,14 +198,15 @@ export default async function handler(req, res) {
       if (fromDate && date < fromDate) { rejected++; continue; }
       const ts = Number(m.timeStamp ?? m.timestamp ?? 0);
       const prev = byDate.get(date);
-      if (!prev || ts >= prev.ts) byDate.set(date, { date, weight: +weight.toFixed(2), ts });
+      if (!prev || ts >= prev.ts) byDate.set(date, { date, weight: +weight.toFixed(2), metrics: extractMetrics(m), ts });
     }
 
     const records = [...byDate.values()]
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map(({ date, weight }) => ({ date, weight }));
+      .map(({ date, weight, metrics }) => ({ date, weight, metrics }));
+    const metricKeys = [...new Set(records.flatMap(r => Object.keys(r.metrics)))].sort();
 
-    return res.status(200).json({ records, count: records.length, rawCount: raw.length, rejected, fromDate });
+    return res.status(200).json({ records, count: records.length, rawCount: raw.length, rejected, fromDate, metricKeys });
   } catch (err) {
     console.error("renpho-sync error:", err);
     return res.status(502).json({ error: err.message || "Renpho sync failed" });
