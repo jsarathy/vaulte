@@ -19,7 +19,7 @@ export default function CompareTab({ compareSlots, setCompareSlots, compareData,
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(5,minmax(0,1fr))", gap:"7px" }}>
           {compareSlots.map((date,idx)=>{
-            const data=compareData[idx];
+            const data=(date&&allDays.find(d=>d.date===date))||compareData[idx];
             const t=getDayTotals(data);
             return (
               <div key={idx} style={{ background:"#fff",border:`0.5px solid ${C.border}`,borderRadius:"8px",overflow:"hidden" }}>

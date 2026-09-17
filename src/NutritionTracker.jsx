@@ -406,8 +406,8 @@ export default function NutritionTracker({ userId }) {
       if(recs.length===0){setRenphoMsg({ok:true,text:data.warning||"No measurements found."});}
       else{
         const existing=new Map(weightLog.map(r=>[r.date,r]));
-        // Sync wins on `actual`; manual week/dose/projected are preserved.
-        const merged=recs.map(rec=>({...(existing.get(rec.date)||{}),date:rec.date,actual:rec.weight}));
+        // Sync wins on `actual` and `renpho` (all scale metrics); manual week/dose/projected are preserved.
+        const merged=recs.map(rec=>({...(existing.get(rec.date)||{}),date:rec.date,actual:rec.weight,...(rec.metrics?{renpho:rec.metrics}:{})}));
         await Promise.all(merged.map(row=>setDoc(doc(db,"users",userId,"weight_log",row.date),row)));
         const next=new Map(weightLog.map(r=>[r.date,r]));
         merged.forEach(row=>next.set(row.date,row));
