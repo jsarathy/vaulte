@@ -20,6 +20,32 @@ const RENPHO_METRICS = {
   fatFreeWeight:{label:"Fat-free weight",unit:"kg"}, lbm:{label:"Lean body mass",unit:"kg"},
   heartRate:{label:"Heart rate",unit:"bpm"}, cardiacIndex:{label:"Cardiac index",unit:""},
 };
+// Renpho fields that aren't useful metrics, so they get no tab.
+const HIDDEN_METRICS = new Set(["weight","fc","isauto","tw","wc"]);
+
+// Plain-English explanation shown when a metric tab is hovered.
+const METRIC_INFO = {
+  weight: "Total body weight, from the Renpho scale. The dashed line is your planned trajectory.",
+  waist: "Waist circumference, measured with a tape. Tracks fat loss where the scale can stall.",
+  bmi: "Body Mass Index: weight relative to height. A rough screening number — it can't tell fat from muscle.",
+  bodyfat: "Share of your body weight that is fat. Renpho estimates it from bioelectrical impedance, so absolute values are approximate; the trend is what matters.",
+  water: "Share of body weight that is water. Drops when dehydrated, so it swings day to day.",
+  muscle: "Estimated weight of muscle, including the water held in it. Rising while weight falls is the ideal pattern.",
+  skeletalMuscle: "The muscle attached to bone that you actually train, as a share of body weight.",
+  bone: "Estimated weight of bone mineral. Changes very slowly; large day-to-day swings are measurement noise.",
+  bmr: "Basal metabolic rate: the calories your body burns at complete rest, estimated from your composition.",
+  visfat: "Visceral fat: the fat around your organs, on Renpho's 1-59 scale. Under 10 is considered healthy, and it's the fat most linked to metabolic risk.",
+  subfat: "Subcutaneous fat: the fat just under your skin, as a share of body weight.",
+  protein: "Share of body weight made up of protein, mostly in muscle and organs.",
+  bodyage: "Metabolic age: the age your body composition resembles. Lower than your real age is the goal.",
+  fatFreeWeight: "Everything you weigh that isn't fat: muscle, bone, organs and water.",
+  lbm: "Lean body mass: total weight minus fat mass.",
+  heartRate: "Resting heart rate, if your scale measures it during the reading.",
+  cardiacIndex: "A measure of how hard your heart works relative to body size.",
+};
+const metricInfo = k => METRIC_INFO[k] ?? METRIC_INFO[k?.toLowerCase()]
+  ?? `${metricLabel(k)}, as reported by your Renpho scale.`;
+
 const metricLabel = k => RENPHO_METRICS[k]?.label
   ?? k.replace(/_/g," ").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/^./, c=>c.toUpperCase());
 const metricUnit = k => RENPHO_METRICS[k]?.unit ?? "";
@@ -60,6 +86,7 @@ export default function WeightTracker({
   // (otherwise the date axis is clipped) and re-flows when the window is resized.
   const [chartBox, setChartBox] = useState({ w:0, h:0 });
   const [hoverPt, setHoverPt] = useState(null); // expanded view only: { t, v }
+  const [hoverMetric, setHoverMetric] = useState(null); // metric tab being hovered
   useEffect(() => { if (!chartFull) setHoverPt(null); }, [chartFull, chartMetric]);
   useEffect(() => {
     if (!chartFull || !chartScrollRef.current || typeof ResizeObserver === "undefined") return;
@@ -137,18 +164,35 @@ export default function WeightTracker({
 
   // Metric tabs: Weight and Waist (with projections) plus one per Renpho metric that has data.
   const renphoKeys = [...new Set(weightLog.flatMap(r => Object.keys(r.renpho || {})))]
-    .filter(k => k.toLowerCase() !== "weight")
+    .filter(k => !HIDDEN_METRICS.has(k.toLowerCase()))
     .sort((a,b) => metricLabel(a).localeCompare(metricLabel(b)));
   const metricTabs = [["weight","Weight"],["waist","Waist"], ...renphoKeys.map(k => [k, metricLabel(k)])];
   const metricPill = (
-    <div onDoubleClick={e=>e.stopPropagation()}
-      style={{ display:"flex", flexWrap:"wrap", gap:"4px" }}>
-      {metricTabs.map(([v,label])=>(
-        <button key={v} onClick={e=>{ e.stopPropagation(); setChartMetric(v); }}
-          style={{ border:"0.5px solid #cfe0f0", borderRadius:"999px", cursor:"pointer", padding:"3px 12px", fontSize:"11px", fontWeight:"bold",
-            background: chartMetric===v ? "#185FA5" : "#F7FAFD",
-            color: chartMetric===v ? "#fff" : "#6b7280" }}>{label}</button>
-      ))}
+    <div onDoubleClick={e=>e.stopPropagation()} style={{ position:"relative" }}>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:"4px" }}>
+        {metricTabs.map(([v,label])=>(
+          <span key={v} style={{ position:"relative", display:"inline-flex" }}>
+            <button onClick={e=>{ e.stopPropagation(); setChartMetric(v); }}
+              onMouseEnter={()=>setHoverMetric(v)} onMouseLeave={()=>setHoverMetric(null)}
+              onFocus={()=>setHoverMetric(v)} onBlur={()=>setHoverMetric(null)}
+              style={{ border:"0.5px solid #cfe0f0", borderRadius:"999px", cursor:"pointer", padding:"3px 12px", fontSize:"11px", fontWeight:"bold",
+                background: chartMetric===v ? "#185FA5" : "#F7FAFD",
+                color: chartMetric===v ? "#fff" : "#6b7280" }}>{label}</button>
+            {hoverMetric===v && (
+              <div style={{ position:"absolute", top:"calc(100% + 6px)", left:"50%", transform:"translateX(-50%)",
+                zIndex:40, width:"260px", maxWidth:"80vw",
+                background:"#1f2937", color:"#fff", borderRadius:"6px", padding:"8px 10px", textAlign:"left",
+                fontSize:"11.5px", lineHeight:1.45, fontWeight:"normal", boxShadow:"0 4px 14px rgba(0,0,0,0.22)",
+                pointerEvents:"none" }}>
+                <div style={{ fontWeight:"bold", marginBottom:"3px" }}>
+                  {metricLabel(v)}{metricUnit(v) ? ` (${metricUnit(v)})` : v==="weight" ? " (kg)" : v==="waist" ? " (cm)" : ""}
+                </div>
+                {metricInfo(v)}
+              </div>
+            )}
+          </span>
+        ))}
+      </div>
     </div>
   );
 

@@ -14,7 +14,6 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import NutritionTracker from "./NutritionTracker";
-import RoutineTracker from "./RoutineTracker";
 import { auth, db, storage } from "./firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
@@ -557,7 +556,6 @@ export default function App() {
             {navItem("home",      "Home",       "~")}
             {navItem("account",   "My Account", "*")}
             {navItem("nutrition", "Nutrition",  "N")}
-            {navItem("routine",   "Routine",    "R")}
             <div className="sidebar-delete" style={{ marginTop:"auto", padding:"24px 16px 0", borderTop:"1px solid rgba(212,175,55,0.1)" }}>
               <button className="btn-danger" style={{ width:"100%", padding:"10px", fontSize:"10px" }} onClick={handleDeleteAccount}>Delete Account</button>
             </div>
@@ -596,12 +594,6 @@ export default function App() {
             {activePanel === "nutrition" && (
               <div className="fade-up" style={{ margin:"-24px" }}>
                 <NutritionTracker userId={auth.currentUser?.uid} />
-              </div>
-            )}
-
-            {activePanel === "routine" && (
-              <div className="fade-up" style={{ margin:"-24px" }}>
-                <RoutineTracker userId={auth.currentUser?.uid} />
               </div>
             )}
 
