@@ -941,7 +941,7 @@ Use realistic values. For portions use a typical serving size.`;
                       <div style={{ fontSize:"11px", color:"#6b7280" }}>{r.description}</div>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:"10px", marginLeft:"12px" }}>
-                      <div style={{ fontSize:"12px", color:"#378ADD", fontWeight:"bold", whiteSpace:"nowrap" }}>{r.nutrition?.kcal} kcal</div>
+                      <div style={{ textAlign:"right", whiteSpace:"nowrap" }}><div style={{ fontSize:"12px", color:"#378ADD", fontWeight:"bold" }}>{r.nutrition?.kcal} kcal</div>{r.portion_g!=null&&<div style={{ fontSize:"11px", color:"#6b7280" }}>{r.portion_g} g</div>}</div>
                       <button onClick={e=>{e.stopPropagation();setRecipeModal(r);}} style={{ background:"none", border:"none", color:"#378ADD", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>👁</button>
                       <button onClick={async e=>{
                         e.stopPropagation();
