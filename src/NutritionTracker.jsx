@@ -15,6 +15,7 @@ import LogTab        from "./tabs/LogTab";
 import CompareTab    from "./tabs/CompareTab";
 import AddEntry      from "./tabs/AddEntry";
 import WeightTracker from "./tabs/WeightTracker";
+import BodyTracker   from "./tabs/BodyTracker";
 
 // ── Meds panel (Daily log sidebar) ───────────────────────────────────────────
 // Reads and writes the SAME routine_log/{date} documents as RoutineTracker,
@@ -339,6 +340,7 @@ export default function NutritionTracker({ userId }) {
   const [weightLog,setWeightLog]=useState([]);const [weightPlanConfig,setWeightPlanConfig]=useState(DEFAULT_PLAN_CONFIG);
   const [editingPlan,setEditingPlan]=useState(false);const [editCfg,setEditCfg]=useState(DEFAULT_PLAN_CONFIG);
   const [weightEntry,setWeightEntry]=useState(null);
+  const [bodyLog,setBodyLog]=useState([]);
   const [renphoSyncing,setRenphoSyncing]=useState(false);const [renphoMsg,setRenphoMsg]=useState(null);
   const [chatMessages,setChatMessages]=useState([]);const [chatInput,setChatInput]=useState("");
   const [chatMealId,setChatMealId]=useState("__chat__");const [chatDate,setChatDate]=useState(()=>new Date().toISOString().split("T")[0]);
@@ -363,6 +365,8 @@ export default function NutritionTracker({ userId }) {
         const wSnap=await getDocs(collection(db,"users",userId,"weight_log"));
         const rows=wSnap.docs.map(d=>({date:d.id,...d.data()})).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
         setWeightLog(rows);
+        const bSnap=await getDocs(collection(db,"users",userId,"body_log"));
+        setBodyLog(bSnap.docs.map(d=>({date:d.id,...d.data()})).sort((a,b)=>(a.date||"").localeCompare(b.date||"")));
         try{const chatDoc=await getDoc(doc(db,"users",userId,"claude_chat","conversation"));if(chatDoc.exists()){const{history}=chatDoc.data();if(Array.isArray(history)&&history.length>0){setJustChatHistory(history);setChatMessages(history.map(h=>({id:genId(),type:h.role==="user"?"user":"claude",text:h.content})));}}}catch(e){}
         const polarDoc=await getDoc(doc(db,"users",userId,"polar","connection"));if(polarDoc.exists()){const pd=polarDoc.data();setPolarConnected(pd.connected||false);setPolarLastSync(pd.last_sync_at||null);}
         const polarSnap=await getDocs(collection(db,"users",userId,"polar_sessions"));
@@ -384,7 +388,11 @@ export default function NutritionTracker({ userId }) {
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
   const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}};
   const openWeightEntry=(date)=>{const ex=weightLog.find(r=>r.date===date)||{};setWeightEntry({date,week:ex.week??"",dose:ex.dose??"",projected:ex.projected??"",actual:ex.actual??"",existing:!!ex.date});};
-  const onCalendarClick=(date)=>{if(activeTab==="weight")openWeightEntry(date);else switchDay(date);};
+  // Body tab: clicking a calendar date adds an empty row for that date (no-op if it exists).
+  const addBodyRow=async(date)=>{if(!userId||bodyLog.some(r=>r.date===date))return;const row={date};
+    try{await setDoc(doc(db,"users",userId,"body_log",date),row);}catch(e){console.error("body row create failed",e);return;}
+    setBodyLog(prev=>[...prev,row].sort((a,b)=>(a.date||"").localeCompare(b.date||"")));};
+  const onCalendarClick=(date)=>{if(activeTab==="weight")openWeightEntry(date);else if(activeTab==="body")addBodyRow(date);else switchDay(date);};
   const num=(v)=>{const t=String(v).trim();if(t==="")return null;const n=Number(t);return Number.isFinite(n)?n:null;};
   const saveWeightEntry=async()=>{if(!weightEntry||!userId)return;const{date,week,dose,projected,actual}=weightEntry;
     const row={date,week:num(week),dose:String(dose).trim(),projected:num(projected),actual:num(actual)};
@@ -436,7 +444,7 @@ export default function NutritionTracker({ userId }) {
 
   if(loading) return <div style={{ padding:"40px",textAlign:"center",color:C.muted,fontFamily:FONT.sans }}>Loading your log…</div>;
 
-  const TABS=[["log","Daily log"],["compare","Compare"],["add","Add entry"],["weight","Weight"]];
+  const TABS=[["log","Daily log"],["compare","Compare"],["add","Add entry"],["weight","Weight"],["body","Body"]];
 
   return (
     <div className="nt-root" style={{ background:C.bg,color:C.text,height:"calc(100vh - 110px)",display:"flex",flexDirection:"column",borderRadius:"10px",overflow:"hidden",border:`0.5px solid ${C.border}` }}>
@@ -488,6 +496,7 @@ export default function NutritionTracker({ userId }) {
           {activeTab==="compare"&&<CompareTab compareSlots={compareSlots} setCompareSlots={setCompareSlots} compareData={compareData} setCompareData={setCompareData} allDays={allDays} calcSex={calcSex} calcAge={calcAge} calcHeight={calcHeight} calcWeight={calcWeight} setCalcSex={setCalcSex} setCalcAge={setCalcAge} setCalcHeight={setCalcHeight} setCalcWeight={setCalcWeight} calcProtein={calcProtein} setCalcProtein={setCalcProtein} calcFatPct={calcFatPct} setCalcFatPct={setCalcFatPct}/>}
           {activeTab==="add"&&<AddEntry userId={userId} allDays={allDays} currentDate={currentDate} currentDayData={currentDayData} setCurrentDayData={setCurrentDayData} userRecipes={userRecipes} setUserRecipes={setUserRecipes} addDate={addDate} setAddDate={setAddDate} addMealId={addMealId} setAddMealId={setAddMealId} addMealName={addMealName} setAddMealName={setAddMealName} addItem={addItem} setAddItem={setAddItem} addMsg={addMsg} setAddMsg={setAddMsg} polarConnected={polarConnected} polarSessions={polarSessions} setPolarSessions={setPolarSessions} polarSyncing={polarSyncing} polarLastSync={polarLastSync} polarSyncMsg={polarSyncMsg} syncPolar={syncPolar} setPolarLogModal={setPolarLogModal} persistDay={persistDay} setRecipeModal={setRecipeModal}/>}
           {activeTab==="weight"&&<WeightTracker userId={userId} weightLog={weightLog} setWeightLog={setWeightLog} renphoSyncing={renphoSyncing} renphoMsg={renphoMsg} syncRenpho={syncRenpho} purgeBefore={purgeBefore} weightPlanConfig={weightPlanConfig} setWeightPlanConfig={setWeightPlanConfig} editingPlan={editingPlan} setEditingPlan={setEditingPlan} editCfg={editCfg} setEditCfg={setEditCfg} savePlanConfig={savePlanConfig}/>}
+          {activeTab==="body"&&<BodyTracker userId={userId} bodyLog={bodyLog} setBodyLog={setBodyLog} sex={weightPlanConfig?.sex}/>}
         </div>
 
         <WeightEntryModal entry={weightEntry} setEntry={setWeightEntry} onSave={saveWeightEntry} onDelete={deleteWeightEntry}/>
