@@ -1,5 +1,7 @@
 // api/renpho-sync.js
 // Pulls weight measurements from the Renpho Health cloud (cloud.renpho.com).
+// With { kind: "girth" } in the body it instead pulls Smart Tape Measure
+// (body girth) readings for the Body tab.
 //
 // There is no official Renpho API. The endpoints, the AES-128-ECB envelope and
 // the payload shapes below come from reverse-engineered clients and can break
@@ -29,6 +31,17 @@ const ENDPOINTS = {
   deviceInfo: "renpho-aggregation/device/count",
   measurements: "RenphoHealth/scale/queryAllMeasureDataList",
   bodyComposition: "RenphoHealth/scale/queryBodyCompositionMeasureData",
+  girth: "RenphoHealth/renpho/girth/queryAllGirthsDataList",
+};
+
+// Smart Tape Measure: Renpho field -> Body tab key (all cm). The overall
+// arm/thigh/calf fields and the custom slots are not used.
+const GIRTH_FIELDS = {
+  neckValue:"neck", shoulderValue:"shoulder", chestValue:"chest", waistValue:"waist",
+  abdomenValue:"abdomen", hipValue:"hip",
+  leftArmValue:"bicepL", rightArmValue:"bicepR",
+  leftThighValue:"thighL", rightThighValue:"thighR",
+  leftCalfValue:"calfL", rightCalfValue:"calfR",
 };
 
 // ── AES-128-ECB envelope ─────────────────────────────────────────────────────
@@ -145,6 +158,56 @@ function toISODate(ts) {
   return isNaN(d) ? null : d.toISOString().split("T")[0];
 }
 
+// Girth records carry the device's own UTC offset ("+1:00"); use it for the date.
+function girthDate(m) {
+  const ts = Number(m.timeStamp);
+  if (!Number.isFinite(ts) || ts <= 0) return null;
+  const tz = String(m.timeZone ?? "").trim();
+  let off = 0;
+  const mt = tz.match(/^([+-])?(\d+(?:\.\d+)?)(?::(\d+))?$/);
+  if (mt) off = (mt[1] === "-" ? -1 : 1) * (Number(mt[2]) * 3600 + Number(mt[3] || 0) * 60);
+  const ms = (ts < 1e12 ? ts * 1000 : ts) + off * 1000;
+  return new Date(ms).toISOString().split("T")[0];
+}
+
+// The girth endpoint identifies the user from the headers: no table or user id.
+async function fetchGirths(auth, pageSize = 100) {
+  const out = [];
+  for (let page = 1; page <= 40; page++) {
+    const result = await post(ENDPOINTS.girth, encryptRequest({ pageNum: page, pageSize }), auth);
+    checkResponse(result, `Girth page ${page}`);
+    if (!result.data) break;
+    const recs = extractRecords(decryptResponse(result.data));
+    if (!recs) break;
+    out.push(...recs);
+    if (recs.length < pageSize) break;
+  }
+  return out;
+}
+
+async function girthHandler(req, res, auth) {
+  const raw = await fetchGirths(auth);
+  // One record per calendar day: latest reading wins. Unmeasured sites come back as 0 and are dropped.
+  const byDate = new Map();
+  for (const m of raw) {
+    const date = girthDate(m);
+    if (!date) continue;
+    const values = {};
+    for (const [field, key] of Object.entries(GIRTH_FIELDS)) {
+      const n = Number(m[field]);
+      if (Number.isFinite(n) && n > 0) values[key] = +n.toFixed(1);
+    }
+    if (!Object.keys(values).length) continue;
+    const ts = Number(m.timeStamp) || 0;
+    const prev = byDate.get(date);
+    if (!prev || ts >= prev.ts) byDate.set(date, { date, values, ts });
+  }
+  const records = [...byDate.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ date, values }) => ({ date, values }));
+  return res.status(200).json({ records, count: records.length, rawCount: raw.length });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
@@ -162,6 +225,7 @@ export default async function handler(req, res) {
 
   try {
     const auth = await login(email, password);
+    if (req.body?.kind === "girth") return await girthHandler(req, res, auth);
 
     const devResult = await post(ENDPOINTS.deviceInfo, encryptRequest({}), auth);
     checkResponse(devResult, "DeviceInfo");
