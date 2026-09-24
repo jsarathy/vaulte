@@ -82,9 +82,12 @@ export default async function handler(req, res) {
   if (!userId) return res.status(500).json({ error: "APPLE_SYNC_USER_ID not configured" });
 
   let body = req.body;
-  if (typeof body === "string") { try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON" }); } }
-  const { date, steps, active, flights } = body || {};
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) return res.status(400).json({ error: "Missing or invalid date (YYYY-MM-DD)" });
+  if (Buffer.isBuffer(body)) body = body.toString("utf8");
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON", received: body.slice(0, 200) }); } }
+  const { steps, active, flights } = body || {};
+  // Accept any value containing YYYY-MM-DD; fall back to today in UK time
+  const m = /(\d{4}-\d{2}-\d{2})/.exec(String(body?.date ?? ""));
+  const date = m ? m[1] : new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
   // Daily-totals mode (Shortcut sends plain numbers): { date, steps, active, flights }
   if (![steps, active, flights].some(Array.isArray)) {
@@ -92,7 +95,7 @@ export default async function handler(req, res) {
     const totals = { steps: Math.round(num(steps)), activeMin: Math.round(num(active)), flights: Math.round(num(flights)) };
     try {
       await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals });
-      return res.json({ ok: true, date, totals });
+      return res.json({ ok: true, date, totals, receivedDate: body?.date ?? null });
     } catch (e) {
       console.error("apple-sync write failed:", e);
       return res.status(500).json({ error: "Firestore write failed" });
