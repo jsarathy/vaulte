@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals, calcFatBurned } from "../constants/helpers";
 import { C, FONT, border, IconX, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
 import HRChart from "../components/HRChart.jsx";
+import AppleActivityCard from "../components/AppleActivityCard.jsx";
 
 const LS_KEY = "vaulte_collapsed_meals";
 
@@ -336,6 +337,9 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
           </div>
         );
       })}
+
+      {/* Apple Watch activity (below Evening Exercise) */}
+      <AppleActivityCard userId={userId} date={currentDate} dayData={currentDayData} weightKg={calcWeight}/>
     </>
   );
 }
