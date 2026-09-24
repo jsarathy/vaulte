@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     const totals = { steps: Math.round(num(steps)), activeMin: Math.round(num(active)), flights: Math.round(num(flights)) };
     try {
       await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals });
-      return res.json({ ok: true, date, totals, receivedDate: body?.date ?? null });
+      return res.json({ ok: true, date, totals, received: { date: body?.date ?? null, steps: steps ?? null, active: active ?? null, flights: flights ?? null, keys: Object.keys(body || {}) } });
     } catch (e) {
       console.error("apple-sync write failed:", e);
       return res.status(500).json({ error: "Firestore write failed" });
