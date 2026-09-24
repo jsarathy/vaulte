@@ -93,3 +93,73 @@ export function calcFatBurned(calories, fat_pct) {
   const fatGrams = Math.round(fatKcal / 9);
   return { fatKcal, fatGrams };
 }
+
+// ── Apple Watch activity ──────────────────────────────────────────────────────
+// Firestore: users/{uid}/apple_activity/{YYYY-MM-DD}
+//   { date, updated_at, slots: { "HHMM": [steps, activeMin, flights] } }  — 5-min slots, local time
+// Slots overlapping a Polar session are excluded (pro-rata) so exercise isn't double counted.
+export const APPLE_KCAL = {
+  perStepPerKg:  0.00057, // ≈0.04 kcal/step at 70 kg
+  activeMetDelta: 1.5,    // MET above walking pace for active minutes (walking already counted via steps)
+  flightMetres:   3,      // vertical rise per flight
+  efficiency:     0.25,   // muscular efficiency for climbing
+};
+
+const slotToMin = k => parseInt(k.slice(0, 2), 10) * 60 + parseInt(k.slice(2, 4), 10);
+
+function polarWindow(s) {
+  const m = /T(\d{2}):(\d{2})/.exec(s?.start_time || ""); // Polar start-time is local, no TZ
+  if (!m) return null;
+  const start = +m[1] * 60 + +m[2];
+  return [start, start + (s.duration_min || 0)];
+}
+
+// Typical steps/min for step-based Polar sports (used when only daily totals are available)
+function sportCadence(sport = "") {
+  const s = sport.toUpperCase();
+  if (/RUN|JOG/.test(s)) return 160;
+  if (/WALK/.test(s))    return 110;
+  if (/HIK|TREK/.test(s)) return 100;
+  return 0; // cycling, swimming, strength, rowing… — few or no steps
+}
+
+export function calcAppleActivity(slots, polarSessions = [], weightKg = 84, totals = null) {
+  const windows = polarSessions.map(polarWindow).filter(Boolean);
+  const kept = { steps:0, activeMin:0, flights:0 };
+  const excluded = { steps:0, activeMin:0, flights:0 };
+  const useTotals = totals && !(slots && Object.keys(slots).length);
+  if (useTotals) {
+    // Estimate what Apple counted during Polar sessions (assumes the Watch was worn)
+    let estSteps = 0, estMin = 0;
+    polarSessions.forEach(p => {
+      const mins = p.duration_min || 0;
+      estSteps += mins * sportCadence(p.sport);
+      estMin   += mins;
+    });
+    excluded.steps     = Math.min(totals.steps || 0, estSteps);
+    excluded.activeMin = Math.min(totals.activeMin || 0, estMin);
+    kept.steps     = (totals.steps || 0) - excluded.steps;
+    kept.activeMin = (totals.activeMin || 0) - excluded.activeMin;
+    kept.flights   = totals.flights || 0;
+  }
+  Object.entries(useTotals ? {} : (slots || {})).forEach(([k, v]) => {
+    const [st = 0, am = 0, fl = 0] = v || [];
+    const s0 = slotToMin(k), s1 = s0 + 5;
+    let overlap = 0;
+    windows.forEach(([a, b]) => { overlap += Math.max(0, Math.min(s1, b) - Math.max(s0, a)); });
+    const out = Math.min(1, overlap / 5), keep = 1 - out;
+    kept.steps += st * keep; kept.activeMin += am * keep; kept.flights += fl * keep;
+    excluded.steps += st * out; excluded.activeMin += am * out; excluded.flights += fl * out;
+  });
+  const W = weightKg || 84;
+  const kcalSteps   = kept.steps * APPLE_KCAL.perStepPerKg * W;
+  const kcalActive  = kept.activeMin * APPLE_KCAL.activeMetDelta * W / 60;
+  const kcalFlights = kept.flights * W * 9.81 * APPLE_KCAL.flightMetres / APPLE_KCAL.efficiency / 4184;
+  const r = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
+  return {
+    ...r(kept),
+    excluded: r(excluded),
+    kcal: { steps:Math.round(kcalSteps), active:Math.round(kcalActive), flights:Math.round(kcalFlights),
+            total:Math.round(kcalSteps + kcalActive + kcalFlights) },
+  };
+}
