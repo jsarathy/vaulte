@@ -83,7 +83,7 @@ export default async function handler(req, res) {
 
   let body = req.body;
   if (Buffer.isBuffer(body)) body = body.toString("utf8");
-  if (typeof body === "string") { try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON", received: body.slice(0, 200) }); } }
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON" }); } }
   const { steps, active, flights } = body || {};
   // Accept any value containing YYYY-MM-DD; fall back to today in UK time
   const m = /(\d{4}-\d{2}-\d{2})/.exec(String(body?.date ?? ""));
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     const totals = { steps: Math.round(num(steps)), activeMin: Math.round(num(active)), flights: Math.round(num(flights)) };
     try {
       await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals });
-      return res.json({ ok: true, date, totals, received: { date: body?.date ?? null, steps: steps ?? null, active: active ?? null, flights: flights ?? null, keys: Object.keys(body || {}) } });
+      return res.json({ ok: true, date, totals });
     } catch (e) {
       console.error("apple-sync write failed:", e);
       return res.status(500).json({ error: "Firestore write failed" });

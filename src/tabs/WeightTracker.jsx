@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { db } from "../firebase";
 import { doc, setDoc } from "firebase/firestore";
 import {
-  buildProjectionSeries, projectedWeightAt, waistForWeight, deriveMilestones,
+  buildProjectionSeries, projectedWeightAt, deriveMilestones,
 } from "../constants/weightPlan";
 
 // Friendly names/units for Renpho's raw field names. Unknown keys fall back to a
@@ -26,7 +26,6 @@ const HIDDEN_METRICS = new Set(["weight","fc","isauto","tw","wc"]);
 // Plain-English explanation shown when a metric tab is hovered.
 const METRIC_INFO = {
   weight: "Total body weight, from the Renpho scale. The dashed line is your planned trajectory.",
-  waist: "Waist circumference, measured with a tape. Tracks fat loss where the scale can stall.",
   bmi: "Body Mass Index: weight relative to height. A rough screening number — it can't tell fat from muscle.",
   bodyfat: "Share of your body weight that is fat. Renpho estimates it from bioelectrical impedance, so absolute values are approximate; the trend is what matters.",
   water: "Share of body weight that is water. Drops when dehydrated, so it swings day to day.",
@@ -63,7 +62,7 @@ export default function WeightTracker({
 
   // Trajectory panel: double-click to fill the screen, Esc to collapse.
   const [chartFull, setChartFull] = useState(false);
-  const [chartMetric, setChartMetric] = useState("weight"); // "weight" | "waist" | a Renpho metric key
+  const [chartMetric, setChartMetric] = useState("weight"); // "weight" | a Renpho metric key
   useEffect(() => {
     if (!chartFull) return;
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); setChartFull(false); } };
@@ -112,11 +111,10 @@ export default function WeightTracker({
   const tBmiLo = (cfg.targetWeightMinKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
   const tBmiHi = (cfg.targetWeightMaxKg / Math.pow(cfg.heightCm/100, 2)).toFixed(1);
 
-  // ── Projection curve: anchor points interpolated in time; waist derived ──
+  // ── Projection curve: anchor points interpolated in time ──
   const projSeries = buildProjectionSeries(cfg);
   const planOK = projSeries.length > 1;
   const projectedAt = (dateStr) => projectedWeightAt(cfg, dateStr);
-  const waistAt = (kg) => (kg == null ? null : waistForWeight(cfg, kg));
 
   // Sync cutoff: measurements before this are rejected by the sync route and
   // can be purged from the log. Falls back to the plan start date.
@@ -162,11 +160,12 @@ export default function WeightTracker({
     return new Date(t + Number(wk)*7*86400000).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"2-digit"});
   };
 
-  // Metric tabs: Weight and Waist (with projections) plus one per Renpho metric that has data.
+  // Metric tabs: Weight (with projection) plus one per Renpho metric that has data.
+  // Waist now lives on the Body tab.
   const renphoKeys = [...new Set(weightLog.flatMap(r => Object.keys(r.renpho || {})))]
     .filter(k => !HIDDEN_METRICS.has(k.toLowerCase()))
     .sort((a,b) => metricLabel(a).localeCompare(metricLabel(b)));
-  const metricTabs = [["weight","Weight"],["waist","Waist"], ...renphoKeys.map(k => [k, metricLabel(k)])];
+  const metricTabs = [["weight","Weight"], ...renphoKeys.map(k => [k, metricLabel(k)])];
   const metricPill = (
     <div onDoubleClick={e=>e.stopPropagation()} style={{ position:"relative" }}>
       <div style={{ display:"flex", flexWrap:"wrap", gap:"4px" }}>
@@ -185,7 +184,7 @@ export default function WeightTracker({
                 fontSize:"11.5px", lineHeight:1.45, fontWeight:"normal", boxShadow:"0 4px 14px rgba(0,0,0,0.22)",
                 pointerEvents:"none" }}>
                 <div style={{ fontWeight:"bold", marginBottom:"3px" }}>
-                  {metricLabel(v)}{metricUnit(v) ? ` (${metricUnit(v)})` : v==="weight" ? " (kg)" : v==="waist" ? " (cm)" : ""}
+                  {metricLabel(v)}{metricUnit(v) ? ` (${metricUnit(v)})` : v==="weight" ? " (kg)" : ""}
                 </div>
                 {metricInfo(v)}
               </div>
@@ -223,16 +222,16 @@ export default function WeightTracker({
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px" }}>
             <thead>
               <tr style={{ background:"#185FA5", color:"#fff", position:"sticky", top:0 }}>
-                {["Wk","Date","Dose","Proj (kg)","Actual (kg)","vs Proj","Proj Waist","Waist Act","Cum Loss"].map(h => (
+                {["Wk","Date","Dose","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].map(h => (
                   <th key={h} style={{ padding:"7px 8px", textAlign:"center", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {weightLog.map((row,i) => {
+              {/* Latest first; i stays the index into weightLog (used by saveField) */}
+              {weightLog.map((row,i) => ({ row, i })).reverse().map(({ row, i }) => {
                 const planProj = projectedAt(row.date);
                 const effProj = row.projected!=null ? row.projected : planProj;
-                const projWaist = waistAt(effProj);
                 const vsProj = (row.actual!=null && effProj!=null)?(row.actual-effProj).toFixed(1):null;
                 const cumLoss = row.actual!=null?(cumBaseline-row.actual).toFixed(1):null;
                 const rowBg = i%2===0?"#fff":"#F7FAFD";
@@ -276,18 +275,6 @@ export default function WeightTracker({
                       color:vsProj==null?"#ccc":parseFloat(vsProj)>0?"#c62828":parseFloat(vsProj)<0?"#2E7D32":"#6b7280" }}>
                       {vsProj==null?"—":`${parseFloat(vsProj)>0?"+":""}${vsProj}`}
                     </td>
-                    <td style={{ padding:"5px 8px", textAlign:"right", color:projWaist!=null?"#6b7280":"#ccc" }}>
-                      {projWaist==null?"—":projWaist.toFixed(1)}
-                    </td>
-                    <td style={{ padding:"5px 8px", textAlign:"right" }}>
-                      <input type="number" step="0.1" min="40" max="200"
-                        value={row.waistActual??""}
-                        placeholder={isPast?"—":""}
-                        onChange={e => saveField(i,"waistActual",toNum(e.target.value))}
-                        style={{ width:"56px", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px", textAlign:"right",
-                          background:row.waistActual!=null?"#FFF3E0":"#fff", fontWeight:row.waistActual!=null?"bold":"normal",
-                          color:row.waistActual!=null?"#B26A00":"#1a2a3a" }}/>
-                    </td>
                     <td style={{ padding:"5px 8px", textAlign:"right", color:cumLoss?"#378ADD":"#ccc", fontWeight:cumLoss?"bold":"normal" }}>
                       {cumLoss==null?"—":`-${cumLoss} kg`}
                     </td>
@@ -325,19 +312,18 @@ export default function WeightTracker({
             </div>
           )}
           {(()=>{
-            const isWaist = chartMetric === "waist";
-            const isPlan = chartMetric === "weight" || isWaist; // only these have a projection
-            const valOf = r => chartMetric === "weight" ? r.actual : isWaist ? r.waistActual : r.renpho?.[chartMetric];
-            const unit = chartMetric === "weight" ? "kg" : isWaist ? "cm" : metricUnit(chartMetric);
+            const isPlan = chartMetric === "weight"; // only weight has a projection
+            const valOf = r => isPlan ? r.actual : r.renpho?.[chartMetric];
+            const unit = isPlan ? "kg" : metricUnit(chartMetric);
             const acts = weightLog.filter(r => valOf(r) != null && Number.isFinite(Date.parse(r.date)))
                                   .map(r => ({ t: Date.parse(r.date), v: Number(valOf(r)), date: r.date }))
                                   .sort((a,b) => a.t - b.t);
-            const projOf = p => (isWaist ? p.waist : p.projected);
+            const projOf = p => p.projected;
             const projPts = isPlan ? projSeries.filter(p => projOf(p) != null) : [];
             if (projPts.length < 2 && acts.length < 2) {
               return <div style={{ height:chartFull?"70vh":"200px", display:"flex", alignItems:"center", justifyContent:"center", color:"#9ca3af", fontSize:"12px" }}>
                 {!isPlan ? "Needs at least two readings — sync Renpho to fill this in"
-                  : isWaist ? "Add waist measurements, or set the curve anchors and start waist" : "Set a start date, start weight and curve anchors to see the projection"}
+                  : "Set a start date, start weight and curve anchors to see the projection"}
               </div>;
             }
 
@@ -524,9 +510,6 @@ export default function WeightTracker({
             {editingPlan ? (
               <div style={{ marginBottom:"10px" }}>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"6px", marginBottom:"8px" }}>
-                  <div><span style={lbl}>Start waist (cm)</span>{num("startWaistCm",56,0.1)}</div>
-                  <div><span style={lbl}>cm/kg at start</span>{num("cmPerKgStart",56,0.01)}</div>
-                  <div><span style={lbl}>cm/kg at end</span>{num("cmPerKgEnd",56,0.01)}</div>
                   <div><span style={lbl}>Maint. kcal</span>{num("maintenanceCaloriesKcal",60)}</div>
                   <div style={{ gridColumn:"span 2" }}><span style={lbl}>Sync from (ignore earlier)</span>
                     <input type="date" value={editCfg.syncFromDate||editCfg.startDate||""}
@@ -561,9 +544,6 @@ export default function WeightTracker({
                 {[["Anchors",`${(cfg.planAnchors||[]).length + 1} points`],
                   ["Plan length",planOK?`${projSeries[projSeries.length-1].week} weeks`:"—"],
                   ["End weight",planOK?`${projSeries[projSeries.length-1].projected.toFixed(1)} kg`:"—"],
-                  ["End waist",planOK&&projSeries[projSeries.length-1].waist!=null?`${projSeries[projSeries.length-1].waist.toFixed(1)} cm`:"—"],
-                  ["Start waist",`${cfg.startWaistCm} cm`],
-                  ["Waist rate",`${cfg.cmPerKgStart} → ${cfg.cmPerKgEnd} cm/kg`],
                   ["Maintenance",`${(cfg.maintenanceCaloriesKcal||0).toLocaleString()} kcal`],
                   ["Sync From",syncFrom||"—"]].map(([k,v])=>(
                   <div key={k} style={{ display:"flex", justifyContent:"space-between", borderBottom:"1px solid #F0F4F8", padding:"2px 0" }}>
