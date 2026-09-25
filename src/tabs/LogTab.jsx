@@ -121,7 +121,10 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
   const [polarDetail, setPolarDetail] = useState(null); // loaded session object
   const [polarLoading, setPolarLoading] = useState(null); // item id being loaded
 
+  const [appleKcal, setAppleKcal] = useState(0); // reported by AppleActivityCard
+
   useEffect(() => { saveCollapsed(collapsed); }, [collapsed]);
+  useEffect(() => { setAppleKcal(0); }, [currentDate]);
 
   const openPolarDetail = async (item) => {
     if (!item.polar_session_id || !userId) return;
@@ -138,20 +141,23 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
   const totals = getDayTotals(currentDayData);
   const BMR = calcSex==="m" ? 10*calcWeight+6.25*calcHeight-5*calcAge+5 : 10*calcWeight+6.25*calcHeight-5*calcAge-161;
   let activeTierIdx = 0;
-  if (totals.exerciseBurned>300) activeTierIdx=3;
-  else if (totals.exerciseBurned>150) activeTierIdx=2;
-  else if (totals.exerciseBurned>0) activeTierIdx=1;
+  const exerciseBurned = totals.exerciseBurned + appleKcal; // workouts + Apple Watch daily activity
+  if (exerciseBurned>300) activeTierIdx=3;
+  else if (exerciseBurned>150) activeTierIdx=2;
+  else if (exerciseBurned>0) activeTierIdx=1;
   const activeTier = ACTIVITY_LEVELS[activeTierIdx];
   const tdee = Math.round(BMR * activeTier.factor);
   const macroTgt = calcMacros(tdee, calcWeight, calcProtein, calcFatPct/100);
   const pct = Math.min(100, Math.round((totals.foodKcal/tdee)*100));
   const remaining = tdee - totals.foodKcal;
-  const netKcal = totals.foodKcal - totals.exerciseBurned;
+  const netKcal = totals.foodKcal - exerciseBurned;
   const netRemaining = tdee - netKcal;
   const netPct = Math.min(100, Math.round((netKcal/tdee)*100));
   const macros = [["P",totals.protein,macroTgt.protein_g,"blue"],["F",totals.fat,macroTgt.fat_g,"amber"],["C",totals.carbs,macroTgt.carbs_g,"amber"]];
 
-  const toggle = (id) => setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  // Cards are collapsed by default; only an explicit `false` (user expanded it) shows them open
+  const isClosed = (id) => collapsed[id] ?? true;
+  const toggle = (id) => setCollapsed(prev => ({ ...prev, [id]: !(prev[id] ?? true) }));
 
   // Column widths — shared between header row and item rows
   const COL_ITEM = "auto";
@@ -212,7 +218,7 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
       {/* Summary metric row */}
       <div style={{ display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:"7px",marginBottom:"12px" }}>
         {[
-          ["Consumed",Math.round(totals.foodKcal).toLocaleString(),`${Math.round(totals.exerciseBurned)} kcal exercise burned`,""],
+          ["Consumed",Math.round(totals.foodKcal).toLocaleString(),`${Math.round(exerciseBurned)} kcal burned${appleKcal?` (incl. ${Math.round(appleKcal)} Apple)`:""}`,""],
           ["Protein",`${fmt(totals.protein)}g`,`target ${macroTgt.protein_g}g`,""],
           ["Net carbs",`${fmt(totals.net_carbs)}g`,totals.net_carbs>macroTgt.carbs_g?`+${fmt(totals.net_carbs-macroTgt.carbs_g)}g over`:`${fmt(macroTgt.carbs_g-totals.net_carbs)}g left`,"warn"],
           ["Fat burned",`${fmt(totals.fatBurnedG||0)}g`,totals.exerciseBurned?`${Math.round(totals.exerciseBurned)} kcal exercise`:"no exercise logged",""],
@@ -227,7 +233,7 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
 
       {/* Meal cards */}
       {currentDayData.meals?.map(meal => {
-        const isCollapsed = !!collapsed[meal.id];
+        const isCollapsed = isClosed(meal.id);
         const items = meal.items || [];
         const mKcal  = items.reduce((s,i)=>s+(i.kcal||0),  0);
         const mFat   = items.reduce((s,i)=>s+(i.fat||0),   0);
@@ -339,7 +345,8 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
       })}
 
       {/* Apple Watch activity (below Evening Exercise) */}
-      <AppleActivityCard userId={userId} date={currentDate} dayData={currentDayData} weightKg={calcWeight}/>
+      <AppleActivityCard userId={userId} date={currentDate} dayData={currentDayData} weightKg={calcWeight}
+        collapsed={isClosed("apple_activity")} onToggle={()=>toggle("apple_activity")} onKcal={setAppleKcal}/>
     </>
   );
 }

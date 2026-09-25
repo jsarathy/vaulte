@@ -138,7 +138,7 @@ export function deriveMilestones(cfg) {
   const s = buildProjectionSeries(cfg);
   if (!s.length) return [];
   const fmt = (t) => new Date(t).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const w = (r) => (r.waist != null ? ` - waist ~${r.waist.toFixed(1)} cm` : "");
+  const w = () => ""; // waist moved to the Body tab; milestone notes are weight-only
   const start = s[0], end = s[s.length - 1];
   const first = (pred) => s.find(pred) || null;
 

@@ -262,7 +262,8 @@ export default function BodyTracker({ userId, bodyLog, setBodyLog, sex }) {
                   No measurements yet — click a date in the calendar to start a row.
                 </td></tr>
               )}
-              {bodyLog.map((row,i) => {
+              {/* Latest first; i stays the index into bodyLog (used by saveField) */}
+              {bodyLog.map((row,i) => ({ row, i })).reverse().map(({ row, i }) => {
                 const rowBg = i%2===0?"#fff":"#F7FAFD";
                 const isCurrent = i===bodyLog.length-1;
                 return (
