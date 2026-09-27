@@ -1,6 +1,6 @@
 // src/components/AppleActivityCard.jsx — daily Apple Watch steps / active minutes / flights + kcal
 import { useState, useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { C, FONT } from "../constants/design.jsx";
 import { calcAppleActivity } from "../constants/helpers";
@@ -15,13 +15,12 @@ export default function AppleActivityCard({ userId, date, dayData, weightKg, col
 
   useEffect(() => {
     if (!userId || !date) return;
-    let cancelled = false;
     setLoading(true);
-    getDoc(doc(db, "users", userId, "apple_activity", date))
-      .then(s => { if (!cancelled) setActivity(s.exists() ? s.data() : null); })
-      .catch(e => { console.error("apple_activity load failed:", e); if (!cancelled) setActivity(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    // Live listener: a Shortcut sync shows within a second, no page refresh needed
+    const unsub = onSnapshot(doc(db, "users", userId, "apple_activity", date),
+      s => { setActivity(s.exists() ? s.data() : null); setLoading(false); },
+      e => { console.error("apple_activity listen failed:", e); setActivity(null); setLoading(false); });
+    return unsub;
   }, [userId, date]);
 
   useEffect(() => {
