@@ -1,9 +1,20 @@
 // src/components/HourlyStepsCard.jsx — Apple Watch steps by hour for one day (from apple_activity.hourly)
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 
-export default function HourlyStepsCard({ userId, date }) {
+export default function HourlyStepsCard({ userId, date: dateProp }) {
+  // Own date, so any day can be browsed; follows the Add Entry date when that changes.
+  const [date, setDate] = useState(dateProp);
+  useEffect(() => { setDate(dateProp); }, [dateProp]);
+  const pickerRef = useRef(null);
+  const openPicker = () => {
+    const el = pickerRef.current;
+    if (!el) return;
+    try { el.showPicker(); } catch { el.focus(); el.click(); }
+  };
+  const today = new Date().toLocaleDateString("en-CA");
+  const fmtDate = d => d ? new Date(d + "T12:00:00").toLocaleDateString("en-GB", { weekday:"short", day:"numeric", month:"short", year:"numeric" }) : "";
   const [hourly, setHourly] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hover, setHover] = useState(null);
@@ -32,7 +43,17 @@ export default function HourlyStepsCard({ userId, date }) {
         <div style={{ color:"#fff", fontWeight:"bold", fontSize:"13px", display:"flex", alignItems:"center", gap:"6px" }}>
           <span style={{ fontSize:"16px" }}>⌚</span> Steps by hour
         </div>
-        <span style={{ color:"rgba(255,255,255,0.8)", fontSize:"11px" }}>{date}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:"8px", position:"relative" }}>
+          <span style={{ color:"rgba(255,255,255,0.8)", fontSize:"11px" }}>{fmtDate(date)}</span>
+          <button onClick={openPicker} title="Pick a day"
+            style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"4px", padding:"3px 8px", fontSize:"11px", cursor:"pointer" }}>
+            📅 Browse by date
+          </button>
+          {/* Native calendar, opened by the button */}
+          <input ref={pickerRef} type="date" value={date || ""} max={today}
+            onChange={e => e.target.value && setDate(e.target.value)}
+            style={{ position:"absolute", right:0, bottom:0, width:"1px", height:"1px", opacity:0, pointerEvents:"none" }}/>
+        </div>
       </div>
       <div style={{ padding:"10px 12px" }}>
         {loading ? (
