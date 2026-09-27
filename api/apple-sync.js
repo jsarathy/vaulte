@@ -72,6 +72,23 @@ export function bucketSamples(samples, date, idx, slots) {
   }
 }
 
+// Shortcuts' default date text, e.g. "27 Sep 2026 at 07:00", "27/09/2026, 07:00", "Sep 27, 2026 at 7:00 AM".
+const MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+function parseLoose(str) {
+  const s = String(str || "");
+  let y, mo, d;
+  let m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);                        // 27/09/2026 (UK order)
+  if (m) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+  else if ((m = /(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{4})/.exec(s))) { d = +m[1]; mo = MONTHS[m[2].toLowerCase()]; y = +m[3]; }
+  else if ((m = /([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/.exec(s))) { mo = MONTHS[m[1].toLowerCase()]; d = +m[2]; y = +m[3]; }
+  const t = /(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?/.exec(s.replace(/\d{4}/, ""));
+  if (!y || !mo || !d || !t) return null;
+  let h = +t[1];
+  if (t[3]) { const pm = /p/i.test(t[3]); if (h === 12) h = pm ? 12 : 0; else if (pm) h += 12; }
+  const date = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return { date, min: h * 60 + +t[2] };
+}
+
 // Shortcut lists may arrive as JSON arrays or newline-separated text.
 function toList(x) {
   if (Array.isArray(x)) return x;
@@ -86,7 +103,7 @@ export function buildHourly(values, starts, date) {
   const out = {};
   vals.forEach((v, i) => {
     const n = Number(String(v).replace(/[^0-9.\-]/g, ""));
-    const t = parseLocal(sts[i]);
+    const t = parseLocal(sts[i]) || parseLoose(sts[i]);
     if (!t || t.date !== date || !isFinite(n) || n <= 0) return;
     const hh = String(Math.floor(t.min / 60)).padStart(2, "0");
     out[hh] = (out[hh] || 0) + Math.round(n);
