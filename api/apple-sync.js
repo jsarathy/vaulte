@@ -130,7 +130,10 @@ export default async function handler(req, res) {
   const { steps, active, flights } = body || {};
   // Accept any value containing YYYY-MM-DD; fall back to today in UK time
   const m = /(\d{4}-\d{2}-\d{2})/.exec(String(body?.date ?? ""));
-  const date = m ? m[1] : new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  // Also accept Shortcuts' default date text ("Sep 26, 2026", "26 Sep 2026", "26/09/2026") so a backfill never lands on today by mistake
+  const loose = m ? null : parseLoose(`${body?.date ?? ""} 12:00`);
+  if (!m && !loose && body?.date) return res.status(400).json({ error: `Unrecognised date: ${body.date}` });
+  const date = m ? m[1] : loose ? loose.date : new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
   // Daily-totals mode (Shortcut sends plain numbers): { date, steps, active, flights }
   if (![steps, active, flights].some(Array.isArray)) {
