@@ -3,6 +3,10 @@
 //
 // POST /api/apple-sync
 // Two body formats: daily totals { date, steps, active, flights } (numbers), or timestamped samples below.
+// Daily-totals mode may also carry hourly steps (Find Health Samples, Group by Hour):
+//   hourly_steps: [812, 1540, ...]   hourly_start: ["2026-09-27T07:00:00+01:00", ...]  (same order)
+// Hours with no steps are simply absent (Fill Missing OFF), hence the start times.
+// Stored as hourly: { "07": 812, "08": 1540, ... } alongside totals.
 // Headers: Authorization: Bearer <APPLE_SYNC_TOKEN>
 // Body: {
 //   date:    "YYYY-MM-DD",                       // day being synced (whole day is replaced)
@@ -68,6 +72,28 @@ export function bucketSamples(samples, date, idx, slots) {
   }
 }
 
+// Shortcut lists may arrive as JSON arrays or newline-separated text.
+function toList(x) {
+  if (Array.isArray(x)) return x;
+  if (x == null || x === "") return [];
+  return String(x).split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+}
+
+// Zip hourly values with their start times → { "HH": steps }. Returns null if nothing usable.
+export function buildHourly(values, starts, date) {
+  const vals = toList(values), sts = toList(starts);
+  if (!vals.length || vals.length !== sts.length) return null;
+  const out = {};
+  vals.forEach((v, i) => {
+    const n = Number(String(v).replace(/[^0-9.\-]/g, ""));
+    const t = parseLocal(sts[i]);
+    if (!t || t.date !== date || !isFinite(n) || n <= 0) return;
+    const hh = String(Math.floor(t.min / 60)).padStart(2, "0");
+    out[hh] = (out[hh] || 0) + Math.round(n);
+  });
+  return Object.keys(out).length ? out : null;
+}
+
 function add(slots, slotMin, idx, val) {
   const key = String(Math.floor(slotMin / 60)).padStart(2, "0") + String(slotMin % 60).padStart(2, "0");
   const arr = slots[key] || (slots[key] = [0, 0, 0]);
@@ -93,9 +119,10 @@ export default async function handler(req, res) {
   if (![steps, active, flights].some(Array.isArray)) {
     const num = x => { const n = Number(String(x ?? "").replace(/[^0-9.\-]/g, "")); return isFinite(n) ? n : 0; };
     const totals = { steps: Math.round(num(steps)), activeMin: Math.round(num(active)), flights: Math.round(num(flights)) };
+    const hourly = buildHourly(body?.hourly_steps, body?.hourly_start, date);
     try {
-      await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals });
-      return res.json({ ok: true, date, totals });
+      await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals, ...(hourly ? { hourly } : {}) });
+      return res.json({ ok: true, date, totals, hourly_hours: hourly ? Object.keys(hourly).length : 0 });
     } catch (e) {
       console.error("apple-sync write failed:", e);
       return res.status(500).json({ error: "Firestore write failed" });
