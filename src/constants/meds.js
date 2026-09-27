@@ -3,6 +3,11 @@
 // (weekly grid) and NutritionTracker (Daily log sidebar) so the two views
 // can never drift out of sync.
 
+// Each med can carry inclusive ISO dates: from (started) and to (stopped).
+// No from = applies to all past days; no to = still current.
+// A dose/name change is a NEW entry with a NEW id (history hangs off the id):
+//   { id:"statin_20", name:"Statin 20mg", time:"19:30", from:"2025-01-01", to:"2026-03-14" },
+//   { id:"statin_40", name:"Statin 40mg", time:"19:30", from:"2026-03-15" },
 export const MEDS_TASKS = [
     { id: "thyronorm", name: "Thyronorm", time: "07:00" },
     { id: "esomeprazole", name: "Esomeprazole", time: "11:45" },
@@ -18,6 +23,9 @@ export const isSunday = (dateStr) =>
 export const hasText = (e) =>
     !!(e && ((typeof e.text === "string" && e.text.trim()) || e.done));
 
-// Meds that apply on a given date (Vit D is Sunday-only).
+// Meds that apply on a given date: within from/to (ISO strings compare correctly), Sunday-only where flagged.
 export const medsForDate = (dateStr) =>
-    MEDS_TASKS.filter(t => !t.sunday || isSunday(dateStr));
+    MEDS_TASKS.filter(t =>
+        (!t.sunday || isSunday(dateStr)) &&
+        (!t.from || dateStr >= t.from) &&
+        (!t.to || dateStr <= t.to));
