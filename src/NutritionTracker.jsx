@@ -372,7 +372,7 @@ export default function NutritionTracker({ userId }) {
         const polarSnap=await getDocs(collection(db,"users",userId,"polar_sessions"));
         setPolarSessions(polarSnap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>!s.logged).sort((a,b)=>(b.start_time||"").localeCompare(a.start_time||"")));
         const mergedDays = days.map(ensureMealSlots); setAllDays(mergedDays);
-        if(mergedDays.length>0){const first=mergedDays[0];setCurrentDate(first.date);setCurrentDayData(first);setChatDate(first.date);const slots=mergedDays.slice(0,5).map(d=>d.date);setCompareSlots([...slots,...Array(5-slots.length).fill(null)].slice(0,5));setCompareData(mergedDays.slice(0,5).concat(Array(5).fill(null)).slice(0,5));}
+        if(mergedDays.length>0){const first=mergedDays[0];setCurrentDate(first.date);setCurrentDayData(first);setChatDate(first.date);const logged=mergedDays.filter(d=>d.meals?.some(m=>m.items?.length)).slice(0,5);const slots=logged.map(d=>d.date);setCompareSlots([...slots,...Array(5-slots.length).fill(null)].slice(0,5));setCompareData(logged.concat(Array(5).fill(null)).slice(0,5));}
       }catch(err){console.error("Init error:",err);}finally{setLoading(false);}
     })();
   },[userId]);
@@ -384,7 +384,18 @@ export default function NutritionTracker({ userId }) {
   },[userId]);
 
   const switchDay=async(date)=>{setCurrentDate(date);let data=allDays.find(d=>d.date===date)||null;if(!data)data=await loadDay(userId,date);setCurrentDayData(ensureMealSlots(data));setChatDate(date);setChatMealId("__chat__");};
-  const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));setCurrentDayData(dayData);};
+  const persistDay=async(dayData)=>{await saveDay(userId,dayData);setAllDays(prev=>[dayData,...prev.filter(d=>d.date!==dayData.date)].sort((a,b)=>b.date.localeCompare(a.date)));setCurrentDayData(dayData);
+    const hasEntries=d=>!!d?.meals?.some(m=>m.items?.length);
+    if(hasEntries(dayData)){
+      // A newly logged day that is newer than every Compare slot moves into the first slot (oldest drops off), so Compare shows it without a reload.
+      if(!compareSlots.includes(dayData.date)&&!compareSlots.some(d=>d&&d>dayData.date)){setCompareSlots([dayData.date,...compareSlots.slice(0,4)]);setCompareData([dayData,...compareData.slice(0,4)]);}
+    }else{
+      // Day emptied (last entry deleted): drop it from Compare and backfill with the most recent logged day not already shown.
+      const idx=compareSlots.indexOf(dayData.date);
+      if(idx>=0){const fill=allDays.find(d=>d.date!==dayData.date&&hasEntries(d)&&!compareSlots.includes(d.date))||null;
+        setCompareSlots([...compareSlots.filter((_,i)=>i!==idx),fill?.date||null]);setCompareData([...compareData.filter((_,i)=>i!==idx),fill]);}
+    }
+  };
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
   const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}};
   const openWeightEntry=(date)=>{const ex=weightLog.find(r=>r.date===date)||{};setWeightEntry({date,week:ex.week??"",dose:ex.dose??"",projected:ex.projected??"",actual:ex.actual??"",existing:!!ex.date});};

@@ -357,7 +357,8 @@ export default function BodyTracker({ userId, bodyLog, setBodyLog, sex }) {
             const rawStep = (maxW - minW) / (chartFull ? 10 : 6);
             const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
             const stepY = [1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=rawStep);
-            const yDec = Math.max(0, -Math.floor(Math.log10(stepY) + 1e-9));
+            // Enough decimals to show the step exactly (2.5 → 1, 0.25 → 2), so labels never round onto a neighbouring value.
+            let yDec = 0; while (yDec < 6 && Math.abs(stepY * 10**yDec - Math.round(stepY * 10**yDec)) > 1e-6) yDec++;
             const yTicks=[];
             for(let w=Math.ceil(minW/stepY)*stepY; w<=maxW+1e-9; w+=stepY) yTicks.push(+w.toFixed(yDec+1));
 

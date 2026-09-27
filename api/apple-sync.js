@@ -3,6 +3,10 @@
 //
 // POST /api/apple-sync
 // Two body formats: daily totals { date, steps, active, flights } (numbers), or timestamped samples below.
+// Daily-totals mode may also carry hourly steps (Find Health Samples, Group by Hour):
+//   hourly_steps: [812, 1540, ...]   hourly_start: ["2026-09-27T07:00:00+01:00", ...]  (same order)
+// Hours with no steps are simply absent (Fill Missing OFF), hence the start times.
+// Stored as hourly: { "07": 812, "08": 1540, ... } alongside totals.
 // Headers: Authorization: Bearer <APPLE_SYNC_TOKEN>
 // Body: {
 //   date:    "YYYY-MM-DD",                       // day being synced (whole day is replaced)
@@ -68,6 +72,45 @@ export function bucketSamples(samples, date, idx, slots) {
   }
 }
 
+// Shortcuts' default date text, e.g. "27 Sep 2026 at 07:00", "27/09/2026, 07:00", "Sep 27, 2026 at 7:00 AM".
+const MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+function parseLoose(str) {
+  const s = String(str || "");
+  let y, mo, d;
+  let m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);                        // 27/09/2026 (UK order)
+  if (m) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+  else if ((m = /(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{4})/.exec(s))) { d = +m[1]; mo = MONTHS[m[2].toLowerCase()]; y = +m[3]; }
+  else if ((m = /([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/.exec(s))) { mo = MONTHS[m[1].toLowerCase()]; d = +m[2]; y = +m[3]; }
+  const t = /(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?/.exec(s.replace(/\d{4}/, ""));
+  if (!y || !mo || !d || !t) return null;
+  let h = +t[1];
+  if (t[3]) { const pm = /p/i.test(t[3]); if (h === 12) h = pm ? 12 : 0; else if (pm) h += 12; }
+  const date = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return { date, min: h * 60 + +t[2] };
+}
+
+// Shortcut lists may arrive as JSON arrays or newline-separated text.
+function toList(x) {
+  if (Array.isArray(x)) return x;
+  if (x == null || x === "") return [];
+  return String(x).split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+}
+
+// Zip hourly values with their start times → { "HH": steps }. Returns null if nothing usable.
+export function buildHourly(values, starts, date) {
+  const vals = toList(values), sts = toList(starts);
+  if (!vals.length || vals.length !== sts.length) return null;
+  const out = {};
+  vals.forEach((v, i) => {
+    const n = Number(String(v).replace(/[^0-9.\-]/g, ""));
+    const t = parseLocal(sts[i]) || parseLoose(sts[i]);
+    if (!t || t.date !== date || !isFinite(n) || n <= 0) return;
+    const hh = String(Math.floor(t.min / 60)).padStart(2, "0");
+    out[hh] = (out[hh] || 0) + Math.round(n);
+  });
+  return Object.keys(out).length ? out : null;
+}
+
 function add(slots, slotMin, idx, val) {
   const key = String(Math.floor(slotMin / 60)).padStart(2, "0") + String(slotMin % 60).padStart(2, "0");
   const arr = slots[key] || (slots[key] = [0, 0, 0]);
@@ -87,15 +130,19 @@ export default async function handler(req, res) {
   const { steps, active, flights } = body || {};
   // Accept any value containing YYYY-MM-DD; fall back to today in UK time
   const m = /(\d{4}-\d{2}-\d{2})/.exec(String(body?.date ?? ""));
-  const date = m ? m[1] : new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  // Also accept Shortcuts' default date text ("Sep 26, 2026", "26 Sep 2026", "26/09/2026") so a backfill never lands on today by mistake
+  const loose = m ? null : parseLoose(`${body?.date ?? ""} 12:00`);
+  if (!m && !loose && body?.date) return res.status(400).json({ error: `Unrecognised date: ${body.date}` });
+  const date = m ? m[1] : loose ? loose.date : new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
   // Daily-totals mode (Shortcut sends plain numbers): { date, steps, active, flights }
   if (![steps, active, flights].some(Array.isArray)) {
     const num = x => { const n = Number(String(x ?? "").replace(/[^0-9.\-]/g, "")); return isFinite(n) ? n : 0; };
     const totals = { steps: Math.round(num(steps)), activeMin: Math.round(num(active)), flights: Math.round(num(flights)) };
+    const hourly = buildHourly(body?.hourly_steps, body?.hourly_start, date);
     try {
-      await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals });
-      return res.json({ ok: true, date, totals });
+      await getAdminDb().doc(`users/${userId}/apple_activity/${date}`).set({ date, mode: "daily", updated_at: new Date().toISOString(), totals, ...(hourly ? { hourly } : {}) });
+      return res.json({ ok: true, date, totals, hourly_hours: hourly ? Object.keys(hourly).length : 0 });
     } catch (e) {
       console.error("apple-sync write failed:", e);
       return res.status(500).json({ error: "Firestore write failed" });

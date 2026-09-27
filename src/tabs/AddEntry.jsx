@@ -6,6 +6,7 @@ import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe, claudeRecalculateNutrition } from "../api/claude";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
+import HourlyStepsCard from "../components/HourlyStepsCard";
 import { db } from "../firebase";
 import { doc, setDoc, getDocs, collection, orderBy, query } from "firebase/firestore";
 
@@ -586,6 +587,9 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
             )}
           </div>
         </div>
+
+        {/* Apple Watch steps by hour, for the Add Entry date */}
+        <HourlyStepsCard userId={userId} date={addDate}/>
       </div>
 
       {/* ── Browse All Polar Sessions Modal ── */}
