@@ -5,7 +5,7 @@ export default function RecipeModal({ recipe, onClose }) {
   if (!recipe) return null;
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()}
-      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.35)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:FONT.sans }}>
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.35)", zIndex:5000, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:FONT.sans }}>
       <div style={{ background:"#fff", borderRadius:"10px", width:"580px", maxWidth:"95vw", maxHeight:"88vh", overflowY:"auto", border:`0.5px solid ${C.border}` }}>
         {/* Header */}
         <div style={{ padding:"14px 18px", borderBottom:border, display:"flex", justifyContent:"space-between", alignItems:"flex-start", position:"sticky", top:0, background:"#fff", zIndex:1, borderRadius:"10px 10px 0 0" }}>

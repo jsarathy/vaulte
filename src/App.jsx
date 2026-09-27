@@ -679,6 +679,28 @@ export default function App() {
                   <InfoCard icon="T" label="Telephone"     value={profile.phone} />
                   <InfoCard icon="A" label="Address"       value={[profile.address, profile.city, profile.postcode].filter(Boolean).join(", ")} />
                 </div>
+
+                {/* Accounts the Vaulte app depends on */}
+                <div style={{ marginTop:"28px" }} className="fade-up-3">
+                  <div style={{ color:"rgba(212,175,55,0.6)", fontSize:"10px", letterSpacing:"2px", fontFamily:"'Cinzel',serif", marginBottom:"12px" }}>ACCOUNTS USED BY VAULTE</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:"10px" }}>
+                    {[
+                      { name:"GitHub",                       url:"https://github.com/jsarathy/vaulte" },
+                      { name:"Vercel",                       url:"https://vercel.com/jsarathys-projects/vaulte" },
+                      { name:"Firebase (Google)",            url:"https://console.firebase.google.com/project/vaulte-1ea20" },
+                      { name:"Anthropic (Claude API)" },
+                      { name:"Polar",                        url:"https://flow.polar.com/diary" },
+                      { name:"Renpho" },
+                      { name:"Apple Health (iOS Shortcuts)" },
+                    ].map(({ name, url }) => (
+                      <div key={name} className="info-card" style={{ padding:"12px 16px", flexDirection:"column", alignItems:"flex-start", gap:"4px" }}>
+                        <div style={{ color:"#f0ead6", fontSize:"14px", letterSpacing:"0.3px" }}>{name}</div>
+                        {url && <a href={url} target="_blank" rel="noopener noreferrer"
+                          style={{ color:"rgba(212,175,55,0.8)", fontSize:"11px", wordBreak:"break-all", textDecoration:"none" }}>{url.replace(/^https:\/\//,"")}</a>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>

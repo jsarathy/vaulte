@@ -57,10 +57,12 @@ export default function AddEntry({
   const [recalcLoading, setRecalcLoading] = useState(false);
   // Unified quantity modal — replaces old ingredientModal
   const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
+  const qtyModalRef = useRef(null); qtyModalRef.current = qtyModal; // live value for async callbacks
   const [qtyValue, setQtyValue] = useState("1");
   const [qtyUnit, setQtyUnit] = useState("portion");
   const [qtyLoading, setQtyLoading] = useState(false);
   const [qtyError, setQtyError] = useState("");
+  const [qtySave, setQtySave] = useState(false); // save the looked-up item to Saved recipes
   // ── Saved-recipe matching ──────────────────────────────────────────────────
   // Normalised exact match only: lowercase, trim, collapse internal whitespace.
   // Substring matching is deliberately NOT used here — "chicken curry" must not
@@ -82,6 +84,7 @@ export default function AddEntry({
   };
   const openPortionModal = (recipe) => {
     setShowDropdown(false);
+    recipePortionModalRef.current = { recipe }; // set now so the pending blur timer sees it
     setRecipePortionModal({ recipe });
     setRecipePortionQty("1");
     setRecipePortionUnit("portion");
@@ -91,6 +94,7 @@ export default function AddEntry({
 
   // Recipe portion modal — lets user scale macros before adding a saved recipe
   const [recipePortionModal, setRecipePortionModal] = useState(null); // { recipe }
+  const recipePortionModalRef = useRef(null); recipePortionModalRef.current = recipePortionModal; // live value for the name-box blur timer
   const [recipePortionQty, setRecipePortionQty] = useState("1");
   const [recipePortionUnit, setRecipePortionUnit] = useState("portion");
   const [recipePortionScaled, setRecipePortionScaled] = useState(null);
@@ -156,7 +160,9 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
     const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
     if (!hasNutrition) {
       // Open qty modal (user can switch to recipe builder from there if needed)
-      setQtyValue("1"); setQtyUnit("portion"); setQtyError("");
+      const saved = findSavedRecipe(addItem.name);
+      if (saved) { openPortionModal(saved); return; }
+      setQtyValue("1"); setQtyUnit("portion"); setQtyError(""); setQtySave(false);
       setQtyModal({ name: addItem.name, autoSubmit: true });
       setTimeout(() => qtyInputRef.current?.focus(), 50);
       return;
@@ -234,38 +240,23 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   setShowDropdown(matches.length > 0);
                 } else setShowDropdown(false);
               }}
-              onBlur={async () => {
-                setTimeout(async () => {
+              onBlur={() => {
+                setTimeout(() => {
                   setShowDropdown(false);
-                  if (qtyModal) return; // already open, skip
+                  // Skip if a box is already open — incl. a recipe just picked from the dropdown
+                  if (qtyModalRef.current || recipePortionModalRef.current) return;
                   const name = addItem.name.trim();
                   if (!name) return;
                   // If already has nutrition (filled from recipe dropdown), skip
                   const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
                   if (hasNutrition) return;
-                  // Already saved? Use it — no classification call, no recipe builder.
+                  // Already saved? Use it — no Claude call.
                   const saved = findSavedRecipe(name);
                   if (saved) { openPortionModal(saved); return; }
-                  // Classify: ingredient → qty modal (grams), dish → recipe builder
-                  try {
-                    const res = await fetch("/api/claude", {
-                      method:"POST", headers:{"Content-Type":"application/json"},
-                      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:10,
-                        messages:[{role:"user", content:`Is "${name}" a single whole-food ingredient (apple, milk, chicken breast) or a cooked/prepared dish (stew, curry, pasta)? Reply with exactly one word: INGREDIENT or DISH`}] })
-                    });
-                    const data = await res.json();
-                    const verdict = (data.content?.[0]?.text||"DISH").trim().toUpperCase();
-                    if (verdict.includes("INGREDIENT")) {
-                      setQtyValue("100"); setQtyUnit("g"); setQtyError("");
-                      setQtyModal({ name });
-                      setTimeout(() => qtyInputRef.current?.focus(), 50);
-                    } else {
-                      setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
-                    }
-                  } catch {
-                    // On error, fall back to recipe builder for dishes
-                    setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
-                  }
+                  // Otherwise open Get Nutrition at 1 portion. Ingredient/dish is decided on click.
+                  setQtyValue("1"); setQtyUnit("portion"); setQtyError(""); setQtySave(false);
+                  setQtyModal({ name });
+                  setTimeout(() => qtyInputRef.current?.focus(), 50);
                 }, 150);
               }}
               onKeyDown={e => {
@@ -278,7 +269,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   e.preventDefault();
                   openPortionModal(saved);
                 }
-                // If no match, let onBlur handle ingredient/dish classification as before
+                // If no match, onBlur opens the Get Nutrition box
               }}
               onFocus={() => { if (nameDropdown.length>0) setShowDropdown(true); }}
               placeholder="e.g. Pinto bean stew (1 portion)"
@@ -718,6 +709,11 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
               </div>
             </div>
 
+            <label style={{ display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:C.muted,marginBottom:"14px",cursor:"pointer" }}>
+              <input type="checkbox" checked={qtySave} onChange={e=>setQtySave(e.target.checked)}/>
+              Save to Saved recipes
+            </label>
+
             {qtyError && <div style={{ fontSize:"11px",color:C.danger,marginBottom:"10px" }}>{qtyError}</div>}
             {qtyLoading && <div style={{ fontSize:"11px",color:C.muted,marginBottom:"10px",textAlign:"center" }}>Looking up nutrition…</div>}
 
@@ -733,9 +729,11 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                   const name = qtyModal.name;
                   setQtyLoading(true); setQtyError("");
                   try {
-                    const prompt = `Give me the nutrition for ${qty} ${unit === "portion" ? `portion${qty !== 1 ? "s" : ""}` : unit} of "${name}".
-Reply with ONLY a JSON object, no markdown, no explanation:
-{"display_name":"${name} (${qty} ${unit === "portion" ? "portion" : unit})","kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}
+                    const amount = `${qty} ${unit === "portion" ? `portion${qty !== 1 ? "s" : ""}` : unit}`;
+                    const prompt = `First decide: is "${name}" a single food eaten as-is (apple, raw carrots, milk, chicken breast, a slice of toast) or a cooked/prepared dish that needs a recipe (stew, curry, pasta bake)?
+If it is a DISH, reply with ONLY: {"kind":"DISH"}
+Otherwise give the nutrition for ${amount} of "${name}". Reply with ONLY a JSON object, no markdown, no explanation:
+{"kind":"INGREDIENT","display_name":"${name} (${qty} ${unit === "portion" ? "portion" : unit})","kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}
 Use realistic values. For portions use a typical serving size.`;
                     const res = await fetch("/api/claude", {
                       method:"POST", headers:{"Content-Type":"application/json"},
@@ -745,6 +743,27 @@ Use realistic values. For portions use a typical serving size.`;
                     const data = await res.json();
                     const text = (data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
                     const n = JSON.parse(text);
+                    if (String(n.kind||"").toUpperCase() === "DISH") {
+                      // Dish → recipe builder with the name filled in
+                      setQtyModal(null);
+                      setBuilderInput(name); setBuilderPreview(null); setBuilderError(""); setRecipeBuilder(true);
+                      return;
+                    }
+                    if (qtySave) {
+                      // Saved as 1 portion: portions → divide by qty; any other unit → 1 portion = the amount entered
+                      const per = unit === "portion" ? qty : 1;
+                      const val = k => { const v = Number(n[k]); return Number.isFinite(v) ? Math.round(v / per * 10) / 10 : 0; };
+                      const recipe = {
+                        id: genId(), name, description: "", source: "Get Nutrition", servings: 1,
+                        prep_time: "", cook_time: "",
+                        ingredients: [{ amount: unit === "portion" ? "1 portion" : `${qty} ${unit}`, item: name }],
+                        steps: [], notes: "",
+                        nutrition: Object.fromEntries(["kcal","fat","sat_fat","carbs","sugar","fibre","net_carbs","protein"].map(k => [k, val(k)])),
+                        ...(unit === "g" ? { portion_g: qty } : {}),
+                      };
+                      await saveRecipe(userId, recipe);
+                      setUserRecipes(prev => [...prev.filter(r => normName(r.name) !== normName(name)), recipe].sort((a,b)=>a.name.localeCompare(b.name)));
+                    }
                     const filledItem = {
                       name: n.display_name || `${name} (${qty} ${unit})`,
                       kcal: n.kcal ?? "", fat: n.fat ?? "", sat_fat: n.sat_fat ?? "",
