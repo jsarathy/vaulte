@@ -72,11 +72,12 @@ export default function HourlyStepsCard({ userId, date: dateProp }) {
   const k = full ? 1.6 : 1;
   const W = full ? Math.max(600, box.w || (typeof window !== "undefined" ? window.innerWidth - 48 : 1200)) : 300;
   const H = full ? Math.max(300, (box.h || (typeof window !== "undefined" ? window.innerHeight - 140 : 600)) - 4) : 130;
-  const PAD = { l: 34 * k, r: 8 * k, t: 10 * k, b: 18 * k };
+  const tk = full ? 1.5 : 1; // expanded view: all text 50% larger (Fix 8)
+  const PAD = { l: 34 * k * tk, r: 8 * k, t: 10 * k * tk, b: 18 * k * tk };
   const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b, bw = cW / 24;
   const { yMax, ticks } = niceAxis(peakVal, full ? 8 : 4);
   const yS = v => PAD.t + cH - (v / yMax) * cH;
-  const fs = 8 * k;
+  const fs = 8 * k * tk;
   const xLabelHours = full ? Array.from({ length: 24 }, (_, h) => h) : [0, 3, 6, 9, 12, 15, 18, 21];
 
   const chart = (
@@ -109,7 +110,7 @@ export default function HourlyStepsCard({ userId, date: dateProp }) {
   );
 
   const summary = (
-    <div style={{ display:"flex", justifyContent:"space-between", fontSize: full ? "13px" : "11px", color:"#6b7280", marginBottom:"4px" }}>
+    <div style={{ display:"flex", justifyContent:"space-between", fontSize: full ? "20px" : "11px", color:"#6b7280", marginBottom: full ? "8px" : "4px" }}>
       <span>{hover != null ? `${hh(hover)}–${hh((hover + 1) % 24)} · ${vals[hover].toLocaleString()} steps` : `${total.toLocaleString()} steps`}</span>
       <span>peak {hh(peak)} · {peakVal.toLocaleString()}</span>
     </div>
@@ -117,9 +118,9 @@ export default function HourlyStepsCard({ userId, date: dateProp }) {
 
   const browseBtn = (dark) => (
     <div style={{ display:"flex", alignItems:"center", gap:"8px", position:"relative" }}>
-      <span style={{ color: dark ? "rgba(255,255,255,0.8)" : "#6b7280", fontSize: dark ? "11px" : "13px" }}>{fmtDate(date)}</span>
+      <span style={{ color: dark ? "rgba(255,255,255,0.8)" : "#6b7280", fontSize: dark ? "11px" : "20px" }}>{fmtDate(date)}</span>
       <button onClick={openPicker} onDoubleClick={e => e.stopPropagation()} title="Pick a day"
-        style={{ background: dark ? "rgba(255,255,255,0.15)" : "#185FA5", border:"none", color:"#fff", borderRadius:"4px", padding:"3px 8px", fontSize:"11px", cursor:"pointer" }}>
+        style={{ background: dark ? "rgba(255,255,255,0.15)" : "#185FA5", border:"none", color:"#fff", borderRadius:"4px", padding: dark ? "3px 8px" : "5px 12px", fontSize: dark ? "11px" : "16px", cursor:"pointer" }}>
         📅 Browse by date
       </button>
       <input ref={pickerRef} type="date" value={date || ""} max={today}
@@ -142,10 +143,10 @@ export default function HourlyStepsCard({ userId, date: dateProp }) {
         style={{ position:"fixed", inset:0, zIndex:1000, background:"#fff", padding:"20px 24px", display:"flex", flexDirection:"column", cursor:"zoom-out" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
-            <span style={{ fontSize:"16px", fontWeight:"bold", color:"#185FA5" }}>⌚ Steps by hour</span>
+            <span style={{ fontSize:"24px", fontWeight:"bold", color:"#185FA5" }}>⌚ Steps by hour</span>
             {browseBtn(false)}
           </div>
-          <span style={{ fontSize:"11px", color:"#9ca3af" }}>Esc or double-click to collapse</span>
+          <span style={{ fontSize:"16px", color:"#9ca3af" }}>Esc or double-click to collapse</span>
         </div>
         {body}
       </div>
