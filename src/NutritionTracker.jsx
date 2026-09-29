@@ -16,6 +16,7 @@ import CompareTab    from "./tabs/CompareTab";
 import AddEntry      from "./tabs/AddEntry";
 import WeightTracker from "./tabs/WeightTracker";
 import BodyTracker   from "./tabs/BodyTracker";
+import MonthlyTargetsCard from "./components/MonthlyTargetsCard";
 
 // ── Meds panel (Daily log sidebar) ───────────────────────────────────────────
 // Reads and writes the SAME routine_log/{date} documents as RoutineTracker,
@@ -350,6 +351,13 @@ export default function NutritionTracker({ userId }) {
   const [addItem,setAddItem]=useState({name:"",kcal:"",fat:"",sat_fat:"",carbs:"",sugar:"",fibre:"",net_carbs:"",protein:""});const [addMsg,setAddMsg]=useState(null);
   const [compareSlots,setCompareSlots]=useState([null,null,null,null,null]);const [compareData,setCompareData]=useState([null,null,null,null,null]);
   const [calcSex,setCalcSex]=useState("m");const [calcAge,setCalcAge]=useState(60);const [calcHeight,setCalcHeight]=useState(165);const [calcWeight,setCalcWeight]=useState(84);const [calcProtein,setCalcProtein]=useState(1.4);const [calcFatPct,setCalcFatPct]=useState(30);
+  // Reference calculator: save inputs whenever one changes (after the saved values have loaded)
+  const calcLoadedRef=useRef(false);
+  useEffect(()=>{
+    if(!userId||!calcLoadedRef.current)return;
+    const t=setTimeout(()=>{setDoc(doc(db,"users",userId,"settings","calculator"),{sex:calcSex,age:calcAge,height:calcHeight,weight:calcWeight,protein:calcProtein,fatPct:calcFatPct,updated_at:new Date().toISOString()}).catch(e=>console.error("calculator save failed",e));},600);
+    return()=>clearTimeout(t);
+  },[userId,calcSex,calcAge,calcHeight,calcWeight,calcProtein,calcFatPct]);
 
   useEffect(()=>{
     if(!userId){setLoading(false);return;}
@@ -358,6 +366,8 @@ export default function NutritionTracker({ userId }) {
         setLoading(true);
         let days=await loadAllDays(userId);if(days.length===0)days=await seedInitialData(userId);
         const recipes=await loadAllRecipes(userId);setUserRecipes(recipes);
+        // Reference calculator inputs (Compare tab) — restore saved values
+        try{const cd=await getDoc(doc(db,"users",userId,"settings","calculator"));if(cd.exists()){const c=cd.data();if(c.sex)setCalcSex(c.sex);if(Number.isFinite(c.age))setCalcAge(c.age);if(Number.isFinite(c.height))setCalcHeight(c.height);if(Number.isFinite(c.weight))setCalcWeight(c.weight);if(Number.isFinite(c.protein))setCalcProtein(c.protein);if(Number.isFinite(c.fatPct))setCalcFatPct(c.fatPct);}}catch(e){console.error("calculator load failed",e);}finally{calcLoadedRef.current=true;}
         const cfgDoc=await getDoc(doc(db,"users",userId,"weight_plan","settings"));
         const cfg=cfgDoc.exists()?{...DEFAULT_PLAN_CONFIG,...cfgDoc.data()}:DEFAULT_PLAN_CONFIG;
         setWeightPlanConfig(cfg);setEditCfg(cfg);
@@ -482,6 +492,7 @@ export default function NutritionTracker({ userId }) {
         <div style={{ width:"190px",flexShrink:0,background:C.surface,borderRight:`0.5px solid ${C.border}`,display:"flex",flexDirection:"column",overflow:"hidden" }}>
           <div style={{ flex:1,overflowY:"auto" }}>
             <CalendarSidebar allDays={allDays} currentDate={currentDate} calYear={calYear} calMonth={calMonth} setCalYear={setCalYear} setCalMonth={setCalMonth} switchDay={onCalendarClick}/>
+            <MonthlyTargetsCard userId={userId} year={calYear} month={calMonth}/>
           </div>
           {activeTab==="log"&&<MedsPanel userId={userId} date={currentDate}/>}
           {allDays.length>0&&(()=>{
