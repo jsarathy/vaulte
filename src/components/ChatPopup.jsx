@@ -1,5 +1,6 @@
 // src/components/ChatPopup.jsx
 import { useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { fmt } from "../constants/helpers";
 import { C, FONT, border, IconChat, IconSend, IconX, IconTrash } from "../constants/design";
 
@@ -11,7 +12,9 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
   // to the bubble; the next open starts beside the bubble again. Size is remembered, position is not.
   const MIN = { w: 340, h: 420 }, M = 8; // min size, margin from the browser edges
   const wrapRef = useRef(null);
-  const vw = () => window.innerWidth, vh = () => window.innerHeight;
+  // Bounds = the visible display (visual viewport when available, e.g. with pinch-zoom / on-screen keyboard).
+  const vw = () => Math.floor(window.visualViewport?.width || document.documentElement.clientWidth || window.innerWidth);
+  const vh = () => Math.floor(window.visualViewport?.height || document.documentElement.clientHeight || window.innerHeight);
   const clampSize = (w, h) => ({
     w: Math.round(Math.min(Math.max(w, MIN.w), Math.max(MIN.w, vw() - 2 * M))),
     h: Math.round(Math.min(Math.max(h, MIN.h), Math.max(MIN.h, vh() - 2 * M))),
@@ -45,7 +48,8 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
       if (posRef.current) setPos(clampPos(posRef.current.x, posRef.current.y, s.w, s.h));
     };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("resize", onResize); window.visualViewport?.removeEventListener("resize", onResize); };
   }, [chatOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const track = (onMove, onUp) => {
@@ -95,7 +99,9 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
 
   return (
     <div ref={wrapRef} style={{ position:"absolute", bottom:"16px", right:"16px", zIndex:500 }}>
-      {chatOpen && pos && (
+      {chatOpen && pos && createPortal(
+        // Portalled to <body>: the app sits inside an animated (transformed) wrapper, which would otherwise make
+        // "fixed" relative to that wrapper instead of the screen and push the window off the visible display.
         <div style={{ position:"fixed", left:`${pos.x}px`, top:`${pos.y}px`, width:`${size.w}px`, height:`${size.h}px`, zIndex:2500, background:"#fff", borderRadius:"10px", boxShadow:"0 12px 40px rgba(0,0,0,0.22)", border:`0.5px solid ${C.border}`, display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:FONT.sans }}>
           {/* Resize handles on every edge and corner */}
           {handles.map(([dx, dy, box, cursor], i) => (
@@ -211,7 +217,7 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
             </button>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* Floating button */}
       <button onClick={()=>setChatOpen(o=>!o)} title="Nutrition assistant"
