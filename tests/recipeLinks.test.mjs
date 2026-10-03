@@ -49,3 +49,51 @@ test("splitIngredients + combineNutrition: A + rice, 2 servings", () => {
   assert.equal(n.protein, Math.round((15 * 250 / 328 + 9.5) / 2 * 10) / 10);
   assert.equal(n.sugar, 0);
 });
+
+// ── Fix 22: dependent recipes follow changes to the recipes they use ─────────
+import { relinkDependent, applyLinkDelta } from "../src/constants/recipeLinks.js";
+const B = { id:"b", name:"Pinto Rice Bowl", servings:2, portion_g:300, portion_g_source:"estimated",
+  ingredients:[{ amount:"250g", item:"Pinto Bean Stew" }, { amount:"350g", item:"Cooked basmati rice" }],
+  nutrition:{ kcal:733.8, fat:9.2, sat_fat:1, carbs:37.5, sugar:2.5, fibre:11.7, net_carbs:25.8, protein:15.7 } };
+
+test("relink: unrelated recipe has no rows", () => {
+  const C = { id:"c", name:"Toast", ingredients:[{ amount:"1", item:"Bread" }] };
+  assert.equal(relinkDependent(C, A, { ...A, nutrition:{ kcal:400 } }, recipes, recipes).rows.length, 0);
+});
+test("A's kcal 338 → 400: B changes by (400−338)×250/328 ÷ 2", () => {
+  const A2 = { ...A, nutrition:{ ...A.nutrition, kcal:400 } };
+  const { rows, deltaOk, ingredients } = relinkDependent(B, A, A2, recipes, [A2, N]);
+  assert.equal(deltaOk, true); assert.deepEqual(ingredients, B.ingredients);
+  const { nutrition, weight } = applyLinkDelta(B, rows);
+  assert.equal(nutrition.kcal, Math.round((733.8 + (400 - 338) * 250 / 328 / 2) * 10) / 10); // 757.4
+  assert.equal(nutrition.protein, 15.7);
+  assert.deepEqual(weight, { portion_g:300, portion_g_source:"estimated" }); // grams unchanged
+});
+test("A's Wt/portion 328 → 400: grams link re-scales, B's weight unchanged", () => {
+  const A2 = { ...A, portion_g:400 };
+  const { rows } = relinkDependent(B, A, A2, recipes, [A2, N]);
+  const { nutrition } = applyLinkDelta(B, rows);
+  assert.equal(nutrition.kcal, Math.round((733.8 + (338 * 250 / 400 - 338 * 250 / 328) / 2) * 10) / 10);
+});
+test("portions link: A's weight change moves B's estimated weight; weighed B kept", () => {
+  const Bp = { ...B, ingredients:[{ amount:"1 portion", item:"Pinto Bean Stew" }, B.ingredients[1]] };
+  const A2 = { ...A, portion_g:340 };
+  const { rows } = relinkDependent(Bp, A, A2, recipes, [A2, N]);
+  assert.deepEqual(applyLinkDelta(Bp, rows).weight, { portion_g:306, portion_g_source:"estimated" }); // 300 + 12/2
+  assert.deepEqual(applyLinkDelta({ ...Bp, portion_g_source:"weighed" }, rows, { keepWeight:true }).weight, {});
+});
+test("rename: B's ingredient follows the new name", () => {
+  const A2 = { ...A, name:"Pinto Stew v2" };
+  const { ingredients, deltaOk } = relinkDependent(B, A, A2, recipes, [A2, N]);
+  assert.equal(ingredients[0].item, "Pinto Stew v2"); assert.equal(deltaOk, true);
+});
+test("not usable before (no Wt/portion) → full recalculation needed", () => {
+  const A0 = { ...A, portion_g:undefined };
+  const { deltaOk, rows } = relinkDependent(B, A0, A, [A0, N], recipes);
+  assert.equal(rows.length, 1); assert.equal(deltaOk, false);
+});
+test("new recipe matching an ingredient name → full recalculation", () => {
+  const R = { id:"r", name:"Cooked basmati rice", portion_g:150, nutrition:{ kcal:190 } };
+  const { rows, deltaOk } = relinkDependent(B, null, R, recipes, [...recipes, R]);
+  assert.equal(rows.length, 1); assert.equal(deltaOk, false);
+});

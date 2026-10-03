@@ -7,7 +7,7 @@
 //                    and is never overwritten.
 import { saveRecipe } from "./firestore";
 import { claudeEstimatePortionWeight, claudeRecalculateNutrition } from "./claude";
-import { splitIngredients, combineNutrition } from "../constants/recipeLinks";
+import { splitIngredients, combineNutrition, relinkDependent, applyLinkDelta } from "../constants/recipeLinks";
 
 export const hasPortionWeight = r => Number(r?.portion_g) > 0;
 export const isEstimatedWeight = r => hasPortionWeight(r) && r.portion_g_source === "estimated";
@@ -54,6 +54,41 @@ export async function computeRecipeFields(recipe, recipes = [], { keepWeight = f
   return { nutrition, ...(weight || {}) };
 }
 
+// After saved recipe A changes (oldA → newA; oldA null if new), update every
+// recipe that uses it, then their dependents in turn. Uses the difference in
+// A's contribution where both old and new links are usable (no Claude call);
+// otherwise recalculates the recipe in full. Each recipe is saved as it's done.
+// recipesNew: the recipe list including newA. Returns { list, updated: [names] }.
+export async function propagateRecipeChange(uid, oldA, newA, recipesNew, setUserRecipes, path = new Set()) {
+  const onPath = new Set(path).add(newA.id);
+  let list = recipesNew;
+  const recipesOld = oldA ? list.map(r => r.id === newA.id ? oldA : r) : list.filter(r => r.id !== newA.id);
+  const updated = [];
+  for (const id of list.map(r => r.id)) {
+    if (onPath.has(id)) continue;                       // never itself, no cycles
+    const B = list.find(r => r.id === id);              // latest copy (may have been updated deeper down)
+    const { ingredients, rows, deltaOk } = relinkDependent(B, oldA, newA, recipesOld, list);
+    if (!rows.length) continue;
+    const keepWeight = hasPortionWeight(B) && !isEstimatedWeight(B);
+    const B1 = { ...B, ingredients };
+    let fields;
+    if (deltaOk) {
+      const { nutrition, weight } = applyLinkDelta(B, rows, { keepWeight });
+      fields = { nutrition, ...(weight ?? ((await estimatePortionWeight(B1, list)) || {})) };
+    } else {
+      fields = await computeRecipeFields(B1, list, { keepWeight });
+    }
+    const B2 = { ...B1, ...fields };
+    await saveRecipe(uid, B2);
+    list = list.map(r => r.id === B2.id ? B2 : r);
+    setUserRecipes(prev => prev.map(r => r.id === B2.id ? B2 : r));
+    updated.push(B2.name);
+    const deeper = await propagateRecipeChange(uid, B, B2, list, setUserRecipes, onPath);
+    list = deeper.list; updated.push(...deeper.updated);
+  }
+  return { list, updated };
+}
+
 // One-off fill-in for saved recipes with no Wt/portion. Runs once per page
 // load; each recipe is saved as soon as its estimate arrives. A recipe edited
 // meanwhile (or given a weight) is skipped and picked up on a later load.
@@ -70,6 +105,9 @@ export async function backfillPortionWeights(uid, getRecipes, setUserRecipes) {
       const updated = { ...latest, ...w };
       await saveRecipe(uid, updated);
       setUserRecipes(prev => prev.map(x => x.id === updated.id && !hasPortionWeight(x) ? updated : x));
+      // Recipes built on this one may now link properly (grams need a Wt/portion)
+      await propagateRecipeChange(uid, latest, updated, getRecipes().map(x => x.id === updated.id ? updated : x), setUserRecipes)
+        .catch(e => console.error("dependent recipe update failed", e));
     }
   } catch (e) {
     console.error("portion weight backfill failed", e);

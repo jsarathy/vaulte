@@ -4,7 +4,7 @@ import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../consta
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe, claudeScaleRecipeNutrition } from "../api/claude";
-import { computeRecipeFields, hasPortionWeight, isEstimatedWeight } from "../api/recipeWeights";
+import { computeRecipeFields, hasPortionWeight, isEstimatedWeight, propagateRecipeChange } from "../api/recipeWeights";
 import { linkInfo, splitIngredients } from "../constants/recipeLinks";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
@@ -63,6 +63,7 @@ export default function AddEntry({
   const [builderEditId, setBuilderEditId] = useState(null);
   const [builderNutritionKey, setBuilderNutritionKey] = useState(null);
   const [builderSaving, setBuilderSaving] = useState(false);
+  const [recipeNotice, setRecipeNotice] = useState(null); // { ok, text } — dependent recipes updated after a save
   const nutritionKey = r => JSON.stringify({
     s: Number(r?.servings) || 0,
     i: (r?.ingredients || []).map(x => [String(x.amount || "").trim(), String(x.item || "").trim()]).filter(([a, b]) => a || b),
@@ -797,6 +798,9 @@ Use realistic values. For portions use a typical serving size.`;
                       };
                       await saveRecipe(userId, recipe);
                       setUserRecipes(prev => [...prev.filter(r => normName(r.name) !== normName(name)), recipe].sort((a,b)=>a.name.localeCompare(b.name)));
+                      const replaced = userRecipes.find(r => normName(r.name) === normName(name)) || null;
+                      propagateRecipeChange(userId, replaced, recipe, [...userRecipes.filter(r => normName(r.name) !== normName(name)), recipe], setUserRecipes)
+                        .catch(e => console.error("dependent recipe update failed", e));
                     }
                     const filledItem = {
                       name: n.display_name || `${name} (${qty} ${unit})`,
@@ -995,6 +999,15 @@ Use realistic values. For portions use a typical serving size.`;
                         }
                         await saveRecipe(userId, recipe);
                         setUserRecipes(prev=>[...prev.filter(r=>r.id!==recipe.id),recipe].sort((a,b)=>a.name.localeCompare(b.name)));
+                        // Recipes that use this one are updated too
+                        setRecipeNotice(null);
+                        try {
+                          const oldA = builderEditId ? userRecipes.find(r=>r.id===recipe.id) : null;
+                          const { updated } = await propagateRecipeChange(userId, oldA, recipe, [...userRecipes.filter(r=>r.id!==recipe.id), recipe], setUserRecipes);
+                          if (updated.length) setRecipeNotice({ ok:true, text:`Also updated ${updated.length} recipe${updated.length===1?"":"s"} that use${updated.length===1?"s":""} it: ${updated.join(", ")}` });
+                        } catch (err) {
+                          setRecipeNotice({ ok:false, text:`Saved, but couldn't update recipes that use it (${err.message || "error"}) — open them and save to recalculate.` });
+                        }
                         if (!builderEditId) {
                           const n = recipe.nutrition||{};
                           setAddItem({ name:recipe.name, kcal:n.kcal||"", fat:n.fat||"", sat_fat:n.sat_fat||"",
@@ -1023,8 +1036,9 @@ Use realistic values. For portions use a typical serving size.`;
           <div style={{ background:"#fff", borderRadius:"12px", width:"520px", maxWidth:"95vw", maxHeight:"88vh", display:"flex", flexDirection:"column", boxShadow:"0 8px 40px rgba(0,0,0,0.25)" }}>
             <div style={{ background:"#185FA5", color:"#fff", padding:"14px 18px", borderRadius:"12px 12px 0 0", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
               <div style={{ fontWeight:"bold", fontSize:"15px" }}>📖 Saved Recipes</div>
-              <button onClick={()=>setShowRecipesModal(false)} style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
+              <button onClick={()=>{ setShowRecipesModal(false); setRecipeNotice(null); }} style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
             </div>
+            {recipeNotice && <div data-recipe-notice style={{ margin:"8px 8px 0", padding:"7px 10px", borderRadius:"6px", fontSize:"12px", background:recipeNotice.ok?"#E8F5E9":"#FFF8E1", color:recipeNotice.ok?"#2E7D32":"#8D6E00" }}>{recipeNotice.text}</div>}
             <div style={{ flex:1, overflowY:"auto", padding:"8px" }}>
               {userRecipes.length===0
                 ? <div style={{ textAlign:"center", padding:"30px", color:"#6b7280", fontSize:"13px" }}>No saved recipes yet. Use "Create with Claude" to build your first recipe.</div>
