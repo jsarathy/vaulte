@@ -6,6 +6,7 @@ import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS } f
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
+import { backfillPortionWeights } from "./api/recipeWeights";
 import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
 import { MEDS_TASKS, medsForDate, hasText } from "./constants/meds";
 
@@ -334,7 +335,7 @@ export default function NutritionTracker({ userId }) {
   const [allDays,setAllDays]=useState([]);const [currentDate,setCurrentDate]=useState(null);const [currentDayData,setCurrentDayData]=useState(null);
   const [activeTab,setActiveTab]=useState("log");const [loading,setLoading]=useState(true);
   const [calYear,setCalYear]=useState(()=>new Date().getFullYear());const [calMonth,setCalMonth]=useState(()=>new Date().getMonth());
-  const [recipeModal,setRecipeModal]=useState(null);const [userRecipes,setUserRecipes]=useState([]);
+  const [recipeModal,setRecipeModal]=useState(null);const [userRecipes,setUserRecipes]=useState([]);const userRecipesRef=useRef([]);userRecipesRef.current=userRecipes;
   const [polarConnected,setPolarConnected]=useState(false);const [polarSessions,setPolarSessions]=useState([]);
   const [polarSyncing,setPolarSyncing]=useState(false);const [polarLastSync,setPolarLastSync]=useState(null);
   const [polarSyncMsg,setPolarSyncMsg]=useState(null);const [polarLogModal,setPolarLogModal]=useState(null);
@@ -365,7 +366,9 @@ export default function NutritionTracker({ userId }) {
       try{
         setLoading(true);
         let days=await loadAllDays(userId);if(days.length===0)days=await seedInitialData(userId);
-        const recipes=await loadAllRecipes(userId);setUserRecipes(recipes);
+        const recipes=await loadAllRecipes(userId);setUserRecipes(recipes);userRecipesRef.current=recipes;
+        // Fill in an estimated Wt/portion for any saved recipe without one (background, once per load)
+        backfillPortionWeights(userId,()=>userRecipesRef.current,setUserRecipes);
         // Reference calculator inputs (Compare tab) — restore saved values
         try{const cd=await getDoc(doc(db,"users",userId,"settings","calculator"));if(cd.exists()){const c=cd.data();if(c.sex)setCalcSex(c.sex);if(Number.isFinite(c.age))setCalcAge(c.age);if(Number.isFinite(c.height))setCalcHeight(c.height);if(Number.isFinite(c.weight))setCalcWeight(c.weight);if(Number.isFinite(c.protein))setCalcProtein(c.protein);if(Number.isFinite(c.fatPct))setCalcFatPct(c.fatPct);}}catch(e){console.error("calculator load failed",e);}finally{calcLoadedRef.current=true;}
         const cfgDoc=await getDoc(doc(db,"users",userId,"weight_plan","settings"));
