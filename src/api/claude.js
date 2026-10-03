@@ -150,6 +150,26 @@ export async function claudeRecalculateNutrition(recipe) {
   }, NUTRITION_SCHEMA);
 }
 
+// Nutrition for an amount of a saved recipe in g / ml / oz. Used when the
+// recipe has no Wt/portion (or for ml); with a Wt/portion, g and oz are
+// scaled locally instead.
+export async function claudeScaleRecipeNutrition(recipe, qty, unit) {
+  return requestStructured({
+    model:"claude-sonnet-4-6",
+    max_tokens:600,
+    system:`You are a precise nutrition analysis assistant. You are given a cooked recipe: its servings, ingredients, nutrition per serving and, if known, portion_g (the cooked weight of one serving in grams). Return the nutrition for the requested amount of the cooked dish, scaled from the per-serving nutrition given. If portion_g is null, first estimate it from the ingredients, allowing for water lost or absorbed in cooking.`,
+    messages:[{role:"user", content: JSON.stringify({
+      name: recipe.name,
+      servings: recipe.servings,
+      ingredients: recipe.ingredients,
+      nutrition_per_serving: recipe.nutrition,
+      portion_g: recipe.portion_g ?? null,
+      amount: qty,
+      unit
+    })}]
+  }, NUTRITION_SCHEMA);
+}
+
 export async function claudeRegenerateRecipe(recipe) {
   return requestStructured({
     model:"claude-sonnet-4-6",
