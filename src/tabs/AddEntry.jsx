@@ -5,7 +5,7 @@ import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe, claudeScaleRecipeNutrition } from "../api/claude";
 import { computeRecipeFields, hasPortionWeight, isEstimatedWeight, propagateRecipeChange } from "../api/recipeWeights";
-import { linkInfo, splitIngredients } from "../constants/recipeLinks";
+import { linkInfo, splitIngredients, findDependentsDeep } from "../constants/recipeLinks";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
@@ -1063,9 +1063,16 @@ Use realistic values. For portions use a typical serving size.`;
                       <button onClick={e=>{e.stopPropagation();setRecipeModal(r);}} style={{ background:"none", border:"none", color:"#378ADD", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>👁</button>
                       <button onClick={async e=>{
                         e.stopPropagation();
-                        if(!confirm("Delete this recipe?")) return;
-                        await deleteRecipe(userId,r.id);
-                        setUserRecipes(prev=>prev.filter(ur=>ur.id!==r.id));
+                        // Recipes built on this one (directly or indirectly) go too — they can't be worked out without it
+                        const deps = findDependentsDeep(r, userRecipes);
+                        if(!confirm(deps.length
+                          ? `Delete "${r.name}"?\n\nThis also deletes ${deps.length} recipe${deps.length===1?"":"s"} that use${deps.length===1?"s":""} it:\n• ${deps.map(d=>d.name).join("\n• ")}\n\nFood already logged isn't affected.`
+                          : `Delete "${r.name}"?`)) return;
+                        const gone = [r, ...deps];
+                        for (const x of gone) await deleteRecipe(userId, x.id);
+                        const ids = new Set(gone.map(x=>x.id));
+                        setUserRecipes(prev=>prev.filter(ur=>!ids.has(ur.id)));
+                        setRecipeNotice(deps.length ? { ok:true, text:`Deleted ${r.name} and ${deps.length} recipe${deps.length===1?"":"s"} that used it: ${deps.map(d=>d.name).join(", ")}` } : null);
                       }} style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"11px", opacity:0.5, padding:"0 3px" }}>✕</button>
                     </div>
                   </div>

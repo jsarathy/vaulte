@@ -97,3 +97,14 @@ test("new recipe matching an ingredient name → full recalculation", () => {
   const { rows, deltaOk } = relinkDependent(B, null, R, recipes, [...recipes, R]);
   assert.equal(rows.length, 1); assert.equal(deltaOk, false);
 });
+
+// ── Fix 23: deleting a recipe deletes the recipes built on it ────────────────
+import { findDependentsDeep } from "../src/constants/recipeLinks.js";
+test("findDependentsDeep: direct + indirect, unrelated kept, cycle-safe", () => {
+  const Bd = { id:"b", name:"Bowl", ingredients:[{ amount:"250g", item:"pinto bean stew" }] };            // uses A (any case)
+  const Cd = { id:"c", name:"Big Bowl", ingredients:[{ amount:"1 portion", item:"Bowl" }] };             // uses B
+  const Dd = { id:"d", name:"Toast", ingredients:[{ amount:"1", item:"Bread" }] };                       // unrelated
+  const Ac = { ...A, ingredients:[{ amount:"1 portion", item:"Big Bowl" }] };                            // A uses C → cycle
+  assert.deepEqual(findDependentsDeep(Ac, [Ac, Bd, Cd, Dd]).map(r => r.id), ["b", "c"]);
+  assert.deepEqual(findDependentsDeep(Dd, [Ac, Bd, Cd, Dd]), []);
+});

@@ -100,3 +100,17 @@ export function applyLinkDelta(B, rows, { keepWeight = false } = {}) {
   } else weight = null;
   return { nutrition, weight };
 }
+
+// Every recipe that uses `recipe` as an ingredient (by name), directly or via
+// another recipe — deleted along with it so nothing is left half-defined.
+export function findDependentsDeep(recipe, recipes) {
+  const out = [], seen = new Set([recipe.id]), queue = [recipe];
+  while (queue.length) {
+    const name = normRecipeName(queue.shift().name);
+    for (const r of recipes || []) {
+      if (seen.has(r.id)) continue;
+      if ((r.ingredients || []).some(i => normRecipeName(i.item) === name)) { seen.add(r.id); out.push(r); queue.push(r); }
+    }
+  }
+  return out;
+}
