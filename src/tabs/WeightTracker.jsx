@@ -97,29 +97,36 @@ export default function WeightTracker({
 
   const cumBaseline = Number.isFinite(Number(cfg.cumLossBaselineKg)) ? Number(cfg.cumLossBaselineKg) : 86.45;
 
-  // 2-week loss: change over the two most recent calendar weeks (Mon-Sun) ending
-  // at a row's date, i.e. the row's own week plus the week before. Measured from
-  // the first reading in that window to the row's reading, so the span is 8-14
-  // days depending on weekday and reading dates, not a fixed 14 days.
+  // 2-week loss, smoothed: mean of all readings in the latest 2 calendar weeks
+  // (Mon-Sun; the row's own week up to the row's date, plus the week before)
+  // minus the mean of all readings in the 2 calendar weeks before that.
+  // Averaging blocks of readings cancels day-to-day water swings that a
+  // reading-to-reading difference would carry.
   const mondayOf = (dateStr) => {
     const d = new Date(`${dateStr}T00:00:00Z`);
     if (isNaN(d)) return null;
     d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-    return d.toISOString().slice(0, 10);
+    return d;
+  };
+  const isoMinusDays = (d, n) => {
+    const x = new Date(d.getTime());
+    x.setUTCDate(x.getUTCDate() - n);
+    return x.toISOString().slice(0, 10);
   };
   const readings = weightLog
-    .filter(r => r?.date && r.actual != null && Number.isFinite(Number(r.actual)))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    .filter(r => r?.date && r.actual != null && Number.isFinite(Number(r.actual)));
+  const meanBetween = (from, to) => {
+    const xs = readings.filter(r => r.date >= from && r.date <= to).map(r => Number(r.actual));
+    return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null;
+  };
   const twoWeekLossAt = (row) => {
     if (!row?.date || row.actual == null) return null;
     const mon = mondayOf(row.date);
     if (!mon) return null;
-    const start = new Date(`${mon}T00:00:00Z`);
-    start.setUTCDate(start.getUTCDate() - 7);
-    const from = start.toISOString().slice(0, 10);
-    const first = readings.find(r => r.date >= from && r.date <= row.date);
-    if (!first || first.date === row.date) return null;
-    return (Number(first.actual) - Number(row.actual)).toFixed(1);
+    const recent = meanBetween(isoMinusDays(mon, 7), row.date);
+    const prior = meanBetween(isoMinusDays(mon, 21), isoMinusDays(mon, 8));
+    if (recent == null || prior == null) return null;
+    return (prior - recent).toFixed(1);
   };
 
   // Persist one field of one row (date-keyed) and update local state.
