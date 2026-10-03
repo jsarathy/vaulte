@@ -5,7 +5,7 @@ import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe, claudeScaleRecipeNutrition } from "../api/claude";
 import { computeRecipeFields, hasPortionWeight, isEstimatedWeight, propagateRecipeChange } from "../api/recipeWeights";
-import { linkInfo, splitIngredients, findDependentsDeep } from "../constants/recipeLinks";
+import { linkInfo, splitIngredients, findDependentsDeep, findNameClash } from "../constants/recipeLinks";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
@@ -58,6 +58,7 @@ export default function AddEntry({
   const [builderPreview, setBuilderPreview] = useState(null);
   const [builderError, setBuilderError] = useState("");
   const [recalcLoading, setRecalcLoading] = useState(false);
+  const [recalcError, setRecalcError] = useState(""); // shown by the Recalculate button (save/generate errors show by Save)
   // Editing a saved recipe reuses the builder: id being edited (null = new recipe),
   // and the servings + ingredients the current nutrition was calculated from.
   const [builderEditId, setBuilderEditId] = useState(null);
@@ -70,7 +71,7 @@ export default function AddEntry({
   });
   const openRecipeEditor = (r) => {
     const copy = JSON.parse(JSON.stringify(r));
-    setBuilderPreview(copy); setBuilderNutritionKey(nutritionKey(copy)); setBuilderEditId(r.id);
+    setBuilderPreview(copy); setBuilderNutritionKey(nutritionKey(copy)); setBuilderEditId(r.id); setRecalcError("");
     setBuilderInput(""); setBuilderError(""); setShowRecipesModal(false); setRecipeBuilder(true);
   };
   // Recalculate nutrition and, unless the user has entered their own weight, re-estimate Wt/portion.
@@ -82,7 +83,7 @@ export default function AddEntry({
   const closeBuilder = () => {
     const wasEditing = builderEditId;
     setRecipeBuilder(false); setBuilderPreview(null); setBuilderInput(""); setBuilderError("");
-    setBuilderEditId(null); setBuilderNutritionKey(null);
+    setBuilderEditId(null); setBuilderNutritionKey(null); setRecalcError("");
     if (wasEditing) setShowRecipesModal(true); // back to the Saved Recipes list
   };
   // ×, Cancel and backdrop clicks are ignored while a save (with recalculation) is in flight
@@ -788,8 +789,11 @@ Use realistic values. For portions use a typical serving size.`;
                       // Saved as 1 portion: portions → divide by qty; any other unit → 1 portion = the amount entered
                       const per = unit === "portion" ? qty : 1;
                       const val = k => { const v = Number(n[k]); return Number.isFinite(v) ? Math.round(v / per * 10) / 10 : 0; };
+                      // Same name already saved → overwrite it (same id) rather than add a duplicate
+                      const sameName = userRecipes.filter(r => normName(r.name) === normName(name));
+                      const replaced = sameName[0] || null;
                       const recipe = {
-                        id: genId(), name, description: "", source: "Get Nutrition", servings: 1,
+                        id: replaced?.id ?? genId(), name, description: "", source: "Get Nutrition", servings: 1,
                         prep_time: "", cook_time: "",
                         ingredients: [{ amount: unit === "portion" ? "1 portion" : `${qty} ${unit}`, item: name }],
                         steps: [], notes: "",
@@ -797,8 +801,8 @@ Use realistic values. For portions use a typical serving size.`;
                         ...(unit === "g" ? { portion_g: qty } : {}),
                       };
                       await saveRecipe(userId, recipe);
+                      for (const dup of sameName.slice(1)) await deleteRecipe(userId, dup.id); // tidy up older duplicates
                       setUserRecipes(prev => [...prev.filter(r => normName(r.name) !== normName(name)), recipe].sort((a,b)=>a.name.localeCompare(b.name)));
-                      const replaced = userRecipes.find(r => normName(r.name) === normName(name)) || null;
                       propagateRecipeChange(userId, replaced, recipe, [...userRecipes.filter(r => normName(r.name) !== normName(name)), recipe], setUserRecipes)
                         .catch(e => console.error("dependent recipe update failed", e));
                     }
@@ -921,17 +925,17 @@ Use realistic values. For portions use a typical serving size.`;
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
                       <button disabled={recalcLoading} onClick={async()=>{
-                        setRecalcLoading(true); setBuilderError("");
+                        setRecalcLoading(true); setRecalcError("");
                         try {
                           const fields = await recalcRecipeFields(builderPreview);
                           setBuilderPreview(p=>({...p, ...fields}));
                           setBuilderNutritionKey(nutritionKey(builderPreview));
-                        } catch (err) { setBuilderError(err.message || "Could not recalculate nutrition."); }
+                        } catch (err) { setRecalcError(err.message || "Could not recalculate nutrition."); }
                         setRecalcLoading(false);
                       }} style={{ background:"none", border:"1px solid #185FA5", color:"#185FA5", borderRadius:"4px", padding:"4px 10px", fontSize:"11px", cursor:recalcLoading?"not-allowed":"pointer" }}>
                         {recalcLoading ? "⏳ Recalculating…" : "↻ Recalculate nutrition from ingredients above"}
                       </button>
-                      {builderError && <div style={{ color:"#c62828", fontSize:"12px" }}>{builderError}</div>}
+                      {recalcError && <div style={{ color:"#c62828", fontSize:"12px" }}>{recalcError}</div>}
                     </div>
                     <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Ingredients</div>
                     <div style={{ fontSize:"11px", color:"#6b7280", marginBottom:"4px" }}>
@@ -989,6 +993,9 @@ Use realistic values. For portions use a typical serving size.`;
                       ? <button onClick={requestCloseBuilder} disabled={builderSaving} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>Cancel</button>
                       : <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Start over</button>}
                     <button disabled={builderSaving||recalcLoading} onClick={async()=>{
+                      const clash = findNameClash(builderPreview.name, userRecipes, builderPreview.id);
+                      if (!String(builderPreview.name || "").trim()) { setBuilderError("Give the recipe a name."); return; }
+                      if (clash) { setBuilderError(`A saved recipe is already called "${clash.name}" — choose another name.`); return; }
                       setBuilderSaving(true); setBuilderError("");
                       try {
                         let recipe = builderPreview;

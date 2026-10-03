@@ -108,3 +108,17 @@ test("findDependentsDeep: direct + indirect, unrelated kept, cycle-safe", () => 
   assert.deepEqual(findDependentsDeep(Ac, [Ac, Bd, Cd, Dd]).map(r => r.id), ["b", "c"]);
   assert.deepEqual(findDependentsDeep(Dd, [Ac, Bd, Cd, Dd]), []);
 });
+
+// ── Fix 25: duplicate recipe names ───────────────────────────────────────────
+import { findNameClash } from "../src/constants/recipeLinks.js";
+test("findNameClash: case/space-insensitive, ignores itself", () => {
+  assert.equal(findNameClash("  pinto BEAN stew", recipes, "x"), A);
+  assert.equal(findNameClash("Pinto Bean Stew", recipes, "a"), null);
+  assert.equal(findNameClash("", recipes, "x"), null);
+});
+test("deleting one of two same-named recipes deletes no dependents", () => {
+  const A2 = { ...A, id:"a2" };
+  const Bd = { id:"b", name:"Bowl", ingredients:[{ amount:"250g", item:"Pinto Bean Stew" }] };
+  assert.deepEqual(findDependentsDeep(A2, [A, A2, Bd]), []);
+  assert.deepEqual(findDependentsDeep(A, [A, Bd]).map(r => r.id), ["b"]);
+});
