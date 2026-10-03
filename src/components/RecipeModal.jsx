@@ -20,10 +20,11 @@ export default function RecipeModal({ recipe, onClose }) {
           {recipe.description&&<p style={{ color:C.muted, fontSize:"12px", marginBottom:"12px", lineHeight:1.6 }}>{recipe.description}</p>}
 
           {/* Tags */}
-          {(recipe.prep_time||recipe.cook_time||recipe.servings)&&(
+          {(recipe.prep_time||recipe.cook_time||recipe.servings||recipe.portion_g)&&(
             <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"12px" }}>
               {recipe.prep_time&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Prep {recipe.prep_time}</span>}
               {recipe.cook_time&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Cook {recipe.cook_time}</span>}
+              {recipe.portion_g>0&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Wt/portion {recipe.portion_g} g</span>}
               {recipe.servings&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Serves {recipe.servings}</span>}
             </div>
           )}

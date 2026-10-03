@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
-import { claudeCreateRecipe, claudeRecalculateNutrition } from "../api/claude";
+import { claudeCreateRecipe, claudeRecalculateNutrition, claudeScaleRecipeNutrition } from "../api/claude";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
@@ -883,6 +883,13 @@ Use realistic values. For portions use a typical serving size.`;
                           onChange={e=>setBuilderPreview(p=>({...p,cook_time:e.target.value}))}
                           style={{ width:"80px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
                       </label>
+                      <label title="Cooked weight of one portion — used to work out nutrition by weight" style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", color:"#185FA5", fontWeight:"bold" }}>
+                        ⚖ Wt/portion
+                        <input type="number" min="0" step="any" value={builderPreview.portion_g??""} placeholder="225"
+                          onChange={e=>{ const v = parseFloat(e.target.value); setBuilderPreview(p=>({...p,portion_g: Number.isFinite(v) && v > 0 ? v : null})); }}
+                          style={{ width:"56px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
+                        g
+                      </label>
                     </div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"6px" }}>
                       {[["kcal","kcal"],["fat","Fat"],["sat_fat","Sat F"],["carbs","Carbs"],["sugar","Sugar"],["fibre","Fibre"],["net_carbs","Net C"],["protein","Prot"]].map(([k,l]) => (
@@ -1035,17 +1042,17 @@ Use realistic values. For portions use a typical serving size.`;
         const qty = parseFloat(recipePortionQty) || 1;
         const isPortion = recipePortionUnit === "portion";
 
-        // Live-scaled macros for portion unit (no API call needed)
-        const liveScaled = isPortion ? {
-          kcal:    +(base.kcal    * qty).toFixed(1),
-          fat:     +(base.fat     * qty).toFixed(1),
-          sat_fat: +(base.sat_fat * qty).toFixed(1),
-          carbs:   +(base.carbs   * qty).toFixed(1),
-          sugar:   +(base.sugar   * qty).toFixed(1),
-          fibre:   +(base.fibre   * qty).toFixed(1),
-          net_carbs:+(base.net_carbs * qty).toFixed(1),
-          protein: +(base.protein * qty).toFixed(1),
-        } : recipePortionScaled;
+        const portionG = parseFloat(r.portion_g) > 0 ? parseFloat(r.portion_g) : null;
+        const GRAMS_PER_UNIT = { g: 1, oz: 28.3495 };
+        // Scaled locally (no API call): portions always; g / oz when the recipe has a Wt/portion
+        const localFactor = isPortion ? qty
+          : (portionG && GRAMS_PER_UNIT[recipePortionUnit]) ? qty * GRAMS_PER_UNIT[recipePortionUnit] / portionG
+          : null;
+        const isLocal = localFactor != null;
+        const liveScaled = isLocal
+          ? Object.fromEntries(["kcal","fat","sat_fat","carbs","sugar","fibre","net_carbs","protein"]
+              .map(k => [k, +((Number(base[k]) || 0) * localFactor).toFixed(1)]))
+          : recipePortionScaled;
 
         const macroDisplay = liveScaled || base;
         const macroLabel = liveScaled
@@ -1085,7 +1092,7 @@ Use realistic values. For portions use a typical serving size.`;
               <div style={{ padding:"20px" }}>
                 {/* Base nutrition reference */}
                 <div style={{ background:"#F0F4F8", borderRadius:"8px", padding:"10px 12px", marginBottom:"18px" }}>
-                  <div style={{ fontSize:"10px", color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.4px", marginBottom:"7px" }}>Per serving (base)</div>
+                  <div style={{ fontSize:"10px", color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.4px", marginBottom:"7px" }}>Per serving (base){portionG ? ` · ${portionG} g` : ""}</div>
                   <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"4px" }}>
                     {[["kcal","Kcal"],["protein","Prot"],["carbs","Carbs"],["fat","Fat"]].map(([k,l]) => (
                       <div key={k} style={{ textAlign:"center", background:"#fff", borderRadius:"6px", padding:"5px 2px", border:"0.5px solid #e5e7eb" }}>
@@ -1125,6 +1132,13 @@ Use realistic values. For portions use a typical serving size.`;
                     <option value="oz">ounces (oz)</option>
                   </select>
                 </div>
+                {!isPortion && !isLocal && (
+                  <div style={{ fontSize:"11px", color:"#8D6E00", background:"#FFF8E1", border:"1px solid #FFE082", borderRadius:"6px", padding:"6px 10px", marginTop:"-8px", marginBottom:"14px", lineHeight:1.4 }}>
+                    {recipePortionUnit === "ml"
+                      ? "Millilitres are worked out by Claude."
+                      : "This recipe has no Wt/portion, so Claude will estimate the portion weight."} Add a Wt/portion with ✏️ in Saved Recipes for instant results in g / oz.
+                  </div>
+                )}
 
                 {/* Scaled macro preview */}
                 {(liveScaled || recipePortionScaled) && (
@@ -1160,35 +1174,17 @@ Use realistic values. For portions use a typical serving size.`;
                   </button>
 
                   {/* For non-portion units: "Calculate" first, then "Add" */}
-                  {!isPortion && !recipePortionScaled && (
+                  {!isLocal && !recipePortionScaled && (
                     <button disabled={recipePortionLoading}
                       onClick={async () => {
                         const qtyNum = parseFloat(recipePortionQty) || 1;
                         setRecipePortionLoading(true); setRecipePortionError("");
                         try {
-                          const ingredientsList = r.ingredients?.map(i => `${i.amount} ${i.item}`).join(", ") || "not available";
-                          const prompt = `I have a recipe called "${r.name}" that makes ${servings} serving${servings!==1?"s":""}.
-Per serving nutrition: ${base.kcal} kcal, protein ${base.protein}g, fat ${base.fat}g, sat_fat ${base.sat_fat}g, carbs ${base.carbs}g, sugar ${base.sugar}g, fibre ${base.fibre}g, net_carbs ${base.net_carbs}g.
-Ingredients: ${ingredientsList}.
-Calculate nutrition for ${qtyNum} ${recipePortionUnit} of this recipe.
-Reply with ONLY a JSON object, no markdown:
-{"kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}`;
-                          const res = await fetch("/api/claude", {
-                            method:"POST", headers:{"Content-Type":"application/json"},
-                            body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:200,
-                              messages:[{role:"user", content:prompt}] })
-                          });
-                          const data = await res.json();
-                          const text = (data.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
-                          const n = JSON.parse(text);
-                          setRecipePortionScaled({
-                            kcal: +(n.kcal||0).toFixed(1), fat: +(n.fat||0).toFixed(1),
-                            sat_fat: +(n.sat_fat||0).toFixed(1), carbs: +(n.carbs||0).toFixed(1),
-                            sugar: +(n.sugar||0).toFixed(1), fibre: +(n.fibre||0).toFixed(1),
-                            net_carbs: +(n.net_carbs||0).toFixed(1), protein: +(n.protein||0).toFixed(1),
-                          });
-                        } catch {
-                          setRecipePortionError("Could not calculate — try portions instead, or adjust manually.");
+                          const n = await claudeScaleRecipeNutrition(r, qtyNum, recipePortionUnit);
+                          setRecipePortionScaled(Object.fromEntries(["kcal","fat","sat_fat","carbs","sugar","fibre","net_carbs","protein"]
+                            .map(k => [k, +(Number(n[k]) || 0).toFixed(1)])));
+                        } catch (err) {
+                          setRecipePortionError(`Could not calculate (${err.message || "unknown error"}) — try portions, or add a Wt/portion to the recipe.`);
                         } finally {
                           setRecipePortionLoading(false);
                         }
@@ -1201,10 +1197,10 @@ Reply with ONLY a JSON object, no markdown:
                   )}
 
                   {/* Add button — always shown for portions (live calc), shown after Calculate for g/ml */}
-                  {(isPortion || recipePortionScaled) && (
+                  {(isLocal || recipePortionScaled) && (
                     <button
                       onClick={() => {
-                        const macros = isPortion ? liveScaled : recipePortionScaled;
+                        const macros = liveScaled;
                         const unitLabel = isPortion
                           ? `(${qty} portion${qty !== 1 ? "s" : ""})`
                           : `(${qty}${recipePortionUnit})`;
