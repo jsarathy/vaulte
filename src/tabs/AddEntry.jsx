@@ -883,6 +883,13 @@ Use realistic values. For portions use a typical serving size.`;
                           onChange={e=>setBuilderPreview(p=>({...p,cook_time:e.target.value}))}
                           style={{ width:"80px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
                       </label>
+                      <label title="Cooked weight of one portion — used to work out nutrition by weight" style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", color:"#185FA5", fontWeight:"bold" }}>
+                        ⚖ Wt/portion
+                        <input type="number" min="0" step="any" value={builderPreview.portion_g??""} placeholder="225"
+                          onChange={e=>{ const v = parseFloat(e.target.value); setBuilderPreview(p=>({...p,portion_g: Number.isFinite(v) && v > 0 ? v : null})); }}
+                          style={{ width:"56px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
+                        g
+                      </label>
                     </div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"6px" }}>
                       {[["kcal","kcal"],["fat","Fat"],["sat_fat","Sat F"],["carbs","Carbs"],["sugar","Sugar"],["fibre","Fibre"],["net_carbs","Net C"],["protein","Prot"]].map(([k,l]) => (

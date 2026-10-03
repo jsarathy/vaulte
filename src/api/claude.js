@@ -94,9 +94,10 @@ const RECIPE_SCHEMA = {
     },
     steps: { type:"array", items: { type:"string" } },
     notes: { type:"string" },
+    portion_g: { type:"number" },
     nutrition: NUTRITION_SCHEMA
   },
-  required: ["name","description","source","servings","prep_time","cook_time","ingredients","steps","notes","nutrition"],
+  required: ["name","description","source","servings","prep_time","cook_time","ingredients","steps","notes","portion_g","nutrition"],
   additionalProperties: false
 };
 
@@ -132,7 +133,7 @@ export async function claudeCreateRecipe(description) {
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
     system:`You are a recipe and nutrition expert. The user will describe a recipe or dish they want.
 If their description is vague or missing ingredient quantities, use web search to find a real, reputable recipe (e.g. a well-known recipe site) that matches what they asked for, and base your answer on it — don't ask the user for more detail, look it up instead.
-"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values.`,
+"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values. portion_g is the estimated cooked weight of one serving in grams (total cooked weight ÷ servings, allowing for water lost or absorbed in cooking).`,
     messages:[{role:"user", content:description}]
   }, RECIPE_SCHEMA);
 }
@@ -154,7 +155,7 @@ export async function claudeRegenerateRecipe(recipe) {
     model:"claude-sonnet-4-6",
     max_tokens:2000,
     system:`You are a recipe and nutrition expert. The user has a recipe draft they've hand-edited — treat their name, servings, ingredients, steps, and notes as the source of truth, not something to second-guess.
-Refine it: rewrite the method steps if needed so they match the current ingredient list (e.g. if an ingredient was added, removed, or its amount changed, update the steps accordingly), and recalculate the nutrition per serving from scratch based on the current ingredients and servings — don't reuse any nutrition values that might already be present.`,
+Refine it: rewrite the method steps if needed so they match the current ingredient list (e.g. if an ingredient was added, removed, or its amount changed, update the steps accordingly), and recalculate the nutrition per serving from scratch based on the current ingredients and servings — don't reuse any nutrition values that might already be present. portion_g is the cooked weight of one serving in grams: keep the user's value if given, otherwise estimate it.`,
     messages:[{role:"user", content: JSON.stringify({
       name: recipe.name,
       description: recipe.description,
@@ -164,7 +165,8 @@ Refine it: rewrite the method steps if needed so they match the current ingredie
       cook_time: recipe.cook_time,
       ingredients: recipe.ingredients,
       steps: recipe.steps,
-      notes: recipe.notes
+      notes: recipe.notes,
+      portion_g: recipe.portion_g ?? null
     })}]
   }, RECIPE_SCHEMA);
 }
