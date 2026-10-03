@@ -97,6 +97,31 @@ export default function WeightTracker({
 
   const cumBaseline = Number.isFinite(Number(cfg.cumLossBaselineKg)) ? Number(cfg.cumLossBaselineKg) : 86.45;
 
+  // 2-week loss: change over the two most recent calendar weeks (Mon-Sun) ending
+  // at a row's date, i.e. the row's own week plus the week before. Measured from
+  // the first reading in that window to the row's reading, so the span is 8-14
+  // days depending on weekday and reading dates, not a fixed 14 days.
+  const mondayOf = (dateStr) => {
+    const d = new Date(`${dateStr}T00:00:00Z`);
+    if (isNaN(d)) return null;
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  };
+  const readings = weightLog
+    .filter(r => r?.date && r.actual != null && Number.isFinite(Number(r.actual)))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const twoWeekLossAt = (row) => {
+    if (!row?.date || row.actual == null) return null;
+    const mon = mondayOf(row.date);
+    if (!mon) return null;
+    const start = new Date(`${mon}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - 7);
+    const from = start.toISOString().slice(0, 10);
+    const first = readings.find(r => r.date >= from && r.date <= row.date);
+    if (!first || first.date === row.date) return null;
+    return (Number(first.actual) - Number(row.actual)).toFixed(1);
+  };
+
   // Persist one field of one row (date-keyed) and update local state.
   const saveField = async (i, key, val) => {
     const row = weightLog[i];
@@ -222,7 +247,7 @@ export default function WeightTracker({
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:"12px" }}>
             <thead>
               <tr style={{ background:"#185FA5", color:"#fff", position:"sticky", top:0 }}>
-                {["Wk","Date","Dose","Proj (kg)","Actual (kg)","vs Proj","Cum Loss"].map(h => (
+                {["Wk","Date","Dose","Actual (kg)","vs Proj","Cum Loss","2-wk Loss"].map(h => (
                   <th key={h} style={{ padding:"7px 8px", textAlign:"center", fontWeight:"bold", fontSize:"11px", whiteSpace:"nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -234,6 +259,7 @@ export default function WeightTracker({
                 const effProj = row.projected!=null ? row.projected : planProj;
                 const vsProj = (row.actual!=null && effProj!=null)?(row.actual-effProj).toFixed(1):null;
                 const cumLoss = row.actual!=null?(cumBaseline-row.actual).toFixed(1):null;
+                const twoWk = twoWeekLossAt(row);
                 const rowBg = i%2===0?"#fff":"#F7FAFD";
                 const rowDate = row.date?new Date(row.date):null;
                 const isPast = (rowDate && !isNaN(rowDate))?rowDate<=new Date():false;
@@ -256,13 +282,6 @@ export default function WeightTracker({
                         style={{ width:"52px", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"11px", background:"#fff", color:"#1a2a3a", boxSizing:"border-box" }}/>
                     </td>
                     <td style={{ padding:"5px 8px", textAlign:"right" }}>
-                      <input type="number" step="0.1"
-                        value={row.projected??""}
-                        placeholder={planProj!=null?planProj.toFixed(1):"—"}
-                        onChange={e => saveField(i,"projected",toNum(e.target.value))}
-                        style={{ width:"60px", padding:"2px 4px", border:"0.5px solid #e5e7eb", borderRadius:"4px", fontSize:"12px", textAlign:"right", background:"#fff", color:"#6b7280" }}/>
-                    </td>
-                    <td style={{ padding:"5px 8px", textAlign:"right" }}>
                       <input type="number" step="0.1" min="30" max="200"
                         value={row.actual??""}
                         placeholder={isPast?"—":""}
@@ -277,6 +296,10 @@ export default function WeightTracker({
                     </td>
                     <td style={{ padding:"5px 8px", textAlign:"right", color:cumLoss?"#378ADD":"#ccc", fontWeight:cumLoss?"bold":"normal" }}>
                       {cumLoss==null?"—":`-${cumLoss} kg`}
+                    </td>
+                    <td style={{ padding:"5px 8px", textAlign:"right", fontWeight:twoWk!=null?"bold":"normal",
+                      color:twoWk==null?"#ccc":parseFloat(twoWk)>0?"#2E7D32":parseFloat(twoWk)<0?"#c62828":"#6b7280" }}>
+                      {twoWk==null?"—":parseFloat(twoWk)>=0?`-${twoWk} kg`:`+${Math.abs(parseFloat(twoWk)).toFixed(1)} kg`}
                     </td>
                   </tr>
                 );
