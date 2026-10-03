@@ -24,7 +24,7 @@ export default function RecipeModal({ recipe, onClose }) {
             <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginBottom:"12px" }}>
               {recipe.prep_time&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Prep {recipe.prep_time}</span>}
               {recipe.cook_time&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Cook {recipe.cook_time}</span>}
-              {recipe.portion_g>0&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Wt/portion {recipe.portion_g} g</span>}
+              {recipe.portion_g>0&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Wt/portion {recipe.portion_g} g{recipe.portion_g_source==="estimated"?" (est.)":""}</span>}
               {recipe.servings&&<span style={{ background:C.bg, border:`0.5px solid ${C.border}`, color:C.muted, borderRadius:"20px", padding:"3px 10px", fontSize:"11px" }}>Serves {recipe.servings}</span>}
             </div>
           )}

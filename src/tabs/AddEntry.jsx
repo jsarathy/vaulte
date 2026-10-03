@@ -4,6 +4,7 @@ import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../consta
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
 import { claudeCreateRecipe, claudeRecalculateNutrition, claudeScaleRecipeNutrition } from "../api/claude";
+import { estimatePortionWeight, hasPortionWeight, isEstimatedWeight } from "../api/recipeWeights";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
@@ -70,12 +71,24 @@ export default function AddEntry({
     setBuilderPreview(copy); setBuilderNutritionKey(nutritionKey(copy)); setBuilderEditId(r.id);
     setBuilderInput(""); setBuilderError(""); setShowRecipesModal(false); setRecipeBuilder(true);
   };
+  // Recalculate nutrition and, unless the user has entered their own weight, re-estimate Wt/portion.
+  // Returns the fields to merge into the recipe.
+  const recalcRecipeFields = async (recipe) => {
+    const keepWeight = hasPortionWeight(recipe) && !isEstimatedWeight(recipe);
+    const [nutrition, weight] = await Promise.all([
+      claudeRecalculateNutrition(recipe),
+      keepWeight ? null : estimatePortionWeight(recipe),
+    ]);
+    return { nutrition, ...(weight || {}) };
+  };
   const closeBuilder = () => {
     const wasEditing = builderEditId;
     setRecipeBuilder(false); setBuilderPreview(null); setBuilderInput(""); setBuilderError("");
     setBuilderEditId(null); setBuilderNutritionKey(null);
     if (wasEditing) setShowRecipesModal(true); // back to the Saved Recipes list
   };
+  // ×, Cancel and backdrop clicks are ignored while a save (with recalculation) is in flight
+  const requestCloseBuilder = () => { if (!builderSaving) closeBuilder(); };
   // Unified quantity modal — replaces old ingredientModal
   const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
   const qtyModalRef = useRef(null); qtyModalRef.current = qtyModal; // live value for async callbacks
@@ -814,12 +827,12 @@ Use realistic values. For portions use a typical serving size.`;
 
       {/* ── Recipe Builder Modal ── */}
       {recipeBuilder && (
-        <div onClick={e=>e.target===e.currentTarget&&closeBuilder()}
+        <div onClick={e=>e.target===e.currentTarget&&requestCloseBuilder()}
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"#fff", borderRadius:"10px", width:"640px", maxWidth:"95vw", maxHeight:"88vh", overflowY:"auto", boxShadow:"0 8px 40px rgba(0,0,0,0.3)" }}>
             <div style={{ background:"#185FA5", color:"#fff", padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", borderRadius:"10px 10px 0 0" }}>
               <div style={{ fontSize:"15px", fontWeight:"bold" }}>{builderEditId ? "✏️ Edit Recipe" : "🤖 Create Recipe with Claude"}</div>
-              <button onClick={closeBuilder}
+              <button onClick={requestCloseBuilder}
                 style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
             </div>
             <div style={{ padding:"18px" }}>
@@ -838,6 +851,8 @@ Use realistic values. For portions use a typical serving size.`;
                       try {
                         const recipe = await claudeCreateRecipe(builderInput);
                         recipe.id = genId();
+                        const g = Math.round(Number(recipe.portion_g));
+                        if (g > 0) { recipe.portion_g = g; recipe.portion_g_source = "estimated"; } else { recipe.portion_g = null; }
                         setBuilderPreview(recipe);
                         setBuilderNutritionKey(nutritionKey(recipe));
                       } catch (err) { setBuilderError(err.message || "Could not parse recipe. Try adding more detail about ingredients and quantities."); }
@@ -886,9 +901,9 @@ Use realistic values. For portions use a typical serving size.`;
                       <label title="Cooked weight of one portion — used to work out nutrition by weight" style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", color:"#185FA5", fontWeight:"bold" }}>
                         ⚖ Wt/portion
                         <input type="number" min="0" step="any" value={builderPreview.portion_g??""} placeholder="225"
-                          onChange={e=>{ const v = parseFloat(e.target.value); setBuilderPreview(p=>({...p,portion_g: Number.isFinite(v) && v > 0 ? v : null})); }}
+                          onChange={e=>{ const v = parseFloat(e.target.value); const ok = Number.isFinite(v) && v > 0; setBuilderPreview(p=>({...p, portion_g: ok ? v : null, portion_g_source: ok ? "weighed" : null})); }}
                           style={{ width:"56px", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"11px" }}/>
-                        g
+                        g{isEstimatedWeight(builderPreview) && <span title="Estimated from ingredient weights ÷ servings. Type your weighed value to replace it." style={{ color:"#8D6E00", fontWeight:"normal" }}>&nbsp;(est.)</span>}
                       </label>
                     </div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:"4px", marginBottom:"6px" }}>
@@ -905,8 +920,8 @@ Use realistic values. For portions use a typical serving size.`;
                       <button disabled={recalcLoading} onClick={async()=>{
                         setRecalcLoading(true); setBuilderError("");
                         try {
-                          const nutrition = await claudeRecalculateNutrition(builderPreview);
-                          setBuilderPreview(p=>({...p, nutrition}));
+                          const fields = await recalcRecipeFields(builderPreview);
+                          setBuilderPreview(p=>({...p, ...fields}));
                           setBuilderNutritionKey(nutritionKey(builderPreview));
                         } catch (err) { setBuilderError(err.message || "Could not recalculate nutrition."); }
                         setRecalcLoading(false);
@@ -953,7 +968,7 @@ Use realistic values. For portions use a typical serving size.`;
                   <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end", marginTop:"14px", borderTop:"0.5px solid #e5e7eb", paddingTop:"14px" }}>
                     {builderError && <div style={{ color:"#c62828", fontSize:"12px", alignSelf:"center", marginRight:"auto" }}>{builderError}</div>}
                     {builderEditId
-                      ? <button onClick={closeBuilder} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>Cancel</button>
+                      ? <button onClick={requestCloseBuilder} disabled={builderSaving} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>Cancel</button>
                       : <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Start over</button>}
                     <button disabled={builderSaving||recalcLoading} onClick={async()=>{
                       setBuilderSaving(true); setBuilderError("");
@@ -961,8 +976,7 @@ Use realistic values. For portions use a typical serving size.`;
                         let recipe = builderPreview;
                         // Ingredients/servings changed since nutrition was last worked out → recalculate first
                         if (nutritionKey(recipe) !== builderNutritionKey) {
-                          const nutrition = await claudeRecalculateNutrition(recipe);
-                          recipe = { ...recipe, nutrition };
+                          recipe = { ...recipe, ...(await recalcRecipeFields(recipe)) };
                           setBuilderPreview(recipe); setBuilderNutritionKey(nutritionKey(recipe));
                         }
                         await saveRecipe(userId, recipe);
@@ -1016,7 +1030,7 @@ Use realistic values. For portions use a typical serving size.`;
                       <div style={{ fontSize:"11px", color:"#6b7280" }}>{r.description}</div>
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:"10px", marginLeft:"12px" }}>
-                      <div style={{ textAlign:"right", whiteSpace:"nowrap" }}><div style={{ fontSize:"12px", color:"#378ADD", fontWeight:"bold" }}>{r.nutrition?.kcal} kcal</div>{r.portion_g!=null&&<div style={{ fontSize:"11px", color:"#6b7280" }}>{r.portion_g} g</div>}</div>
+                      <div style={{ textAlign:"right", whiteSpace:"nowrap" }}><div style={{ fontSize:"12px", color:"#378ADD", fontWeight:"bold" }}>{r.nutrition?.kcal} kcal</div>{r.portion_g!=null&&<div style={{ fontSize:"11px", color:"#6b7280" }}>{r.portion_g} g{isEstimatedWeight(r) ? " (est.)" : ""}</div>}</div>
                       <button onClick={e=>{e.stopPropagation();openRecipeEditor(r);}} title="Edit recipe" style={{ background:"none", border:"none", color:"#378ADD", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>✏️</button>
                       <button onClick={e=>{e.stopPropagation();setRecipeModal(r);}} style={{ background:"none", border:"none", color:"#378ADD", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>👁</button>
                       <button onClick={async e=>{
@@ -1092,7 +1106,7 @@ Use realistic values. For portions use a typical serving size.`;
               <div style={{ padding:"20px" }}>
                 {/* Base nutrition reference */}
                 <div style={{ background:"#F0F4F8", borderRadius:"8px", padding:"10px 12px", marginBottom:"18px" }}>
-                  <div style={{ fontSize:"10px", color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.4px", marginBottom:"7px" }}>Per serving (base){portionG ? ` · ${portionG} g` : ""}</div>
+                  <div style={{ fontSize:"10px", color:"#6b7280", textTransform:"uppercase", letterSpacing:"0.4px", marginBottom:"7px" }}>Per serving (base){portionG ? ` · ${portionG} g${isEstimatedWeight(r) ? " (est.)" : ""}` : ""}</div>
                   <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"4px" }}>
                     {[["kcal","Kcal"],["protein","Prot"],["carbs","Carbs"],["fat","Fat"]].map(([k,l]) => (
                       <div key={k} style={{ textAlign:"center", background:"#fff", borderRadius:"6px", padding:"5px 2px", border:"0.5px solid #e5e7eb" }}>

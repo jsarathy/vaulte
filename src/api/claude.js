@@ -74,6 +74,13 @@ const NUTRITION_SCHEMA = {
   additionalProperties: false
 };
 
+const PORTION_SCHEMA = {
+  type: "object",
+  properties: { total_g: { type:"number" }, portion_g: { type:"number" } },
+  required: ["total_g","portion_g"],
+  additionalProperties: false
+};
+
 const RECIPE_SCHEMA = {
   type: "object",
   properties: {
@@ -133,7 +140,7 @@ export async function claudeCreateRecipe(description) {
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
     system:`You are a recipe and nutrition expert. The user will describe a recipe or dish they want.
 If their description is vague or missing ingredient quantities, use web search to find a real, reputable recipe (e.g. a well-known recipe site) that matches what they asked for, and base your answer on it — don't ask the user for more detail, look it up instead.
-"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values. portion_g is the estimated cooked weight of one serving in grams (total cooked weight ÷ servings, allowing for water lost or absorbed in cooking).`,
+"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values. portion_g is the estimated weight of one serving in grams: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.`,
     messages:[{role:"user", content:description}]
   }, RECIPE_SCHEMA);
 }
@@ -157,7 +164,7 @@ export async function claudeScaleRecipeNutrition(recipe, qty, unit) {
   return requestStructured({
     model:"claude-sonnet-4-6",
     max_tokens:600,
-    system:`You are a precise nutrition analysis assistant. You are given a cooked recipe: its servings, ingredients, nutrition per serving and, if known, portion_g (the cooked weight of one serving in grams). Return the nutrition for the requested amount of the cooked dish, scaled from the per-serving nutrition given. If portion_g is null, first estimate it from the ingredients, allowing for water lost or absorbed in cooking.`,
+    system:`You are a precise nutrition analysis assistant. You are given a cooked recipe: its servings, ingredients, nutrition per serving and, if known, portion_g (the cooked weight of one serving in grams). Return the nutrition for the requested amount of the cooked dish, scaled from the per-serving nutrition given. If portion_g is null, first estimate it as the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.`,
     messages:[{role:"user", content: JSON.stringify({
       name: recipe.name,
       servings: recipe.servings,
@@ -170,12 +177,26 @@ export async function claudeScaleRecipeNutrition(recipe, qty, unit) {
   }, NUTRITION_SCHEMA);
 }
 
+// Estimated Wt/portion: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.
+export async function claudeEstimatePortionWeight(recipe) {
+  return requestStructured({
+    model:"claude-sonnet-4-6",
+    max_tokens:600,
+    system:`You estimate recipe weights. Given a recipe's ingredients and servings, total_g is the total weight in grams of all the ingredients as listed (convert volumes and counts to grams using typical weights, e.g. 1 medium onion, 1 tbsp oil, 1 litre milk; include liquids; ignore "to taste" items with no amount). portion_g = total_g ÷ servings. Do not adjust for water lost or absorbed in cooking.`,
+    messages:[{role:"user", content: JSON.stringify({
+      name: recipe.name,
+      servings: recipe.servings,
+      ingredients: recipe.ingredients
+    })}]
+  }, PORTION_SCHEMA);
+}
+
 export async function claudeRegenerateRecipe(recipe) {
   return requestStructured({
     model:"claude-sonnet-4-6",
     max_tokens:2000,
     system:`You are a recipe and nutrition expert. The user has a recipe draft they've hand-edited — treat their name, servings, ingredients, steps, and notes as the source of truth, not something to second-guess.
-Refine it: rewrite the method steps if needed so they match the current ingredient list (e.g. if an ingredient was added, removed, or its amount changed, update the steps accordingly), and recalculate the nutrition per serving from scratch based on the current ingredients and servings — don't reuse any nutrition values that might already be present. portion_g is the cooked weight of one serving in grams: keep the user's value if given, otherwise estimate it.`,
+Refine it: rewrite the method steps if needed so they match the current ingredient list (e.g. if an ingredient was added, removed, or its amount changed, update the steps accordingly), and recalculate the nutrition per serving from scratch based on the current ingredients and servings — don't reuse any nutrition values that might already be present. portion_g is the weight of one serving in grams: keep the user's value if given, otherwise estimate it as the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.`,
     messages:[{role:"user", content: JSON.stringify({
       name: recipe.name,
       description: recipe.description,
