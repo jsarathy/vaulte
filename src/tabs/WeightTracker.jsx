@@ -119,6 +119,12 @@ export default function WeightTracker({
     const xs = readings.filter(r => r.date >= from && r.date <= to).map(r => Number(r.actual));
     return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null;
   };
+  // Smoothed weight on a date: mean of readings in the latest 2 calendar weeks
+  // (previous Monday-week through that date). Plotted as the 2-wk avg line.
+  const twoWeekAvgAt = (dateStr) => {
+    const mon = mondayOf(dateStr);
+    return mon ? meanBetween(isoMinusDays(mon, 7), dateStr) : null;
+  };
   const twoWeekLossAt = (row) => {
     if (!row?.date || row.actual == null) return null;
     const mon = mondayOf(row.date);
@@ -348,6 +354,8 @@ export default function WeightTracker({
             const acts = weightLog.filter(r => valOf(r) != null && Number.isFinite(Date.parse(r.date)))
                                   .map(r => ({ t: Date.parse(r.date), v: Number(valOf(r)), date: r.date }))
                                   .sort((a,b) => a.t - b.t);
+            // Weight only: 2-calendar-week average at each reading date.
+            const avgPts = isPlan ? acts.map(a => ({ t: a.t, v: twoWeekAvgAt(a.date) })).filter(p => p.v != null) : [];
             const projOf = p => p.projected;
             const projPts = isPlan ? projSeries.filter(p => projOf(p) != null) : [];
             if (projPts.length < 2 && acts.length < 2) {
@@ -391,6 +399,7 @@ export default function WeightTracker({
 
             const projPath = projPts.map((p,i)=>`${i===0?"M":"L"}${xS(p.t).toFixed(1)},${yS(projOf(p)).toFixed(1)}`).join(" ");
 
+            const avgPath = avgPts.map((p,i)=>`${i===0?"M":"L"}${xS(p.t).toFixed(1)},${yS(p.v).toFixed(1)}`).join(" ");
             const actPath  = acts.map((a,i)=>`${i===0?"M":"L"}${xS(a.t).toFixed(1)},${yS(a.v).toFixed(1)}`).join(" ");
 
             const tzHi = (chartMetric==="weight" && Number.isFinite(cfg.targetWeightMaxKg)) ? yS(cfg.targetWeightMaxKg) : null;
@@ -421,6 +430,7 @@ export default function WeightTracker({
               <div style={{ display:"flex", gap:"14px", justifyContent:"flex-end", fontSize:chartFull?"12px":"10px", color:"#6b7280", marginBottom:"4px" }}>
                 <span style={{ display:"flex", alignItems:"center", gap:"5px" }}><svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#90CAF9" strokeWidth="1.5" strokeDasharray="4,3"/></svg>Projected</span>
                 <span style={{ display:"flex", alignItems:"center", gap:"5px" }}><svg width="16" height="6"><line x1="0" y1="3" x2="16" y2="3" stroke="#378ADD" strokeWidth="2"/><circle cx="8" cy="3" r="2.5" fill="#378ADD"/></svg>Actual</span>
+                {isPlan && avgPts.length > 1 && <span style={{ display:"flex", alignItems:"center", gap:"5px" }}><svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#E65100" strokeWidth="2.5"/></svg>2-wk avg</span>}
               </div>
               <style>{`
                 .vaulte-chart-scroll { scrollbar-width: auto; scrollbar-color: #9ca3af #f3f4f6; }
@@ -451,6 +461,7 @@ export default function WeightTracker({
 
                 {projPath && <path d={projPath} fill="none" stroke="#90CAF9" strokeWidth={sw} strokeDasharray={`${4*k},${3*k}`}/>}
                 {actPath && <path d={actPath} fill="none" stroke="#378ADD" strokeWidth={actSW} opacity="0.6"/>}
+                {avgPts.length > 1 && <path d={avgPath} fill="none" stroke="#E65100" strokeWidth={2*k} strokeLinejoin="round" style={{pointerEvents:"none"}}/>}
                 {acts.map(a=><circle key={a.date} cx={xS(a.t)} cy={yS(a.v)} r={hoverPt?.t===a.t ? r*1.6 : r} fill="#378ADD" stroke="#fff" strokeWidth={Math.max(0.3, r*0.3)} style={{pointerEvents:"none"}}/>)}
 
                 {/* Expanded view: invisible, day-wide hit areas + tooltip */}
@@ -460,7 +471,8 @@ export default function WeightTracker({
                     onMouseEnter={()=>setHoverPt({t:a.t, v:a.v})} onMouseLeave={()=>setHoverPt(null)}/>
                 ))}
                 {chartFull && hoverPt && (()=>{
-                  const label = `${fmt(hoverPt.t)} · ${Number(hoverPt.v).toFixed(1)}${unit?` ${unit}`:""}`;
+                  const hAvg = avgPts.find(p => p.t === hoverPt.t);
+                  const label = `${fmt(hoverPt.t)} · ${Number(hoverPt.v).toFixed(1)}${unit?` ${unit}`:""}${hAvg?` · 2-wk avg ${hAvg.v.toFixed(1)}`:""}`;
                   const bw = label.length * fs * 0.58 + 16, bh = fs * 2;
                   const px = xS(hoverPt.t), py = yS(hoverPt.v);
                   const bx = Math.min(Math.max(px - bw/2, PAD.left), PAD.left + cW - bw);
