@@ -56,6 +56,26 @@ export default function AddEntry({
   const [builderPreview, setBuilderPreview] = useState(null);
   const [builderError, setBuilderError] = useState("");
   const [recalcLoading, setRecalcLoading] = useState(false);
+  // Editing a saved recipe reuses the builder: id being edited (null = new recipe),
+  // and the servings + ingredients the current nutrition was calculated from.
+  const [builderEditId, setBuilderEditId] = useState(null);
+  const [builderNutritionKey, setBuilderNutritionKey] = useState(null);
+  const [builderSaving, setBuilderSaving] = useState(false);
+  const nutritionKey = r => JSON.stringify({
+    s: Number(r?.servings) || 0,
+    i: (r?.ingredients || []).map(x => [String(x.amount || "").trim(), String(x.item || "").trim()]).filter(([a, b]) => a || b),
+  });
+  const openRecipeEditor = (r) => {
+    const copy = JSON.parse(JSON.stringify(r));
+    setBuilderPreview(copy); setBuilderNutritionKey(nutritionKey(copy)); setBuilderEditId(r.id);
+    setBuilderInput(""); setBuilderError(""); setShowRecipesModal(false); setRecipeBuilder(true);
+  };
+  const closeBuilder = () => {
+    const wasEditing = builderEditId;
+    setRecipeBuilder(false); setBuilderPreview(null); setBuilderInput(""); setBuilderError("");
+    setBuilderEditId(null); setBuilderNutritionKey(null);
+    if (wasEditing) setShowRecipesModal(true); // back to the Saved Recipes list
+  };
   // Unified quantity modal — replaces old ingredientModal
   const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
   const qtyModalRef = useRef(null); qtyModalRef.current = qtyModal; // live value for async callbacks
@@ -794,12 +814,12 @@ Use realistic values. For portions use a typical serving size.`;
 
       {/* ── Recipe Builder Modal ── */}
       {recipeBuilder && (
-        <div onClick={e=>e.target===e.currentTarget&&setRecipeBuilder(false)}
+        <div onClick={e=>e.target===e.currentTarget&&closeBuilder()}
           style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ background:"#fff", borderRadius:"10px", width:"640px", maxWidth:"95vw", maxHeight:"88vh", overflowY:"auto", boxShadow:"0 8px 40px rgba(0,0,0,0.3)" }}>
             <div style={{ background:"#185FA5", color:"#fff", padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", borderRadius:"10px 10px 0 0" }}>
-              <div style={{ fontSize:"15px", fontWeight:"bold" }}>🤖 Create Recipe with Claude</div>
-              <button onClick={()=>{ setRecipeBuilder(false); setBuilderPreview(null); setBuilderInput(""); setBuilderError(""); }}
+              <div style={{ fontSize:"15px", fontWeight:"bold" }}>{builderEditId ? "✏️ Edit Recipe" : "🤖 Create Recipe with Claude"}</div>
+              <button onClick={closeBuilder}
                 style={{ background:"none", border:"none", color:"#fff", fontSize:"22px", cursor:"pointer", lineHeight:1 }}>×</button>
             </div>
             <div style={{ padding:"18px" }}>
@@ -819,6 +839,7 @@ Use realistic values. For portions use a typical serving size.`;
                         const recipe = await claudeCreateRecipe(builderInput);
                         recipe.id = genId();
                         setBuilderPreview(recipe);
+                        setBuilderNutritionKey(nutritionKey(recipe));
                       } catch (err) { setBuilderError(err.message || "Could not parse recipe. Try adding more detail about ingredients and quantities."); }
                       setBuilderLoading(false);
                     }} style={{ background:builderLoading||!builderInput.trim()?"#ccc":"#378ADD", color:"#fff", border:"none", borderRadius:"4px", padding:"9px 18px", cursor:builderLoading||!builderInput.trim()?"not-allowed":"pointer", fontSize:"13px", fontWeight:"bold" }}>
@@ -829,8 +850,13 @@ Use realistic values. For portions use a typical serving size.`;
               ) : (
                 <>
                   <div style={{ background:"#E8F5E9", border:"1px solid #A5D6A7", borderRadius:"6px", padding:"10px 14px", marginBottom:"14px", fontSize:"13px", color:"#2E7D32" }}>
-                    ✓ Recipe found — edit anything below, then save
+                    {builderEditId ? "✏️ Edit anything below, then save" : "✓ Recipe found — edit anything below, then save"}
                   </div>
+                  {nutritionKey(builderPreview) !== builderNutritionKey && (
+                    <div style={{ background:"#FFF8E1", border:"1px solid #FFE082", borderRadius:"6px", padding:"8px 12px", marginBottom:"12px", fontSize:"12px", color:"#8D6E00" }}>
+                      Ingredients or servings changed — nutrition will be recalculated when you save.
+                    </div>
+                  )}
                   <div style={{ marginBottom:"10px" }}>
                     <input value={builderPreview.name||""} placeholder="Recipe name"
                       onChange={e=>setBuilderPreview(p=>({...p,name:e.target.value}))}
@@ -874,6 +900,7 @@ Use realistic values. For portions use a typical serving size.`;
                         try {
                           const nutrition = await claudeRecalculateNutrition(builderPreview);
                           setBuilderPreview(p=>({...p, nutrition}));
+                          setBuilderNutritionKey(nutritionKey(builderPreview));
                         } catch (err) { setBuilderError(err.message || "Could not recalculate nutrition."); }
                         setRecalcLoading(false);
                       }} style={{ background:"none", border:"1px solid #185FA5", color:"#185FA5", borderRadius:"4px", padding:"4px 10px", fontSize:"11px", cursor:recalcLoading?"not-allowed":"pointer" }}>
@@ -917,16 +944,34 @@ Use realistic values. For portions use a typical serving size.`;
                       style={{ width:"100%", fontSize:"12px", color:"#5D4037", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"6px 8px", resize:"vertical", minHeight:"40px", boxSizing:"border-box" }}/>
                   </div>
                   <div style={{ display:"flex", gap:"8px", justifyContent:"flex-end", marginTop:"14px", borderTop:"0.5px solid #e5e7eb", paddingTop:"14px" }}>
-                    <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Start over</button>
-                    <button onClick={async()=>{
-                      await saveRecipe(userId, builderPreview);
-                      setUserRecipes(prev=>[...prev,builderPreview].sort((a,b)=>a.name.localeCompare(b.name)));
-                      const n = builderPreview.nutrition||{};
-                      setAddItem({ name:builderPreview.name, kcal:n.kcal||"", fat:n.fat||"", sat_fat:n.sat_fat||"",
-                        carbs:n.carbs||"", sugar:n.sugar||"", fibre:n.fibre||"", net_carbs:n.net_carbs||"", protein:n.protein||"" });
-                      setRecipeBuilder(false); setBuilderPreview(null); setBuilderInput("");
-                    }} style={{ background:"#2E7D32", color:"#fff", border:"none", borderRadius:"4px", padding:"8px 18px", cursor:"pointer", fontSize:"13px", fontWeight:"bold" }}>
-                      ✓ Save Recipe
+                    {builderError && <div style={{ color:"#c62828", fontSize:"12px", alignSelf:"center", marginRight:"auto" }}>{builderError}</div>}
+                    {builderEditId
+                      ? <button onClick={closeBuilder} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>Cancel</button>
+                      : <button onClick={()=>setBuilderPreview(null)} style={{ background:"transparent", color:"#378ADD", border:"1px solid #378ADD", borderRadius:"4px", padding:"8px 14px", cursor:"pointer", fontSize:"12px", fontWeight:"bold" }}>← Start over</button>}
+                    <button disabled={builderSaving||recalcLoading} onClick={async()=>{
+                      setBuilderSaving(true); setBuilderError("");
+                      try {
+                        let recipe = builderPreview;
+                        // Ingredients/servings changed since nutrition was last worked out → recalculate first
+                        if (nutritionKey(recipe) !== builderNutritionKey) {
+                          const nutrition = await claudeRecalculateNutrition(recipe);
+                          recipe = { ...recipe, nutrition };
+                          setBuilderPreview(recipe); setBuilderNutritionKey(nutritionKey(recipe));
+                        }
+                        await saveRecipe(userId, recipe);
+                        setUserRecipes(prev=>[...prev.filter(r=>r.id!==recipe.id),recipe].sort((a,b)=>a.name.localeCompare(b.name)));
+                        if (!builderEditId) {
+                          const n = recipe.nutrition||{};
+                          setAddItem({ name:recipe.name, kcal:n.kcal||"", fat:n.fat||"", sat_fat:n.sat_fat||"",
+                            carbs:n.carbs||"", sugar:n.sugar||"", fibre:n.fibre||"", net_carbs:n.net_carbs||"", protein:n.protein||"" });
+                        }
+                        closeBuilder();
+                      } catch (err) { setBuilderError(err.message || "Could not save recipe."); }
+                      setBuilderSaving(false);
+                    }} style={{ background:builderSaving||recalcLoading?"#ccc":"#2E7D32", color:"#fff", border:"none", borderRadius:"4px", padding:"8px 18px", cursor:builderSaving||recalcLoading?"not-allowed":"pointer", fontSize:"13px", fontWeight:"bold" }}>
+                      {builderSaving
+                        ? (nutritionKey(builderPreview) !== builderNutritionKey ? "⏳ Recalculating & saving…" : "⏳ Saving…")
+                        : builderEditId ? "✓ Save Changes" : "✓ Save Recipe"}
                     </button>
                   </div>
                 </>
@@ -965,6 +1010,7 @@ Use realistic values. For portions use a typical serving size.`;
                     </div>
                     <div style={{ display:"flex", alignItems:"center", gap:"10px", marginLeft:"12px" }}>
                       <div style={{ textAlign:"right", whiteSpace:"nowrap" }}><div style={{ fontSize:"12px", color:"#378ADD", fontWeight:"bold" }}>{r.nutrition?.kcal} kcal</div>{r.portion_g!=null&&<div style={{ fontSize:"11px", color:"#6b7280" }}>{r.portion_g} g</div>}</div>
+                      <button onClick={e=>{e.stopPropagation();openRecipeEditor(r);}} title="Edit recipe" style={{ background:"none", border:"none", color:"#378ADD", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>✏️</button>
                       <button onClick={e=>{e.stopPropagation();setRecipeModal(r);}} style={{ background:"none", border:"none", color:"#378ADD", cursor:"pointer", fontSize:"11px", padding:"0 3px" }}>👁</button>
                       <button onClick={async e=>{
                         e.stopPropagation();
