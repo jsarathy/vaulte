@@ -103,7 +103,10 @@ export function applyLinkDelta(B, rows, { keepWeight = false } = {}) {
 
 // Every recipe that uses `recipe` as an ingredient (by name), directly or via
 // another recipe — deleted along with it so nothing is left half-defined.
+// If another recipe has the same name (a duplicate), the dependents still have
+// it to link to, so nothing else is deleted.
 export function findDependentsDeep(recipe, recipes) {
+  if (findNameClash(recipe.name, recipes, recipe.id)) return [];
   const out = [], seen = new Set([recipe.id]), queue = [recipe];
   while (queue.length) {
     const name = normRecipeName(queue.shift().name);
@@ -113,4 +116,10 @@ export function findDependentsDeep(recipe, recipes) {
     }
   }
   return out;
+}
+
+// Another saved recipe (not `selfId`) with the same name, ignoring case/spaces
+export function findNameClash(name, recipes, selfId) {
+  const q = normRecipeName(name);
+  return q ? (recipes || []).find(r => r.id !== selfId && normRecipeName(r.name) === q) || null : null;
 }
