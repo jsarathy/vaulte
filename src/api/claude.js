@@ -133,14 +133,17 @@ export async function claudeParseFood(text) {
   return result.items;
 }
 
-export async function claudeCreateRecipe(description) {
+export async function claudeCreateRecipe(description, savedRecipeNames = []) {
+  const saved = savedRecipeNames.length
+    ? `\nThe user has these saved recipes: ${JSON.stringify(savedRecipeNames)}. If the description uses one of them as an ingredient, list it as ONE ingredient whose "item" is exactly that saved name (don't expand it into its own ingredients and don't look it up), with "amount" in grams like "250g" or in portions like "1 portion". Its nutrition and weight are filled in from the saved recipe afterwards.`
+    : "";
   return requestStructured({
     model:"claude-sonnet-4-6",
     max_tokens:2000,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
     system:`You are a recipe and nutrition expert. The user will describe a recipe or dish they want.
 If their description is vague or missing ingredient quantities, use web search to find a real, reputable recipe (e.g. a well-known recipe site) that matches what they asked for, and base your answer on it — don't ask the user for more detail, look it up instead.
-"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values. portion_g is the estimated weight of one serving in grams: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.`,
+"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values. portion_g is the estimated weight of one serving in grams: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.${saved}`,
     messages:[{role:"user", content:description}]
   }, RECIPE_SCHEMA);
 }

@@ -3,8 +3,9 @@ import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
-import { claudeCreateRecipe, claudeRecalculateNutrition, claudeScaleRecipeNutrition } from "../api/claude";
-import { estimatePortionWeight, hasPortionWeight, isEstimatedWeight } from "../api/recipeWeights";
+import { claudeCreateRecipe, claudeScaleRecipeNutrition } from "../api/claude";
+import { computeRecipeFields, hasPortionWeight, isEstimatedWeight } from "../api/recipeWeights";
+import { linkInfo, splitIngredients } from "../constants/recipeLinks";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
@@ -75,11 +76,7 @@ export default function AddEntry({
   // Returns the fields to merge into the recipe.
   const recalcRecipeFields = async (recipe) => {
     const keepWeight = hasPortionWeight(recipe) && !isEstimatedWeight(recipe);
-    const [nutrition, weight] = await Promise.all([
-      claudeRecalculateNutrition(recipe),
-      keepWeight ? null : estimatePortionWeight(recipe),
-    ]);
-    return { nutrition, ...(weight || {}) };
+    return computeRecipeFields(recipe, userRecipes, { keepWeight });
   };
   const closeBuilder = () => {
     const wasEditing = builderEditId;
@@ -849,10 +846,12 @@ Use realistic values. For portions use a typical serving size.`;
                     <button disabled={builderLoading||!builderInput.trim()} onClick={async()=>{
                       setBuilderLoading(true); setBuilderError("");
                       try {
-                        const recipe = await claudeCreateRecipe(builderInput);
+                        let recipe = await claudeCreateRecipe(builderInput, userRecipes.map(r => r.name));
                         recipe.id = genId();
                         const g = Math.round(Number(recipe.portion_g));
                         if (g > 0) { recipe.portion_g = g; recipe.portion_g_source = "estimated"; } else { recipe.portion_g = null; }
+                        // Built on saved recipes → use their own nutrition and weights
+                        if (splitIngredients(recipe, userRecipes).linked.length) recipe = { ...recipe, ...(await computeRecipeFields(recipe, userRecipes)) };
                         setBuilderPreview(recipe);
                         setBuilderNutritionKey(nutritionKey(recipe));
                       } catch (err) { setBuilderError(err.message || "Could not parse recipe. Try adding more detail about ingredients and quantities."); }
@@ -931,18 +930,33 @@ Use realistic values. For portions use a typical serving size.`;
                       {builderError && <div style={{ color:"#c62828", fontSize:"12px" }}>{builderError}</div>}
                     </div>
                     <div style={{ fontWeight:"bold", color:"#378ADD", fontSize:"11px", textTransform:"uppercase", marginBottom:"4px" }}>Ingredients</div>
-                    {(builderPreview.ingredients||[]).map((ing,i) => (
-                      <div key={i} style={{ display:"flex", gap:"6px", alignItems:"center", padding:"3px 0", borderBottom:"1px solid #F0F4F8" }}>
+                    <div style={{ fontSize:"11px", color:"#6b7280", marginBottom:"4px" }}>
+                      Tip: name an ingredient exactly as a saved recipe (pick from the list) with an amount in g or portions — its saved nutrition is used.
+                    </div>
+                    <datalist id="vaulte-saved-recipe-names">
+                      {userRecipes.filter(r=>r.id!==builderPreview.id).map(r=><option key={r.id} value={r.name}/>)}
+                    </datalist>
+                    {(builderPreview.ingredients||[]).map((ing,i) => { const li = linkInfo(ing, userRecipes, builderPreview.id); return (
+                      <div key={i}>
+                      <div style={{ display:"flex", gap:"6px", alignItems:"center", padding:"3px 0", borderBottom: li ? "none" : "1px solid #F0F4F8" }}>
                         <input value={ing.amount||""} placeholder="amount"
                           onChange={e=>setBuilderPreview(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?{...x,amount:e.target.value}:x)}))}
                           style={{ width:"70px", fontWeight:"bold", color:"#185FA5", border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"12px" }}/>
-                        <input value={ing.item||""} placeholder="ingredient"
+                        <input value={ing.item||""} placeholder="ingredient" list="vaulte-saved-recipe-names"
                           onChange={e=>setBuilderPreview(p=>({...p,ingredients:p.ingredients.map((x,j)=>j===i?{...x,item:e.target.value}:x)}))}
-                          style={{ flex:1, border:"0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"12px" }}/>
+                          style={{ flex:1, border: li ? "1px solid #378ADD" : "0.5px solid #e5e7eb", borderRadius:"4px", padding:"3px 5px", fontSize:"12px" }}/>
                         <button onClick={()=>setBuilderPreview(p=>({...p,ingredients:p.ingredients.filter((_,j)=>j!==i)}))}
                           style={{ background:"none", border:"none", color:"#c62828", cursor:"pointer", fontSize:"14px", padding:"0 4px" }}>×</button>
                       </div>
-                    ))}
+                      {li && (
+                        <div data-link-badge style={{ fontSize:"10px", padding:"0 0 4px 76px", borderBottom:"1px solid #F0F4F8", color: li.ok ? "#185FA5" : "#8D6E00" }}>
+                          {li.ok
+                            ? `📖 Saved recipe · ${li.grams != null ? `${Math.round(li.grams)} g · ` : ""}${+li.factor.toFixed(2)} portion${li.factor === 1 ? "" : "s"} · ${Math.round(li.nutrition.kcal)} kcal`
+                            : `📖 Saved recipe — ${li.reason}; Claude will estimate it instead`}
+                        </div>
+                      )}
+                      </div>
+                    ); })}
                     <button onClick={()=>setBuilderPreview(p=>({...p,ingredients:[...(p.ingredients||[]),{amount:"",item:""}]}))}
                       style={{ background:"none", border:"1px dashed #378ADD", color:"#378ADD", borderRadius:"4px", padding:"4px 10px", fontSize:"11px", cursor:"pointer", marginTop:"6px", marginBottom:"14px" }}>+ Add ingredient</button>
 
