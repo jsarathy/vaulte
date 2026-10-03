@@ -65,3 +65,38 @@ export function combineNutrition(linked, otherTotal, servings) {
     return [k, Math.round(t / s * 10) / 10];
   }));
 }
+
+// ── Keeping dependent recipes up to date ─────────────────────────────────────
+// When saved recipe A changes (oldA → newA; oldA null for a new recipe), each
+// recipe B with an ingredient named oldA.name or newA.name is affected.
+// Renamed A → B's ingredient is renamed too, so the link holds.
+export function relinkDependent(B, oldA, newA, recipesOld, recipesNew) {
+  const oldName = normRecipeName(oldA?.name), newName = normRecipeName(newA?.name);
+  const rows = [];
+  const ingredients = (B?.ingredients || []).map(ing => {
+    const n = normRecipeName(ing.item);
+    if (!n || (n !== oldName && n !== newName)) return ing;
+    const newIng = oldA && n === oldName && oldName !== newName ? { ...ing, item: newA.name } : ing;
+    rows.push({ oldLi: oldA ? linkInfo(ing, recipesOld, B.id) : null, newLi: linkInfo(newIng, recipesNew, B.id) });
+    return newIng;
+  });
+  return { ingredients, rows, deltaOk: rows.length > 0 && rows.every(r => r.oldLi?.ok && r.newLi?.ok) };
+}
+
+// B's new per-serving nutrition = old + (new A contribution − old) ÷ servings.
+// weight: {} = leave as is, {portion_g, …} = adjusted estimate, null = needs re-estimating.
+export function applyLinkDelta(B, rows, { keepWeight = false } = {}) {
+  const s = Number(B.servings) > 0 ? Number(B.servings) : 1;
+  const base = B.nutrition || {};
+  const nutrition = Object.fromEntries(MACROS.map(k => {
+    const d = rows.reduce((t, r) => t + r.newLi.nutrition[k] - r.oldLi.nutrition[k], 0);
+    return [k, Math.round(((Number(base[k]) || 0) + d / s) * 10) / 10];
+  }));
+  let weight;
+  if (keepWeight) weight = {};
+  else if (Number(B.portion_g) > 0 && rows.every(r => r.oldLi.grams != null && r.newLi.grams != null)) {
+    const g = Math.round(Number(B.portion_g) + rows.reduce((t, r) => t + r.newLi.grams - r.oldLi.grams, 0) / s);
+    weight = g > 0 ? { portion_g: g, portion_g_source: "estimated" } : null;
+  } else weight = null;
+  return { nutrition, weight };
+}
