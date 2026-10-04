@@ -136,12 +136,6 @@ export const waistForWeight = (cfg, weightKg) => {
   return +(wStartCm - (wS - weightKg) * ((rHere + rStart) / 2)).toFixed(1);
 };
 
-/** Projected waist for any date inside the curve; null outside it. */
-export const projectedWaistAt = (cfg, dateStr) => {
-  const w = projectedWeightAt(cfg, dateStr);
-  return w == null ? null : waistForWeight(cfg, w);
-};
-
 /** Weekly series from week 0 to the last anchor. Nothing beyond it. */
 export const buildProjectionSeries = (cfg) => {
   const pts = planAnchorPoints(cfg);
@@ -161,70 +155,39 @@ export const buildProjectionSeries = (cfg) => {
 
 // ── Milestones ──────────────────────────────────────────────────────
 
+const formatMilestoneDate = (t) =>
+  new Date(t).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+const milestone = (row, note, phase) => ({
+  date: formatMilestoneDate(row.t),
+  weight: `${row.projected.toFixed(1)} kg`,
+  note,
+  phase,
+});
+
+const firstAtOrBelow = (series, kg) => series.find((row) => row.projected <= kg) || null;
+
+/** Week the target zone is reached — unless there's no target, or it's only reached at plan end. */
+const targetZoneRow = (cfg, series) => {
+  if (!Number.isFinite(cfg?.targetWeightMaxKg)) return null;
+  const row = firstAtOrBelow(series, cfg.targetWeightMaxKg);
+  return row === series[series.length - 1] ? null : row;
+};
+
+/** Start, -4 kg, -8 kg, target zone and plan end; milestones never reached are left out. */
 export function deriveMilestones(cfg) {
-  const s = buildProjectionSeries(cfg);
-  if (!s.length) return [];
-  const fmt = (t) =>
-    new Date(t).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const w = () => ""; // waist moved to the Body tab; milestone notes are weight-only
-  const start = s[0],
-    end = s[s.length - 1];
-  const first = (pred) => s.find(pred) || null;
-
-  const m4 = first((r) => r.projected <= start.projected - 4);
-  const m8 = first((r) => r.projected <= start.projected - 8);
-  const tgt = Number.isFinite(cfg?.targetWeightMaxKg)
-    ? first((r) => r.projected <= cfg.targetWeightMaxKg)
-    : null;
-
+  const series = buildProjectionSeries(cfg);
+  if (!series.length) return [];
+  const start = series[0];
+  const end = series[series.length - 1];
+  const minus4 = firstAtOrBelow(series, start.projected - 4);
+  const minus8 = firstAtOrBelow(series, start.projected - 8);
+  const target = targetZoneRow(cfg, series);
   return [
-    {
-      date: fmt(start.t),
-      weight: `${start.projected.toFixed(1)} kg`,
-      note: `START${w(start)}`,
-      phase: "Phase 1",
-    },
-    m4 && {
-      date: fmt(m4.t),
-      weight: `${m4.projected.toFixed(1)} kg`,
-      note: `-4 kg${w(m4)}`,
-      phase: "Phase 1",
-    },
-    m8 && {
-      date: fmt(m8.t),
-      weight: `${m8.projected.toFixed(1)} kg`,
-      note: `-8 kg${w(m8)}`,
-      phase: "Phase 1",
-    },
-    tgt &&
-      tgt !== end && {
-        date: fmt(tgt.t),
-        weight: `${tgt.projected.toFixed(1)} kg`,
-        note: `TARGET ZONE${w(tgt)}`,
-        phase: "Phase 3",
-      },
-    {
-      date: fmt(end.t),
-      weight: `${end.projected.toFixed(1)} kg`,
-      note: `Plan end, wk ${end.week}${w(end)}`,
-      phase: "Phase 3",
-    },
+    milestone(start, "START", "Phase 1"),
+    minus4 && milestone(minus4, "-4 kg", "Phase 1"),
+    minus8 && milestone(minus8, "-8 kg", "Phase 1"),
+    target && milestone(target, "TARGET ZONE", "Phase 3"),
+    milestone(end, `Plan end, wk ${end.week}`, "Phase 3"),
   ].filter(Boolean);
-}
-
-// ── Deprecated ──────────────────────────────────────────────────────
-// Retained only so the legacy WeightTab.jsx still builds. Not used by
-// WeightTracker.jsx; delete once WeightTab.jsx is removed.
-export function generateWeightProjection(cfg) {
-  return buildProjectionSeries(cfg).map((r) => ({
-    week: r.week,
-    date: new Date(r.t).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }),
-    projected: r.projected,
-    waist: r.waist,
-    phase: "Phase 1 — Active",
-  }));
 }
