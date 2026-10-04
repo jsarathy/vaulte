@@ -75,6 +75,9 @@ export const CLEAN_FILES = [
   "src/hooks/usePolarBrowse.js",
   "src/components/PolarSessionsPanel.jsx",
   "src/components/PolarBrowseModal.jsx",
+  "src/lib/exerciseLog.js",
+  "src/hooks/useExerciseLog.js",
+  "src/components/ExerciseLogModal.jsx",
 ];
 
 const unused = [

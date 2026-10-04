@@ -43,10 +43,10 @@ function H() {
       >
         <AddEntry
           userId="u"
-          allDays={[]}
+          allDays={window.__allDays || []}
           currentDate="2026-10-03"
           currentDayData={null}
-          setCurrentDayData={() => {}}
+          setCurrentDayData={(d) => (window.__currentDay = d)}
           userRecipes={userRecipes}
           setUserRecipes={setUserRecipes}
           addDate={addDate}
@@ -67,7 +67,10 @@ function H() {
           polarSyncMsg={null}
           syncPolar={() => {}}
           setPolarLogModal={(s) => (window.__polarLog = s)}
-          persistDay={async () => {}}
+          persistDay={async (d) => {
+            if (window.__failPersist) throw new Error("Mock persist failure");
+            (window.__persisted ||= []).push(JSON.parse(JSON.stringify(d)));
+          }}
           setRecipeModal={setRecipeModal}
         />
       </div>

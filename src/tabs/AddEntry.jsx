@@ -1,7 +1,6 @@
 // src/tabs/AddEntry.jsx
 import { useState, useRef } from "react";
-import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
-import { EXERCISE_COMPENDIUM } from "../constants/exercises";
+import { genId, makeMeals, DEFAULT_MEAL_SLOTS } from "../constants/helpers";
 import { loadDay } from "../api/firestore";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
@@ -16,6 +15,9 @@ import { useSavedRecipes } from "../hooks/useSavedRecipes";
 import PolarSessionsPanel from "../components/PolarSessionsPanel";
 import PolarBrowseModal from "../components/PolarBrowseModal";
 import { usePolarBrowse } from "../hooks/usePolarBrowse";
+import ExerciseLogModal from "../components/ExerciseLogModal";
+import { useExerciseLog } from "../hooks/useExerciseLog";
+import { mealSlotOptions } from "../lib/exerciseLog.js";
 import { useFoodLookup } from "../hooks/useFoodLookup";
 import { useRecipeBuilder } from "../hooks/useRecipeBuilder";
 
@@ -86,14 +88,14 @@ export default function AddEntry({
   persistDay,
   setRecipeModal,
 }) {
-  const [exSearch, setExSearch] = useState("");
-  const [exSelected, setExSelected] = useState(null);
-  const [exDuration, setExDuration] = useState("30");
-  const [exHRavg, setExHRavg] = useState("");
-  const [exResult, setExResult] = useState(null);
-  const [exMsg, setExMsg] = useState(null);
-  const [showExModal, setShowExModal] = useState(false);
-  const [exMealId, setExMealId] = useState("");
+  const exercise = useExerciseLog({
+    userId,
+    allDays,
+    addDate,
+    currentDate,
+    setCurrentDayData,
+    persistDay,
+  });
   const browse = usePolarBrowse(userId);
   const saved = useSavedRecipes({ userId, userRecipes, setUserRecipes });
   const builder = useRecipeBuilder({
@@ -852,13 +854,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
           🏋️ Exercise
         </div>
         <button
-          onClick={() => {
-            setShowExModal(true);
-            setExSearch("");
-            setExSelected(null);
-            setExResult(null);
-            setExMsg(null);
-          }}
+          onClick={exercise.show}
           style={{
             width: "100%",
             background: "#378ADD",
@@ -1051,359 +1047,8 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
       {portion.recipe && <RecipePortionModal box={portion} onLoad={loadPortion} />}
 
       {/* ── Exercise Picker Modal ── */}
-      {showExModal && (
-        <div
-          onClick={(e) => e.target === e.currentTarget && setShowExModal(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 3000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "12px",
-              width: "560px",
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div
-              style={{
-                background: "#185FA5",
-                color: "#fff",
-                padding: "14px 18px",
-                borderRadius: "12px 12px 0 0",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div style={{ fontWeight: "bold", fontSize: "15px" }}>🏋️ Log Exercise</div>
-              <button
-                onClick={() => setShowExModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#fff",
-                  fontSize: "22px",
-                  cursor: "pointer",
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ padding: "18px" }}>
-              <input
-                value={exSearch}
-                onChange={(e) => setExSearch(e.target.value)}
-                autoFocus
-                placeholder="Search exercise… e.g. cycling, yoga, running"
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "2px solid #378ADD",
-                  borderRadius: "6px",
-                  fontSize: "13px",
-                  boxSizing: "border-box",
-                  outline: "none",
-                  marginBottom: "10px",
-                }}
-              />
-              <div
-                style={{
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                  border: "0.5px solid #e5e7eb",
-                  borderRadius: "6px",
-                  marginBottom: "12px",
-                }}
-              >
-                {EXERCISE_COMPENDIUM.filter(
-                  (ex) =>
-                    !exSearch ||
-                    ex.name.toLowerCase().includes(exSearch.toLowerCase()) ||
-                    ex.cat.toLowerCase().includes(exSearch.toLowerCase()),
-                ).map((ex) => (
-                  <div
-                    key={ex.name}
-                    onClick={() => {
-                      setExSelected(ex);
-                      setExResult(null);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      borderBottom: "1px solid #F0F4F8",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      background: exSelected?.name === ex.name ? "#E6F1FB" : "transparent",
-                    }}
-                  >
-                    <div style={{ fontWeight: "bold", color: "#185FA5" }}>{ex.name}</div>
-                    <div style={{ fontSize: "10px", color: "#6b7280" }}>
-                      {ex.cat} · MET {ex.met}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: "8px",
-                  marginBottom: "12px",
-                }}
-              >
-                {[
-                  ["Duration (min)", "number", exDuration, setExDuration],
-                  ["Avg HR (opt)", "number", exHRavg, setExHRavg],
-                  ["Weight (kg)", "number", "84", null],
-                ].map(([label, type, val, setter], i) => (
-                  <div key={label}>
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        marginBottom: "2px",
-                      }}
-                    >
-                      {label}
-                    </div>
-                    <input
-                      type={type}
-                      value={i === 2 ? "84" : val}
-                      onChange={setter ? (e) => setter(e.target.value) : undefined}
-                      style={{
-                        width: "100%",
-                        padding: "6px 8px",
-                        border: "0.5px solid #e5e7eb",
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  if (!exSelected || !exDuration) return;
-                  const mins = parseFloat(exDuration) || 0;
-                  const weight = 84;
-                  const met = exSelected.met;
-                  const kcal = Math.round((met * weight * mins) / 60);
-                  const hrAvg = parseFloat(exHRavg) || null;
-                  const hrMax = hrAvg ? Math.round(hrAvg * 1.12) : null;
-                  const hrPct = hrMax ? (hrAvg / hrMax) * 100 : 70;
-                  const fatPct = hrPct < 70 ? 70 : hrPct < 80 ? 60 : hrPct < 90 ? 40 : 20;
-                  const fatKcal = Math.round((kcal * fatPct) / 100);
-                  const zone =
-                    hrPct < 60
-                      ? "Zone 1"
-                      : hrPct < 70
-                        ? "Zone 2"
-                        : hrPct < 80
-                          ? "Zone 3"
-                          : hrPct < 90
-                            ? "Zone 4"
-                            : "Zone 5";
-                  setExResult({
-                    kcal,
-                    fatPct,
-                    fatKcal,
-                    fatGrams: Math.round(fatKcal / 9),
-                    zone,
-                    mins,
-                    weight,
-                    met,
-                  });
-                }}
-                style={{
-                  width: "100%",
-                  background: !exSelected || !exDuration ? "#ccc" : "#378ADD",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "9px",
-                  cursor: !exSelected || !exDuration ? "not-allowed" : "pointer",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  marginBottom: "12px",
-                }}
-              >
-                Calculate
-              </button>
-              {exResult && (
-                <div style={{ background: "#F0F4F8", borderRadius: "8px", padding: "12px" }}>
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      color: "#185FA5",
-                      fontSize: "13px",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    {exSelected.name} · {exResult.mins} min
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "8px",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    {[
-                      ["🔥 Kcal Burned", `${exResult.kcal} kcal`],
-                      ["❤️ HR Zone", exResult.zone],
-                      ["🧈 Fat Burn %", `${exResult.fatPct}%`],
-                      ["🧈 Fat Burned", `${exResult.fatGrams}g (${exResult.fatKcal} kcal)`],
-                    ].map(([label, val]) => (
-                      <div
-                        key={label}
-                        style={{
-                          background: "#fff",
-                          borderRadius: "6px",
-                          padding: "7px 10px",
-                          border: "0.5px solid #e5e7eb",
-                        }}
-                      >
-                        <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "2px" }}>
-                          {label}
-                        </div>
-                        <div style={{ fontWeight: "bold", fontSize: "12px", color: "#185FA5" }}>
-                          {val}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <select
-                      value={exMealId}
-                      onChange={(e) => setExMealId(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: "6px 8px",
-                        border: "0.5px solid #e5e7eb",
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                      }}
-                    >
-                      <option value="">— select meal slot —</option>
-                      {(() => {
-                        const existing = allDays.find((d) => d.date === addDate);
-                        const meals = existing
-                          ? ensureMealSlots(existing).meals
-                          : DEFAULT_MEAL_SLOTS;
-                        return meals.map((m, i) => (
-                          <option key={m.id || i} value={m.id || "__slot__" + m.name}>
-                            {m.name}
-                          </option>
-                        ));
-                      })()}
-                    </select>
-                    <button
-                      onClick={async () => {
-                        if (!exMealId) {
-                          setExMsg({ ok: false, text: "Select a meal slot" });
-                          return;
-                        }
-                        try {
-                          let raw =
-                            allDays.find((d) => d.date === addDate) ||
-                            (await loadDay(userId, addDate));
-                          let day = ensureMealSlots(
-                            raw || { date: addDate, notes: "", meals: makeMeals() },
-                          );
-                          let targetMealId = exMealId;
-                          if (targetMealId.startsWith("__slot__")) {
-                            const match = day.meals.find(
-                              (m) => m.name === targetMealId.replace("__slot__", ""),
-                            );
-                            targetMealId = match?.id || null;
-                          }
-                          if (!targetMealId) {
-                            setExMsg({ ok: false, text: "Meal slot not found — try again" });
-                            return;
-                          }
-                          const item = {
-                            id: genId(),
-                            name: `${exSelected.name} (${exResult.mins} min)`,
-                            kcal: -exResult.kcal,
-                            fat: 0,
-                            sat_fat: 0,
-                            carbs: 0,
-                            sugar: 0,
-                            fibre: 0,
-                            net_carbs: 0,
-                            protein: 0,
-                            is_exercise: 1,
-                            fat_burned_g: exResult.fatGrams,
-                            fat_burned_kcal: exResult.fatKcal,
-                          };
-                          const updated = {
-                            ...day,
-                            meals: day.meals.map((m) =>
-                              m.id === targetMealId
-                                ? { ...m, items: [...(m.items || []), item] }
-                                : m,
-                            ),
-                          };
-                          await persistDay(updated);
-                          if (addDate === currentDate) setCurrentDayData(updated);
-                          setShowExModal(false);
-                          setExResult(null);
-                          setExSelected(null);
-                          setExSearch("");
-                          setExDuration("30");
-                          setExHRavg("");
-                          setExMealId("");
-                        } catch (e) {
-                          setExMsg({ ok: false, text: "Failed to log: " + e.message });
-                        }
-                      }}
-                      style={{
-                        background: "#2E7D32",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "6px",
-                        padding: "8px 16px",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontWeight: "bold",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      ✓ Log It
-                    </button>
-                  </div>
-                  {exMsg && (
-                    <div
-                      style={{
-                        marginTop: "8px",
-                        padding: "6px 10px",
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                        background: exMsg.ok ? "#E8F5E9" : "#FFEBEE",
-                        color: exMsg.ok ? "#2E7D32" : "#c62828",
-                      }}
-                    >
-                      {exMsg.text}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      {exercise.open && (
+        <ExerciseLogModal log={exercise} slots={mealSlotOptions(allDays, addDate)} />
       )}
     </div>
   );
