@@ -3,24 +3,15 @@ import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
-import { claudeCreateRecipe } from "../api/claude";
-import {
-  computeRecipeFields,
-  hasPortionWeight,
-  isEstimatedWeight,
-  propagateRecipeChange,
-} from "../api/recipeWeights";
-import {
-  linkInfo,
-  splitIngredients,
-  findDependentsDeep,
-  findNameClash,
-} from "../constants/recipeLinks";
+import { isEstimatedWeight, propagateRecipeChange } from "../api/recipeWeights";
+import { linkInfo, findDependentsDeep } from "../constants/recipeLinks";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
 import RecipePortionModal from "../components/RecipePortionModal";
 import { useRecipePortion } from "../hooks/useRecipePortion";
+import RecipeBuilderModal from "../components/RecipeBuilderModal";
+import { useRecipeBuilder } from "../hooks/useRecipeBuilder";
 import { db } from "../firebase";
 import { getDocs, collection, orderBy, query } from "firebase/firestore";
 
@@ -104,58 +95,15 @@ export default function AddEntry({
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseSearch, setBrowseSearch] = useState("");
   const [showRecipesModal, setShowRecipesModal] = useState(false);
-  const [recipeBuilder, setRecipeBuilder] = useState(false);
-  const [builderInput, setBuilderInput] = useState("");
-  const [builderLoading, setBuilderLoading] = useState(false);
-  const [builderPreview, setBuilderPreview] = useState(null);
-  const [builderError, setBuilderError] = useState("");
-  const [recalcLoading, setRecalcLoading] = useState(false);
-  const [recalcError, setRecalcError] = useState(""); // shown by the Recalculate button (save/generate errors show by Save)
-  // Editing a saved recipe reuses the builder: id being edited (null = new recipe),
-  // and the servings + ingredients the current nutrition was calculated from.
-  const [builderEditId, setBuilderEditId] = useState(null);
-  const [builderNutritionKey, setBuilderNutritionKey] = useState(null);
-  const [builderSaving, setBuilderSaving] = useState(false);
   const [recipeNotice, setRecipeNotice] = useState(null); // { ok, text } — dependent recipes updated after a save
-  const nutritionKey = (r) =>
-    JSON.stringify({
-      s: Number(r?.servings) || 0,
-      i: (r?.ingredients || [])
-        .map((x) => [String(x.amount || "").trim(), String(x.item || "").trim()])
-        .filter(([a, b]) => a || b),
-    });
-  const openRecipeEditor = (r) => {
-    const copy = JSON.parse(JSON.stringify(r));
-    setBuilderPreview(copy);
-    setBuilderNutritionKey(nutritionKey(copy));
-    setBuilderEditId(r.id);
-    setRecalcError("");
-    setBuilderInput("");
-    setBuilderError("");
-    setShowRecipesModal(false);
-    setRecipeBuilder(true);
-  };
-  // Recalculate nutrition and, unless the user has entered their own weight, re-estimate Wt/portion.
-  // Returns the fields to merge into the recipe.
-  const recalcRecipeFields = async (recipe) => {
-    const keepWeight = hasPortionWeight(recipe) && !isEstimatedWeight(recipe);
-    return computeRecipeFields(recipe, userRecipes, { keepWeight });
-  };
-  const closeBuilder = () => {
-    const wasEditing = builderEditId;
-    setRecipeBuilder(false);
-    setBuilderPreview(null);
-    setBuilderInput("");
-    setBuilderError("");
-    setBuilderEditId(null);
-    setBuilderNutritionKey(null);
-    setRecalcError("");
-    if (wasEditing) setShowRecipesModal(true); // back to the Saved Recipes list
-  };
-  // ×, Cancel and backdrop clicks are ignored while a save (with recalculation) is in flight
-  const requestCloseBuilder = () => {
-    if (!builderSaving) closeBuilder();
-  };
+  const builder = useRecipeBuilder({
+    userId,
+    userRecipes,
+    setUserRecipes,
+    setAddItem,
+    setRecipeNotice,
+    setShowRecipesModal,
+  });
   // Unified quantity modal — replaces old ingredientModal
   const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
   const qtyModalRef = useRef(null);
@@ -828,19 +776,18 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                       Math.round(photoItems.reduce((t, i) => t + (Number(i[k]) || 0), 0) * 10) / 10,
                     ]),
                   );
-                  setBuilderPreview({
-                    id: genId(),
-                    name: photoItems.length === 1 ? photoItems[0].name : "",
-                    description: "Saved from photo",
-                    servings: 1,
-                    nutrition,
-                    ingredients: photoItems.map((i) => ({ amount: "", item: i.name })),
-                    steps: [],
-                    notes: "",
+                  builder.startNew({
+                    preview: {
+                      id: genId(),
+                      name: photoItems.length === 1 ? photoItems[0].name : "",
+                      description: "Saved from photo",
+                      servings: 1,
+                      nutrition,
+                      ingredients: photoItems.map((i) => ({ amount: "", item: i.name })),
+                      steps: [],
+                      notes: "",
+                    },
                   });
-                  setBuilderInput("");
-                  setBuilderError("");
-                  setRecipeBuilder(true);
                   setPhotoItems([]);
                   setPhotoPreview(null);
                 }}
@@ -886,12 +833,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
             📖 Browse Saved Recipes
           </button>
           <button
-            onClick={() => {
-              setRecipeBuilder(true);
-              setBuilderPreview(null);
-              setBuilderInput("");
-              setBuilderError("");
-            }}
+            onClick={() => builder.startNew()}
             style={{
               flex: 1,
               background: "#185FA5",
@@ -1864,10 +1806,7 @@ Use realistic values. For portions use a typical serving size.`;
                     if (String(n.kind || "").toUpperCase() === "DISH") {
                       // Dish → recipe builder with the name filled in
                       setQtyModal(null);
-                      setBuilderInput(name);
-                      setBuilderPreview(null);
-                      setBuilderError("");
-                      setRecipeBuilder(true);
+                      builder.startNew({ input: name });
                       return;
                     }
                     if (qtySave) {
@@ -1971,849 +1910,519 @@ Use realistic values. For portions use a typical serving size.`;
       )}
 
       {/* ── Recipe Builder Modal ── */}
-      {recipeBuilder && (
-        <div
-          onClick={(e) => e.target === e.currentTarget && requestCloseBuilder()}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 3000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "10px",
-              width: "640px",
-              maxWidth: "95vw",
-              maxHeight: "88vh",
-              overflowY: "auto",
-              boxShadow: "0 8px 40px rgba(0,0,0,0.3)",
-            }}
-          >
-            <div
-              style={{
-                background: "#185FA5",
-                color: "#fff",
-                padding: "14px 18px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                borderRadius: "10px 10px 0 0",
-              }}
-            >
-              <div style={{ fontSize: "15px", fontWeight: "bold" }}>
-                {builderEditId ? "✏️ Edit Recipe" : "🤖 Create Recipe with Claude"}
-              </div>
-              <button
-                onClick={requestCloseBuilder}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#fff",
-                  fontSize: "22px",
-                  cursor: "pointer",
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ padding: "18px" }}>
-              {!builderPreview ? (
-                <>
-                  <p
-                    style={{
-                      color: "#6b7280",
-                      fontSize: "13px",
-                      marginBottom: "12px",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    Describe your recipe — a full ingredient list, or just a dish name if you want
-                    Claude to look one up for you. Claude will generate the full recipe with
-                    nutrition per serving, which you can then edit before saving.
-                  </p>
-                  <textarea
-                    value={builderInput}
-                    onChange={(e) => setBuilderInput(e.target.value)}
-                    placeholder="e.g. Pinto bean stew — 606g cooked pinto beans, 102g onion, 6 green chillies, 3 tbsp sesame oil, 200g chopped tomatoes, salt and hing. Sauté onion and chillies, add tomatoes, add beans, simmer 15 min. Makes 4 portions of ~225g each."
+      {builder.open && (
+        <RecipeBuilderModal
+          builder={builder}
+          form={
+            builder.preview && (
+              <>
+                <div style={{ marginBottom: "10px" }}>
+                  <input
+                    value={builder.preview.name || ""}
+                    placeholder="Recipe name"
+                    onChange={(e) => builder.setPreview((p) => ({ ...p, name: e.target.value }))}
                     style={{
                       width: "100%",
-                      minHeight: "120px",
-                      padding: "10px",
+                      fontWeight: "bold",
+                      fontSize: "16px",
+                      color: "#185FA5",
                       border: "0.5px solid #e5e7eb",
-                      borderRadius: "6px",
-                      fontSize: "13px",
-                      fontFamily: "inherit",
-                      resize: "vertical",
-                      background: "#F0F4F8",
+                      borderRadius: "4px",
+                      padding: "6px 8px",
+                      marginBottom: "6px",
                       boxSizing: "border-box",
                     }}
                   />
-                  {builderError && (
-                    <div style={{ color: "#c62828", fontSize: "12px", marginTop: "6px" }}>
-                      {builderError}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
-                    <button
-                      disabled={builderLoading || !builderInput.trim()}
-                      onClick={async () => {
-                        setBuilderLoading(true);
-                        setBuilderError("");
-                        try {
-                          let recipe = await claudeCreateRecipe(
-                            builderInput,
-                            userRecipes.map((r) => r.name),
-                          );
-                          recipe.id = genId();
-                          const g = Math.round(Number(recipe.portion_g));
-                          if (g > 0) {
-                            recipe.portion_g = g;
-                            recipe.portion_g_source = "estimated";
-                          } else {
-                            recipe.portion_g = null;
-                          }
-                          // Built on saved recipes → use their own nutrition and weights
-                          if (splitIngredients(recipe, userRecipes).linked.length)
-                            recipe = {
-                              ...recipe,
-                              ...(await computeRecipeFields(recipe, userRecipes)),
-                            };
-                          setBuilderPreview(recipe);
-                          setBuilderNutritionKey(nutritionKey(recipe));
-                        } catch (err) {
-                          setBuilderError(
-                            err.message ||
-                              "Could not parse recipe. Try adding more detail about ingredients and quantities.",
-                          );
-                        }
-                        setBuilderLoading(false);
-                      }}
-                      style={{
-                        background: builderLoading || !builderInput.trim() ? "#ccc" : "#378ADD",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "4px",
-                        padding: "9px 18px",
-                        cursor: builderLoading || !builderInput.trim() ? "not-allowed" : "pointer",
-                        fontSize: "13px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {builderLoading ? "⏳ Generating…" : "Generate Recipe →"}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
+                  <textarea
+                    value={builder.preview.description || ""}
+                    placeholder="One-line description"
+                    onChange={(e) =>
+                      builder.setPreview((p) => ({ ...p, description: e.target.value }))
+                    }
+                    style={{
+                      width: "100%",
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      border: "0.5px solid #e5e7eb",
+                      borderRadius: "4px",
+                      padding: "6px 8px",
+                      marginBottom: "8px",
+                      resize: "vertical",
+                      minHeight: "36px",
+                      boxSizing: "border-box",
+                    }}
+                  />
                   <div
                     style={{
-                      background: "#E8F5E9",
-                      border: "1px solid #A5D6A7",
-                      borderRadius: "6px",
-                      padding: "10px 14px",
-                      marginBottom: "14px",
-                      fontSize: "13px",
-                      color: "#2E7D32",
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                      marginBottom: "10px",
                     }}
                   >
-                    {builderEditId
-                      ? "✏️ Edit anything below, then save"
-                      : "✓ Recipe found — edit anything below, then save"}
-                  </div>
-                  {nutritionKey(builderPreview) !== builderNutritionKey && (
-                    <div
-                      style={{
-                        background: "#FFF8E1",
-                        border: "1px solid #FFE082",
-                        borderRadius: "6px",
-                        padding: "8px 12px",
-                        marginBottom: "12px",
-                        fontSize: "12px",
-                        color: "#8D6E00",
-                      }}
-                    >
-                      Ingredients or servings changed — nutrition will be recalculated when you
-                      save.
-                    </div>
-                  )}
-                  <div style={{ marginBottom: "10px" }}>
-                    <input
-                      value={builderPreview.name || ""}
-                      placeholder="Recipe name"
-                      onChange={(e) => setBuilderPreview((p) => ({ ...p, name: e.target.value }))}
-                      style={{
-                        width: "100%",
-                        fontWeight: "bold",
-                        fontSize: "16px",
-                        color: "#185FA5",
-                        border: "0.5px solid #e5e7eb",
-                        borderRadius: "4px",
-                        padding: "6px 8px",
-                        marginBottom: "6px",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                    <textarea
-                      value={builderPreview.description || ""}
-                      placeholder="One-line description"
-                      onChange={(e) =>
-                        setBuilderPreview((p) => ({ ...p, description: e.target.value }))
-                      }
-                      style={{
-                        width: "100%",
-                        fontSize: "12px",
-                        color: "#6b7280",
-                        border: "0.5px solid #e5e7eb",
-                        borderRadius: "4px",
-                        padding: "6px 8px",
-                        marginBottom: "8px",
-                        resize: "vertical",
-                        minHeight: "36px",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "10px",
-                        flexWrap: "wrap",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "11px",
-                          color: "#185FA5",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        🍽 Serves
-                        <input
-                          type="number"
-                          min="1"
-                          value={builderPreview.servings ?? ""}
-                          onChange={(e) =>
-                            setBuilderPreview((p) => ({
-                              ...p,
-                              servings: Number(e.target.value) || "",
-                            }))
-                          }
-                          style={{
-                            width: "48px",
-                            border: "0.5px solid #e5e7eb",
-                            borderRadius: "4px",
-                            padding: "3px 5px",
-                            fontSize: "11px",
-                          }}
-                        />
-                      </label>
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "11px",
-                          color: "#185FA5",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ⏱ Prep
-                        <input
-                          value={builderPreview.prep_time || ""}
-                          placeholder="10 minutes"
-                          onChange={(e) =>
-                            setBuilderPreview((p) => ({ ...p, prep_time: e.target.value }))
-                          }
-                          style={{
-                            width: "80px",
-                            border: "0.5px solid #e5e7eb",
-                            borderRadius: "4px",
-                            padding: "3px 5px",
-                            fontSize: "11px",
-                          }}
-                        />
-                      </label>
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "11px",
-                          color: "#185FA5",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        🍳 Cook
-                        <input
-                          value={builderPreview.cook_time || ""}
-                          placeholder="25 minutes"
-                          onChange={(e) =>
-                            setBuilderPreview((p) => ({ ...p, cook_time: e.target.value }))
-                          }
-                          style={{
-                            width: "80px",
-                            border: "0.5px solid #e5e7eb",
-                            borderRadius: "4px",
-                            padding: "3px 5px",
-                            fontSize: "11px",
-                          }}
-                        />
-                      </label>
-                      <label
-                        title="Cooked weight of one portion — used to work out nutrition by weight"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "11px",
-                          color: "#185FA5",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ⚖ Wt/portion
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={builderPreview.portion_g ?? ""}
-                          placeholder="225"
-                          onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            const ok = Number.isFinite(v) && v > 0;
-                            setBuilderPreview((p) => ({
-                              ...p,
-                              portion_g: ok ? v : null,
-                              portion_g_source: ok ? "weighed" : null,
-                            }));
-                          }}
-                          style={{
-                            width: "56px",
-                            border: "0.5px solid #e5e7eb",
-                            borderRadius: "4px",
-                            padding: "3px 5px",
-                            fontSize: "11px",
-                          }}
-                        />
-                        g
-                        {isEstimatedWeight(builderPreview) && (
-                          <span
-                            title="Estimated from ingredient weights ÷ servings. Type your weighed value to replace it."
-                            style={{ color: "#8D6E00", fontWeight: "normal" }}
-                          >
-                            &nbsp;(est.)
-                          </span>
-                        )}
-                      </label>
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(8,1fr)",
-                        gap: "4px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      {[
-                        ["kcal", "kcal"],
-                        ["fat", "Fat"],
-                        ["sat_fat", "Sat F"],
-                        ["carbs", "Carbs"],
-                        ["sugar", "Sugar"],
-                        ["fibre", "Fibre"],
-                        ["net_carbs", "Net C"],
-                        ["protein", "Prot"],
-                      ].map(([k, l]) => (
-                        <div
-                          key={k}
-                          style={{
-                            textAlign: "center",
-                            background: "#E6F1FB",
-                            borderRadius: "4px",
-                            padding: "4px 2px",
-                          }}
-                        >
-                          <input
-                            type="number"
-                            value={(builderPreview.nutrition || {})[k] ?? 0}
-                            onChange={(e) =>
-                              setBuilderPreview((p) => ({
-                                ...p,
-                                nutrition: {
-                                  ...(p.nutrition || {}),
-                                  [k]: Number(e.target.value) || 0,
-                                },
-                              }))
-                            }
-                            style={{
-                              width: "100%",
-                              textAlign: "center",
-                              fontWeight: "bold",
-                              color: "#185FA5",
-                              fontSize: "13px",
-                              border: "none",
-                              background: "transparent",
-                            }}
-                          />
-                          <div style={{ fontSize: "9px", color: "#6b7280" }}>{l}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div
+                    <label
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "12px",
-                        flexWrap: "wrap",
+                        gap: "4px",
+                        fontSize: "11px",
+                        color: "#185FA5",
+                        fontWeight: "bold",
                       }}
                     >
-                      <button
-                        disabled={recalcLoading}
-                        onClick={async () => {
-                          setRecalcLoading(true);
-                          setRecalcError("");
-                          try {
-                            const fields = await recalcRecipeFields(builderPreview);
-                            setBuilderPreview((p) => ({ ...p, ...fields }));
-                            setBuilderNutritionKey(nutritionKey(builderPreview));
-                          } catch (err) {
-                            setRecalcError(err.message || "Could not recalculate nutrition.");
-                          }
-                          setRecalcLoading(false);
-                        }}
+                      🍽 Serves
+                      <input
+                        type="number"
+                        min="1"
+                        value={builder.preview.servings ?? ""}
+                        onChange={(e) =>
+                          builder.setPreview((p) => ({
+                            ...p,
+                            servings: Number(e.target.value) || "",
+                          }))
+                        }
                         style={{
-                          background: "none",
-                          border: "1px solid #185FA5",
-                          color: "#185FA5",
+                          width: "48px",
+                          border: "0.5px solid #e5e7eb",
                           borderRadius: "4px",
-                          padding: "4px 10px",
+                          padding: "3px 5px",
                           fontSize: "11px",
-                          cursor: recalcLoading ? "not-allowed" : "pointer",
                         }}
-                      >
-                        {recalcLoading
-                          ? "⏳ Recalculating…"
-                          : "↻ Recalculate nutrition from ingredients above"}
-                      </button>
-                      {recalcError && (
-                        <div style={{ color: "#c62828", fontSize: "12px" }}>{recalcError}</div>
-                      )}
-                    </div>
-                    <div
+                      />
+                    </label>
+                    <label
                       style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "11px",
+                        color: "#185FA5",
                         fontWeight: "bold",
-                        color: "#378ADD",
-                        fontSize: "11px",
-                        textTransform: "uppercase",
-                        marginBottom: "4px",
                       }}
                     >
-                      Ingredients
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
-                      Tip: name an ingredient exactly as a saved recipe (pick from the list) with an
-                      amount in g or portions — its saved nutrition is used.
-                    </div>
-                    <datalist id="vaulte-saved-recipe-names">
-                      {userRecipes
-                        .filter((r) => r.id !== builderPreview.id)
-                        .map((r) => (
-                          <option key={r.id} value={r.name} />
-                        ))}
-                    </datalist>
-                    {(builderPreview.ingredients || []).map((ing, i) => {
-                      const li = linkInfo(ing, userRecipes, builderPreview.id);
-                      return (
-                        <div key={i}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "6px",
-                              alignItems: "center",
-                              padding: "3px 0",
-                              borderBottom: li ? "none" : "1px solid #F0F4F8",
-                            }}
-                          >
-                            <input
-                              value={ing.amount || ""}
-                              placeholder="amount"
-                              onChange={(e) =>
-                                setBuilderPreview((p) => ({
-                                  ...p,
-                                  ingredients: p.ingredients.map((x, j) =>
-                                    j === i ? { ...x, amount: e.target.value } : x,
-                                  ),
-                                }))
-                              }
-                              style={{
-                                width: "70px",
-                                fontWeight: "bold",
-                                color: "#185FA5",
-                                border: "0.5px solid #e5e7eb",
-                                borderRadius: "4px",
-                                padding: "3px 5px",
-                                fontSize: "12px",
-                              }}
-                            />
-                            <input
-                              value={ing.item || ""}
-                              placeholder="ingredient"
-                              list="vaulte-saved-recipe-names"
-                              onChange={(e) =>
-                                setBuilderPreview((p) => ({
-                                  ...p,
-                                  ingredients: p.ingredients.map((x, j) =>
-                                    j === i ? { ...x, item: e.target.value } : x,
-                                  ),
-                                }))
-                              }
-                              style={{
-                                flex: 1,
-                                border: li ? "1px solid #378ADD" : "0.5px solid #e5e7eb",
-                                borderRadius: "4px",
-                                padding: "3px 5px",
-                                fontSize: "12px",
-                              }}
-                            />
-                            <button
-                              onClick={() =>
-                                setBuilderPreview((p) => ({
-                                  ...p,
-                                  ingredients: p.ingredients.filter((_, j) => j !== i),
-                                }))
-                              }
-                              style={{
-                                background: "none",
-                                border: "none",
-                                color: "#c62828",
-                                cursor: "pointer",
-                                fontSize: "14px",
-                                padding: "0 4px",
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                          {li && (
-                            <div
-                              data-link-badge
-                              style={{
-                                fontSize: "10px",
-                                padding: "0 0 4px 76px",
-                                borderBottom: "1px solid #F0F4F8",
-                                color: li.ok ? "#185FA5" : "#8D6E00",
-                              }}
-                            >
-                              {li.ok
-                                ? `📖 Saved recipe · ${li.grams != null ? `${Math.round(li.grams)} g · ` : ""}${+li.factor.toFixed(2)} portion${li.factor === 1 ? "" : "s"} · ${Math.round(li.nutrition.kcal)} kcal`
-                                : `📖 Saved recipe — ${li.reason}; Claude will estimate it instead`}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    <button
-                      onClick={() =>
-                        setBuilderPreview((p) => ({
-                          ...p,
-                          ingredients: [...(p.ingredients || []), { amount: "", item: "" }],
-                        }))
-                      }
-                      style={{
-                        background: "none",
-                        border: "1px dashed #378ADD",
-                        color: "#378ADD",
-                        borderRadius: "4px",
-                        padding: "4px 10px",
-                        fontSize: "11px",
-                        cursor: "pointer",
-                        marginTop: "6px",
-                        marginBottom: "14px",
-                      }}
-                    >
-                      + Add ingredient
-                    </button>
-
-                    <div
-                      style={{
-                        fontWeight: "bold",
-                        color: "#378ADD",
-                        fontSize: "11px",
-                        textTransform: "uppercase",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Method
-                    </div>
-                    {(builderPreview.steps || []).map((s, i) => (
-                      <div
-                        key={i}
+                      ⏱ Prep
+                      <input
+                        value={builder.preview.prep_time || ""}
+                        placeholder="10 minutes"
+                        onChange={(e) =>
+                          builder.setPreview((p) => ({ ...p, prep_time: e.target.value }))
+                        }
                         style={{
-                          display: "flex",
-                          gap: "6px",
-                          alignItems: "flex-start",
-                          padding: "3px 0",
+                          width: "80px",
+                          border: "0.5px solid #e5e7eb",
+                          borderRadius: "4px",
+                          padding: "3px 5px",
+                          fontSize: "11px",
+                        }}
+                      />
+                    </label>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "11px",
+                        color: "#185FA5",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      🍳 Cook
+                      <input
+                        value={builder.preview.cook_time || ""}
+                        placeholder="25 minutes"
+                        onChange={(e) =>
+                          builder.setPreview((p) => ({ ...p, cook_time: e.target.value }))
+                        }
+                        style={{
+                          width: "80px",
+                          border: "0.5px solid #e5e7eb",
+                          borderRadius: "4px",
+                          padding: "3px 5px",
+                          fontSize: "11px",
+                        }}
+                      />
+                    </label>
+                    <label
+                      title="Cooked weight of one portion — used to work out nutrition by weight"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "11px",
+                        color: "#185FA5",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ⚖ Wt/portion
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={builder.preview.portion_g ?? ""}
+                        placeholder="225"
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value);
+                          const ok = Number.isFinite(v) && v > 0;
+                          builder.setPreview((p) => ({
+                            ...p,
+                            portion_g: ok ? v : null,
+                            portion_g_source: ok ? "weighed" : null,
+                          }));
+                        }}
+                        style={{
+                          width: "56px",
+                          border: "0.5px solid #e5e7eb",
+                          borderRadius: "4px",
+                          padding: "3px 5px",
+                          fontSize: "11px",
+                        }}
+                      />
+                      g
+                      {isEstimatedWeight(builder.preview) && (
+                        <span
+                          title="Estimated from ingredient weights ÷ servings. Type your weighed value to replace it."
+                          style={{ color: "#8D6E00", fontWeight: "normal" }}
+                        >
+                          &nbsp;(est.)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(8,1fr)",
+                      gap: "4px",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    {[
+                      ["kcal", "kcal"],
+                      ["fat", "Fat"],
+                      ["sat_fat", "Sat F"],
+                      ["carbs", "Carbs"],
+                      ["sugar", "Sugar"],
+                      ["fibre", "Fibre"],
+                      ["net_carbs", "Net C"],
+                      ["protein", "Prot"],
+                    ].map(([k, l]) => (
+                      <div
+                        key={k}
+                        style={{
+                          textAlign: "center",
+                          background: "#E6F1FB",
+                          borderRadius: "4px",
+                          padding: "4px 2px",
                         }}
                       >
-                        <span style={{ fontSize: "11px", color: "#6b7280", padding: "7px 0" }}>
-                          {i + 1}.
-                        </span>
-                        <textarea
-                          value={s}
+                        <input
+                          type="number"
+                          value={(builder.preview.nutrition || {})[k] ?? 0}
                           onChange={(e) =>
-                            setBuilderPreview((p) => ({
+                            builder.setPreview((p) => ({
                               ...p,
-                              steps: p.steps.map((x, j) => (j === i ? e.target.value : x)),
+                              nutrition: {
+                                ...(p.nutrition || {}),
+                                [k]: Number(e.target.value) || 0,
+                              },
                             }))
                           }
                           style={{
-                            flex: 1,
-                            fontSize: "12px",
-                            lineHeight: 1.5,
-                            border: "0.5px solid #e5e7eb",
-                            borderRadius: "4px",
-                            padding: "5px 7px",
-                            resize: "vertical",
-                            minHeight: "32px",
-                            boxSizing: "border-box",
+                            width: "100%",
+                            textAlign: "center",
+                            fontWeight: "bold",
+                            color: "#185FA5",
+                            fontSize: "13px",
+                            border: "none",
+                            background: "transparent",
                           }}
                         />
-                        <button
-                          onClick={() =>
-                            setBuilderPreview((p) => ({
-                              ...p,
-                              steps: p.steps.filter((_, j) => j !== i),
-                            }))
-                          }
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "#c62828",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                            padding: "7px 4px",
-                          }}
-                        >
-                          ×
-                        </button>
+                        <div style={{ fontSize: "9px", color: "#6b7280" }}>{l}</div>
                       </div>
                     ))}
-                    <button
-                      onClick={() =>
-                        setBuilderPreview((p) => ({ ...p, steps: [...(p.steps || []), ""] }))
-                      }
-                      style={{
-                        background: "none",
-                        border: "1px dashed #378ADD",
-                        color: "#378ADD",
-                        borderRadius: "4px",
-                        padding: "4px 10px",
-                        fontSize: "11px",
-                        cursor: "pointer",
-                        marginTop: "6px",
-                        marginBottom: "14px",
-                      }}
-                    >
-                      + Add step
-                    </button>
-
-                    <div
-                      style={{
-                        fontWeight: "bold",
-                        color: "#378ADD",
-                        fontSize: "11px",
-                        textTransform: "uppercase",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      Notes
-                    </div>
-                    <textarea
-                      value={builderPreview.notes || ""}
-                      placeholder="Optional notes"
-                      onChange={(e) => setBuilderPreview((p) => ({ ...p, notes: e.target.value }))}
-                      style={{
-                        width: "100%",
-                        fontSize: "12px",
-                        color: "#5D4037",
-                        border: "0.5px solid #e5e7eb",
-                        borderRadius: "4px",
-                        padding: "6px 8px",
-                        resize: "vertical",
-                        minHeight: "40px",
-                        boxSizing: "border-box",
-                      }}
-                    />
                   </div>
                   <div
                     style={{
                       display: "flex",
+                      alignItems: "center",
                       gap: "8px",
-                      justifyContent: "flex-end",
-                      marginTop: "14px",
-                      borderTop: "0.5px solid #e5e7eb",
-                      paddingTop: "14px",
+                      marginBottom: "12px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    {builderError && (
-                      <div
-                        style={{
-                          color: "#c62828",
-                          fontSize: "12px",
-                          alignSelf: "center",
-                          marginRight: "auto",
-                        }}
-                      >
-                        {builderError}
-                      </div>
-                    )}
-                    {builderEditId ? (
-                      <button
-                        onClick={requestCloseBuilder}
-                        disabled={builderSaving}
-                        style={{
-                          background: "transparent",
-                          color: "#378ADD",
-                          border: "1px solid #378ADD",
-                          borderRadius: "4px",
-                          padding: "8px 14px",
-                          cursor: "pointer",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setBuilderPreview(null)}
-                        style={{
-                          background: "transparent",
-                          color: "#378ADD",
-                          border: "1px solid #378ADD",
-                          borderRadius: "4px",
-                          padding: "8px 14px",
-                          cursor: "pointer",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ← Start over
-                      </button>
-                    )}
                     <button
-                      disabled={builderSaving || recalcLoading}
-                      onClick={async () => {
-                        const clash = findNameClash(
-                          builderPreview.name,
-                          userRecipes,
-                          builderPreview.id,
-                        );
-                        if (!String(builderPreview.name || "").trim()) {
-                          setBuilderError("Give the recipe a name.");
-                          return;
-                        }
-                        if (clash) {
-                          setBuilderError(
-                            `A saved recipe is already called "${clash.name}" — choose another name.`,
-                          );
-                          return;
-                        }
-                        setBuilderSaving(true);
-                        setBuilderError("");
-                        try {
-                          let recipe = builderPreview;
-                          // Ingredients/servings changed since nutrition was last worked out → recalculate first
-                          if (nutritionKey(recipe) !== builderNutritionKey) {
-                            recipe = { ...recipe, ...(await recalcRecipeFields(recipe)) };
-                            setBuilderPreview(recipe);
-                            setBuilderNutritionKey(nutritionKey(recipe));
-                          }
-                          await saveRecipe(userId, recipe);
-                          setUserRecipes((prev) =>
-                            [...prev.filter((r) => r.id !== recipe.id), recipe].sort((a, b) =>
-                              a.name.localeCompare(b.name),
-                            ),
-                          );
-                          // Recipes that use this one are updated too
-                          setRecipeNotice(null);
-                          try {
-                            const oldA = builderEditId
-                              ? userRecipes.find((r) => r.id === recipe.id)
-                              : null;
-                            const { updated } = await propagateRecipeChange({
-                              uid: userId,
-                              oldA,
-                              newA: recipe,
-                              recipes: [...userRecipes.filter((r) => r.id !== recipe.id), recipe],
-                              setUserRecipes,
-                            });
-                            if (updated.length)
-                              setRecipeNotice({
-                                ok: true,
-                                text: `Also updated ${updated.length} recipe${updated.length === 1 ? "" : "s"} that use${updated.length === 1 ? "s" : ""} it: ${updated.join(", ")}`,
-                              });
-                          } catch (err) {
-                            setRecipeNotice({
-                              ok: false,
-                              text: `Saved, but couldn't update recipes that use it (${err.message || "error"}) — open them and save to recalculate.`,
-                            });
-                          }
-                          if (!builderEditId) {
-                            const n = recipe.nutrition || {};
-                            setAddItem({
-                              name: recipe.name,
-                              kcal: n.kcal || "",
-                              fat: n.fat || "",
-                              sat_fat: n.sat_fat || "",
-                              carbs: n.carbs || "",
-                              sugar: n.sugar || "",
-                              fibre: n.fibre || "",
-                              net_carbs: n.net_carbs || "",
-                              protein: n.protein || "",
-                            });
-                          }
-                          closeBuilder();
-                        } catch (err) {
-                          setBuilderError(err.message || "Could not save recipe.");
-                        }
-                        setBuilderSaving(false);
-                      }}
+                      disabled={builder.recalcLoading}
+                      onClick={builder.recalculate}
                       style={{
-                        background: builderSaving || recalcLoading ? "#ccc" : "#2E7D32",
-                        color: "#fff",
-                        border: "none",
+                        background: "none",
+                        border: "1px solid #185FA5",
+                        color: "#185FA5",
                         borderRadius: "4px",
-                        padding: "8px 18px",
-                        cursor: builderSaving || recalcLoading ? "not-allowed" : "pointer",
-                        fontSize: "13px",
-                        fontWeight: "bold",
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        cursor: builder.recalcLoading ? "not-allowed" : "pointer",
                       }}
                     >
-                      {builderSaving
-                        ? nutritionKey(builderPreview) !== builderNutritionKey
-                          ? "⏳ Recalculating & saving…"
-                          : "⏳ Saving…"
-                        : builderEditId
-                          ? "✓ Save Changes"
-                          : "✓ Save Recipe"}
+                      {builder.recalcLoading
+                        ? "⏳ Recalculating…"
+                        : "↻ Recalculate nutrition from ingredients above"}
                     </button>
+                    {builder.recalcError && (
+                      <div style={{ color: "#c62828", fontSize: "12px" }}>
+                        {builder.recalcError}
+                      </div>
+                    )}
                   </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      color: "#378ADD",
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Ingredients
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
+                    Tip: name an ingredient exactly as a saved recipe (pick from the list) with an
+                    amount in g or portions — its saved nutrition is used.
+                  </div>
+                  <datalist id="vaulte-saved-recipe-names">
+                    {userRecipes
+                      .filter((r) => r.id !== builder.preview.id)
+                      .map((r) => (
+                        <option key={r.id} value={r.name} />
+                      ))}
+                  </datalist>
+                  {(builder.preview.ingredients || []).map((ing, i) => {
+                    const li = linkInfo(ing, userRecipes, builder.preview.id);
+                    return (
+                      <div key={i}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "6px",
+                            alignItems: "center",
+                            padding: "3px 0",
+                            borderBottom: li ? "none" : "1px solid #F0F4F8",
+                          }}
+                        >
+                          <input
+                            value={ing.amount || ""}
+                            placeholder="amount"
+                            onChange={(e) =>
+                              builder.setPreview((p) => ({
+                                ...p,
+                                ingredients: p.ingredients.map((x, j) =>
+                                  j === i ? { ...x, amount: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            style={{
+                              width: "70px",
+                              fontWeight: "bold",
+                              color: "#185FA5",
+                              border: "0.5px solid #e5e7eb",
+                              borderRadius: "4px",
+                              padding: "3px 5px",
+                              fontSize: "12px",
+                            }}
+                          />
+                          <input
+                            value={ing.item || ""}
+                            placeholder="ingredient"
+                            list="vaulte-saved-recipe-names"
+                            onChange={(e) =>
+                              builder.setPreview((p) => ({
+                                ...p,
+                                ingredients: p.ingredients.map((x, j) =>
+                                  j === i ? { ...x, item: e.target.value } : x,
+                                ),
+                              }))
+                            }
+                            style={{
+                              flex: 1,
+                              border: li ? "1px solid #378ADD" : "0.5px solid #e5e7eb",
+                              borderRadius: "4px",
+                              padding: "3px 5px",
+                              fontSize: "12px",
+                            }}
+                          />
+                          <button
+                            onClick={() =>
+                              builder.setPreview((p) => ({
+                                ...p,
+                                ingredients: p.ingredients.filter((_, j) => j !== i),
+                              }))
+                            }
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#c62828",
+                              cursor: "pointer",
+                              fontSize: "14px",
+                              padding: "0 4px",
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                        {li && (
+                          <div
+                            data-link-badge
+                            style={{
+                              fontSize: "10px",
+                              padding: "0 0 4px 76px",
+                              borderBottom: "1px solid #F0F4F8",
+                              color: li.ok ? "#185FA5" : "#8D6E00",
+                            }}
+                          >
+                            {li.ok
+                              ? `📖 Saved recipe · ${li.grams != null ? `${Math.round(li.grams)} g · ` : ""}${+li.factor.toFixed(2)} portion${li.factor === 1 ? "" : "s"} · ${Math.round(li.nutrition.kcal)} kcal`
+                              : `📖 Saved recipe — ${li.reason}; Claude will estimate it instead`}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() =>
+                      builder.setPreview((p) => ({
+                        ...p,
+                        ingredients: [...(p.ingredients || []), { amount: "", item: "" }],
+                      }))
+                    }
+                    style={{
+                      background: "none",
+                      border: "1px dashed #378ADD",
+                      color: "#378ADD",
+                      borderRadius: "4px",
+                      padding: "4px 10px",
+                      fontSize: "11px",
+                      cursor: "pointer",
+                      marginTop: "6px",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    + Add ingredient
+                  </button>
+
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      color: "#378ADD",
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Method
+                  </div>
+                  {(builder.preview.steps || []).map((s, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        gap: "6px",
+                        alignItems: "flex-start",
+                        padding: "3px 0",
+                      }}
+                    >
+                      <span style={{ fontSize: "11px", color: "#6b7280", padding: "7px 0" }}>
+                        {i + 1}.
+                      </span>
+                      <textarea
+                        value={s}
+                        onChange={(e) =>
+                          builder.setPreview((p) => ({
+                            ...p,
+                            steps: p.steps.map((x, j) => (j === i ? e.target.value : x)),
+                          }))
+                        }
+                        style={{
+                          flex: 1,
+                          fontSize: "12px",
+                          lineHeight: 1.5,
+                          border: "0.5px solid #e5e7eb",
+                          borderRadius: "4px",
+                          padding: "5px 7px",
+                          resize: "vertical",
+                          minHeight: "32px",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                      <button
+                        onClick={() =>
+                          builder.setPreview((p) => ({
+                            ...p,
+                            steps: p.steps.filter((_, j) => j !== i),
+                          }))
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#c62828",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          padding: "7px 4px",
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() =>
+                      builder.setPreview((p) => ({ ...p, steps: [...(p.steps || []), ""] }))
+                    }
+                    style={{
+                      background: "none",
+                      border: "1px dashed #378ADD",
+                      color: "#378ADD",
+                      borderRadius: "4px",
+                      padding: "4px 10px",
+                      fontSize: "11px",
+                      cursor: "pointer",
+                      marginTop: "6px",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    + Add step
+                  </button>
+
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      color: "#378ADD",
+                      fontSize: "11px",
+                      textTransform: "uppercase",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    Notes
+                  </div>
+                  <textarea
+                    value={builder.preview.notes || ""}
+                    placeholder="Optional notes"
+                    onChange={(e) => builder.setPreview((p) => ({ ...p, notes: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      fontSize: "12px",
+                      color: "#5D4037",
+                      border: "0.5px solid #e5e7eb",
+                      borderRadius: "4px",
+                      padding: "6px 8px",
+                      resize: "vertical",
+                      minHeight: "40px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              </>
+            )
+          }
+        />
       )}
 
       {/* ── Saved Recipes Modal ── */}
@@ -2942,7 +2551,7 @@ Use realistic values. For portions use a typical serving size.`;
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openRecipeEditor(r);
+                          builder.openEditor(r);
                         }}
                         title="Edit recipe"
                         style={{

@@ -66,7 +66,8 @@ export const claudeRecalculateNutrition = async (r) => {
     JSON.parse(JSON.stringify({ servings: r.servings, ingredients: r.ingredients })),
   );
   await new Promise((res) => setTimeout(res, 300));
-  if (window.__failRecalc) throw new Error("Mock recalc failure");
+  if (window.__failRecalc)
+    throw new Error(window.__failRecalc === "blank" ? "" : "Mock recalc failure");
   const k = Math.round(1200 / (Number(r.servings) || 1) + 10 * r.ingredients.length);
   return {
     kcal: k,
@@ -82,6 +83,9 @@ export const claudeRecalculateNutrition = async (r) => {
 window.__createArgs = [];
 export const claudeCreateRecipe = async (d, names) => {
   window.__createArgs.push({ d, names });
+  await new Promise((res) => setTimeout(res, window.__createDelay || 0));
+  if (window.__failCreate) throw new Error(""); // no message → the builder's own text
+  if (window.__createResult) return JSON.parse(JSON.stringify(window.__createResult));
   if (/pinto/i.test(d))
     return {
       id: "x",
