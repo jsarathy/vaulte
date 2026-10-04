@@ -300,7 +300,11 @@ export default function CompareTab({
         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
           {ACTIVITY_LEVELS.map((lvl, i) => {
             const td = Math.round(BMR * lvl.factor);
-            const m = calcMacros(td, calcWeight, calcProtein, calcFatPct / 100);
+            const m = calcMacros(td, {
+              weight: calcWeight,
+              proteinPerKg: calcProtein,
+              fatPct: calcFatPct / 100,
+            });
             return (
               <div
                 key={i}

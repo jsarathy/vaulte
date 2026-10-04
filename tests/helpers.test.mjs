@@ -152,39 +152,39 @@ describe("getDayTotals", () => {
 
 describe("calcMacros", () => {
   test("protein scales with weight", () => {
-    const m = calcMacros(1800, 84, 1.4, 0.3);
+    const m = calcMacros(1800, { weight: 84, proteinPerKg: 1.4, fatPct: 0.3 });
     assert.equal(m.protein_g, 118); // 84 * 1.4 = 117.6 → 118
   });
 
   test("fat scales with tdee and fat%", () => {
-    const m = calcMacros(1800, 84, 1.4, 0.3);
+    const m = calcMacros(1800, { weight: 84, proteinPerKg: 1.4, fatPct: 0.3 });
     assert.equal(m.fat_g, 60); // 1800 * 0.30 / 9 = 60
   });
 
   test("carbs fill remaining calories", () => {
-    const m = calcMacros(1800, 84, 1.4, 0.3);
+    const m = calcMacros(1800, { weight: 84, proteinPerKg: 1.4, fatPct: 0.3 });
     // protein kcal: 118*4=472, fat kcal: 60*9=540, remaining: 1800-472-540=788, /4=197
     assert.equal(m.carbs_g, 197);
   });
 
   test("net_carbs is carbs minus fibre_g (30g)", () => {
-    const m = calcMacros(1800, 84, 1.4, 0.3);
+    const m = calcMacros(1800, { weight: 84, proteinPerKg: 1.4, fatPct: 0.3 });
     assert.equal(m.net_carbs, Math.max(0, m.carbs_g - 30));
   });
 
   test("net_carbs never goes negative", () => {
     // Very low carb scenario
-    const m = calcMacros(1200, 84, 2.0, 0.5);
+    const m = calcMacros(1200, { weight: 84, proteinPerKg: 2.0, fatPct: 0.5 });
     assert.ok(m.net_carbs >= 0);
   });
 
   test("fibre_g is always 30", () => {
-    const m = calcMacros(2000, 70, 1.6, 0.25);
+    const m = calcMacros(2000, { weight: 70, proteinPerKg: 1.6, fatPct: 0.25 });
     assert.equal(m.fibre_g, 30);
   });
 
   test("macros are all integers", () => {
-    const m = calcMacros(1750, 77, 1.2, 0.28);
+    const m = calcMacros(1750, { weight: 77, proteinPerKg: 1.2, fatPct: 0.28 });
     assert.equal(m.protein_g, Math.round(m.protein_g));
     assert.equal(m.fat_g, Math.round(m.fat_g));
     assert.equal(m.carbs_g, Math.round(m.carbs_g));

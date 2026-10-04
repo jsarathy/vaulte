@@ -1925,13 +1925,16 @@ Use realistic values. For portions use a typical serving size.`;
                           (a, b) => a.name.localeCompare(b.name),
                         ),
                       );
-                      propagateRecipeChange(
-                        userId,
-                        replaced,
-                        recipe,
-                        [...userRecipes.filter((r) => normName(r.name) !== normName(name)), recipe],
+                      propagateRecipeChange({
+                        uid: userId,
+                        oldA: replaced,
+                        newA: recipe,
+                        recipes: [
+                          ...userRecipes.filter((r) => normName(r.name) !== normName(name)),
+                          recipe,
+                        ],
                         setUserRecipes,
-                      ).catch((e) => console.error("dependent recipe update failed", e));
+                      }).catch((e) => console.error("dependent recipe update failed", e));
                     }
                     const filledItem = {
                       name: n.display_name || `${name} (${qty} ${unit})`,
@@ -2754,13 +2757,13 @@ Use realistic values. For portions use a typical serving size.`;
                             const oldA = builderEditId
                               ? userRecipes.find((r) => r.id === recipe.id)
                               : null;
-                            const { updated } = await propagateRecipeChange(
-                              userId,
+                            const { updated } = await propagateRecipeChange({
+                              uid: userId,
                               oldA,
-                              recipe,
-                              [...userRecipes.filter((r) => r.id !== recipe.id), recipe],
+                              newA: recipe,
+                              recipes: [...userRecipes.filter((r) => r.id !== recipe.id), recipe],
                               setUserRecipes,
-                            );
+                            });
                             if (updated.length)
                               setRecipeNotice({
                                 ok: true,

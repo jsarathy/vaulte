@@ -1,19 +1,18 @@
 // src/constants/helpers.js
 export const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 export const fmt = (n) => (n === 0 ? "0" : parseFloat(parseFloat(n).toFixed(1)));
-export const formatDate = (d) => {
-  const dt = new Date(d + "T12:00:00");
-  return dt.toLocaleDateString("en-GB", {
+
+// Noon, so a time-zone offset can't move the date to the day before/after
+const atNoon = (d) => new Date(d + "T12:00:00");
+export const formatDate = (d) =>
+  atNoon(d).toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
     year: "numeric",
   });
-};
-export const formatDateShort = (d) => {
-  const dt = new Date(d + "T12:00:00");
-  return dt.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-};
+export const formatDateShort = (d) =>
+  atNoon(d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
 export const DEFAULT_MEAL_SLOTS = [
   { name: "☕ Breakfast", is_exercise: 0 },
@@ -25,14 +24,15 @@ export const DEFAULT_MEAL_SLOTS = [
   { name: "🌙 Dinner", is_exercise: 0 },
   { name: "🌆 Evening Exercise", is_exercise: 1 },
 ];
+const SLOT_ORDER = DEFAULT_MEAL_SLOTS.map((s) => s.name);
 
-export const makeMeals = () =>
-  DEFAULT_MEAL_SLOTS.map((s) => ({
-    id: genId(),
-    name: s.name,
-    is_exercise: s.is_exercise,
-    items: [],
-  }));
+const emptyMeal = (slot) => ({
+  id: genId(),
+  name: slot.name,
+  is_exercise: slot.is_exercise,
+  items: [],
+});
+export const makeMeals = () => DEFAULT_MEAL_SLOTS.map(emptyMeal);
 
 export const ACTIVITY_LEVELS = [
   { label: "Sedentary", desc: "Desk job, little/no exercise", factor: 1.2 },
@@ -42,53 +42,37 @@ export const ACTIVITY_LEVELS = [
   { label: "Extremely Active", desc: "Physical job + hard training", factor: 1.9 },
 ];
 
-export function calcMacros(tdee, weight, proteinPerKg, fatPct) {
+// Daily macro targets: protein from body weight, fat as a share of TDEE, carbs the rest.
+export function calcMacros(tdee, { weight, proteinPerKg, fatPct }) {
   const protein_g = Math.round(weight * proteinPerKg);
   const fat_g = Math.round((tdee * fatPct) / 9);
   const carbs_g = Math.round((tdee - protein_g * 4 - fat_g * 9) / 4);
   return { protein_g, fat_g, carbs_g, fibre_g: 30, net_carbs: Math.max(0, carbs_g - 30) };
 }
 
-export function getDayTotals(dayData) {
-  if (!dayData)
-    return {
-      kcal: 0,
-      fat: 0,
-      carbs: 0,
-      sugar: 0,
-      fibre: 0,
-      net_carbs: 0,
-      protein: 0,
-      foodKcal: 0,
-      exerciseBurned: 0,
-    };
-  let kcal = 0,
-    fat = 0,
-    carbs = 0,
-    sugar = 0,
-    fibre = 0,
-    net_carbs = 0,
-    protein = 0,
-    foodKcal = 0,
-    exerciseBurned = 0;
-  dayData.meals?.forEach((meal) => {
-    meal.items?.forEach((i) => {
-      kcal += i.kcal || 0;
-      fat += i.fat || 0;
-      carbs += i.carbs || 0;
-      sugar += i.sugar || 0;
-      fibre += i.fibre || 0;
-      net_carbs += i.net_carbs || 0;
-      protein += i.protein || 0;
-      if (meal.is_exercise) exerciseBurned += Math.abs(i.kcal || 0);
-      else foodKcal += i.kcal || 0;
-    });
-  });
-  return { kcal, fat, carbs, sugar, fibre, net_carbs, protein, foodKcal, exerciseBurned };
+const DAY_MACROS = ["kcal", "fat", "carbs", "sugar", "fibre", "net_carbs", "protein"];
+const zeroTotals = () => ({
+  ...Object.fromEntries(DAY_MACROS.map((k) => [k, 0])),
+  foodKcal: 0,
+  exerciseBurned: 0,
+});
+
+// Exercise entries are logged as negative kcal; their burn is counted as positive.
+function addMeal(totals, meal) {
+  for (const item of meal.items || []) {
+    for (const k of DAY_MACROS) totals[k] += item[k] || 0;
+    const kcal = item.kcal || 0;
+    if (meal.is_exercise) totals.exerciseBurned += Math.abs(kcal);
+    else totals.foodKcal += kcal;
+  }
 }
 
-// Merge any missing DEFAULT_MEAL_SLOTS into an existing day without changing existing meal IDs.
-// Safe to call on any day loaded from Firestore — only adds, never removes.
+export function getDayTotals(dayData) {
+  const totals = zeroTotals();
+  for (const meal of dayData?.meals || []) addMeal(totals, meal);
+  return totals;
+}
+
 // A day counts as logged (calendar) if it has at least one food/exercise entry
 // or some notes — an emptied day's leftover record doesn't.
 export function dayHasContent(day) {
@@ -97,31 +81,27 @@ export function dayHasContent(day) {
   return String(day.notes ?? "").trim() !== "";
 }
 
+const withItems = (meal) => ({ ...meal, items: meal.items || [] });
+
+// Default slots in their standard order; custom meals after them, in their own order.
+function bySlotOrder(a, b) {
+  const ai = SLOT_ORDER.indexOf(a.name);
+  const bi = SLOT_ORDER.indexOf(b.name);
+  if (ai === -1 && bi === -1) return 0;
+  if (ai === -1) return 1;
+  if (bi === -1) return -1;
+  return ai - bi;
+}
+
+// Merge any missing DEFAULT_MEAL_SLOTS into an existing day without changing existing meal IDs.
+// Safe to call on any day loaded from Firestore — only adds, never removes.
 export function ensureMealSlots(day) {
   if (!day) return day;
-  const existing = day.meals || [];
-  const existingNames = new Set(existing.map((m) => m.name));
-  const missing = DEFAULT_MEAL_SLOTS.filter((s) => !existingNames.has(s.name)).map((s) => ({
-    id: genId(),
-    name: s.name,
-    is_exercise: s.is_exercise,
-    items: [],
-  }));
-  if (missing.length === 0)
-    return { ...day, meals: existing.map((m) => ({ ...m, items: m.items || [] })) };
-  // Insert new slots in DEFAULT order, interleaved with existing ones
-  const allNames = DEFAULT_MEAL_SLOTS.map((s) => s.name);
-  const merged = [...existing.map((m) => ({ ...m, items: m.items || [] })), ...missing].sort(
-    (a, b) => {
-      const ai = allNames.indexOf(a.name),
-        bi = allNames.indexOf(b.name);
-      if (ai === -1 && bi === -1) return 0;
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    },
-  );
-  return { ...day, meals: merged };
+  const existing = (day.meals || []).map(withItems);
+  const names = new Set(existing.map((m) => m.name));
+  const missing = DEFAULT_MEAL_SLOTS.filter((s) => !names.has(s.name)).map(emptyMeal);
+  if (missing.length === 0) return { ...day, meals: existing };
+  return { ...day, meals: [...existing, ...missing].sort(bySlotOrder) };
 }
 
 // Parse ISO 8601 duration → minutes e.g. "PT1H30M45S" → 90.75
@@ -145,6 +125,7 @@ export function calcFatBurned(calories, fat_pct) {
 // ── Apple Watch activity ──────────────────────────────────────────────────────
 // Firestore: users/{uid}/apple_activity/{YYYY-MM-DD}
 //   { date, updated_at, slots: { "HHMM": [steps, activeMin, flights] } }  — 5-min slots, local time
+//   or { mode: "daily", totals: { steps, activeMin, flights } }      — daily totals (Shortcut sync)
 // Slots overlapping a Polar session are excluded (pro-rata) so exercise isn't double counted.
 export const APPLE_KCAL = {
   perStepPerKg: 0.00057, // ≈0.04 kcal/step at 70 kg
@@ -171,57 +152,78 @@ function sportCadence(sport = "") {
   return 0; // cycling, swimming, strength, rowing… — few or no steps
 }
 
-export function calcAppleActivity(slots, polarSessions = [], weightKg = 84, totals = null) {
-  const windows = polarSessions.map(polarWindow).filter(Boolean);
-  const kept = { steps: 0, activeMin: 0, flights: 0 };
-  const excluded = { steps: 0, activeMin: 0, flights: 0 };
-  const useTotals = totals && !(slots && Object.keys(slots).length);
-  if (useTotals) {
-    // Estimate what Apple counted during Polar sessions (assumes the Watch was worn)
-    let estSteps = 0,
-      estMin = 0;
-    polarSessions.forEach((p) => {
-      const mins = p.duration_min || 0;
-      estSteps += mins * sportCadence(p.sport);
-      estMin += mins;
-    });
-    excluded.steps = Math.min(totals.steps || 0, estSteps);
-    excluded.activeMin = Math.min(totals.activeMin || 0, estMin);
-    kept.steps = (totals.steps || 0) - excluded.steps;
-    kept.activeMin = (totals.activeMin || 0) - excluded.activeMin;
-    kept.flights = totals.flights || 0;
+const zeroActivity = () => ({ steps: 0, activeMin: 0, flights: 0 });
+const roundAll = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
+
+// Daily totals only: estimate what Apple counted during Polar sessions (assumes the Watch was worn)
+function splitTotals(totals, polarSessions) {
+  let estSteps = 0;
+  let estMin = 0;
+  for (const p of polarSessions) {
+    const mins = p.duration_min || 0;
+    estSteps += mins * sportCadence(p.sport);
+    estMin += mins;
   }
-  Object.entries(useTotals ? {} : slots || {}).forEach(([k, v]) => {
-    const [st = 0, am = 0, fl = 0] = v || [];
-    const s0 = slotToMin(k),
-      s1 = s0 + 5;
-    let overlap = 0;
-    windows.forEach(([a, b]) => {
-      overlap += Math.max(0, Math.min(s1, b) - Math.max(s0, a));
-    });
-    const out = Math.min(1, overlap / 5),
-      keep = 1 - out;
-    kept.steps += st * keep;
-    kept.activeMin += am * keep;
-    kept.flights += fl * keep;
-    excluded.steps += st * out;
-    excluded.activeMin += am * out;
-    excluded.flights += fl * out;
-  });
-  const W = weightKg || 84;
-  const kcalSteps = kept.steps * APPLE_KCAL.perStepPerKg * W;
-  const kcalActive = (kept.activeMin * APPLE_KCAL.activeMetDelta * W) / 60;
-  const kcalFlights =
-    (kept.flights * W * 9.81 * APPLE_KCAL.flightMetres) / APPLE_KCAL.efficiency / 4184;
-  const r = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)]));
+  const steps = totals.steps || 0;
+  const activeMin = totals.activeMin || 0;
+  const excluded = { steps: Math.min(steps, estSteps), activeMin: Math.min(activeMin, estMin) };
   return {
-    ...r(kept),
-    excluded: r(excluded),
-    kcal: {
-      steps: Math.round(kcalSteps),
-      active: Math.round(kcalActive),
-      flights: Math.round(kcalFlights),
-      total: Math.round(kcalSteps + kcalActive + kcalFlights),
+    kept: {
+      steps: steps - excluded.steps,
+      activeMin: activeMin - excluded.activeMin,
+      flights: totals.flights || 0,
     },
+    excluded: { ...excluded, flights: 0 },
   };
+}
+
+// Share (0–1) of the 5-min slot starting at minute `start` covered by Polar sessions
+function polarShare(start, windows) {
+  const end = start + 5;
+  const overlap = windows.reduce(
+    (t, [a, b]) => t + Math.max(0, Math.min(end, b) - Math.max(start, a)),
+    0,
+  );
+  return Math.min(1, overlap / 5);
+}
+
+const addShare = (target, amounts, share) =>
+  Object.keys(target).forEach((k) => (target[k] += amounts[k] * share));
+
+// 5-min slots: each slot split pro rata between kept and excluded (Polar) time
+function splitSlots(slots, polarSessions) {
+  const windows = polarSessions.map(polarWindow).filter(Boolean);
+  const kept = zeroActivity();
+  const excluded = zeroActivity();
+  for (const [key, value] of Object.entries(slots || {})) {
+    const [steps = 0, activeMin = 0, flights = 0] = value || [];
+    const out = polarShare(slotToMin(key), windows);
+    addShare(kept, { steps, activeMin, flights }, 1 - out);
+    addShare(excluded, { steps, activeMin, flights }, out);
+  }
+  return { kept, excluded };
+}
+
+function activityKcal(kept, weightKg) {
+  const W = weightKg || 84;
+  const steps = kept.steps * APPLE_KCAL.perStepPerKg * W;
+  const active = (kept.activeMin * APPLE_KCAL.activeMetDelta * W) / 60;
+  const flights =
+    (kept.flights * W * 9.81 * APPLE_KCAL.flightMetres) / APPLE_KCAL.efficiency / 4184;
+  return {
+    steps: Math.round(steps),
+    active: Math.round(active),
+    flights: Math.round(flights),
+    total: Math.round(steps + active + flights),
+  };
+}
+
+// activity: the apple_activity doc ({ slots } or daily { totals }); slots win when present.
+export function calcAppleActivity(activity, polarSessions = [], weightKg = 84) {
+  const { slots, totals } = activity || {};
+  const useTotals = totals && !(slots && Object.keys(slots).length);
+  const { kept, excluded } = useTotals
+    ? splitTotals(totals, polarSessions)
+    : splitSlots(slots, polarSessions);
+  return { ...roundAll(kept), excluded: roundAll(excluded), kcal: activityKcal(kept, weightKg) };
 }
