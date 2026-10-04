@@ -9,7 +9,7 @@ const UID = "user-1", PATH = `users/${UID}/polar/connection`;
 const realFetch = globalThis.fetch;
 let calls;
 const stubPolar = (impl) => { calls = []; globalThis.fetch = async (url, opts = {}) => {
-  if (String(url).startsWith("http://") ) return realFetch(url, opts); // emulator traffic
+  if (!String(url).includes("polaraccesslink.com")) return realFetch(url, opts); // only Polar is stubbed
   calls.push({ url: String(url), method: opts.method, headers: opts.headers }); return impl(url, opts); }; };
 const call = async body => { const out = res(); await handler({ method: "POST", body }, out); return out; };
 

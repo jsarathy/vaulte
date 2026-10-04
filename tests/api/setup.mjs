@@ -4,6 +4,7 @@
 // FIRESTORE_EMULATOR_HOST, so firebase-admin talks to the emulator only.
 import { generateKeyPairSync } from "node:crypto";
 import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
 
 export const PROJECT = "demo-vaulte";
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("FIRESTORE_EMULATOR_HOST not set — run these with `npm run test:api`");
@@ -13,6 +14,9 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("FIRESTORE_EMULATOR_HO
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
 process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({ type: "service_account", project_id: PROJECT, private_key: privateKey, client_email: `test@${PROJECT}.iam.gserviceaccount.com` });
 process.env.GCLOUD_PROJECT = PROJECT;
+// Start the default app here so tests can read/write Firestore before any
+// handler has run (handlers reuse it: they only initialise when none exists).
+if (!getApps().length) initializeApp({ projectId: PROJECT });
 
 export const db = () => getFirestore();
 
