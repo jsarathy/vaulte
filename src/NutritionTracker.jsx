@@ -8,13 +8,12 @@ import {
   getDayTotals,
   ensureMealSlots,
   DEFAULT_MEAL_SLOTS,
-  dayHasContent,
 } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
 import { backfillPortionWeights } from "./api/recipeWeights";
-import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
+import { C, FONT, border } from "./constants/design.jsx";
 
 import RecipeModal from "./components/RecipeModal";
 import ChatPopup from "./components/ChatPopup";
@@ -25,281 +24,9 @@ import WeightTracker from "./tabs/WeightTracker";
 import BodyTracker from "./tabs/BodyTracker";
 import MonthlyTargetsCard from "./components/MonthlyTargetsCard";
 import MedsPanel from "./components/MedsPanel";
-
-// ── Weight Entry Modal ───────────────────────────────────────────────────────
-function WeightEntryModal({ entry, setEntry, onSave, onDelete }) {
-  if (!entry) return null;
-  const F = (label, key, placeholder) => (
-    <div style={{ marginBottom: "12px" }}>
-      <div style={{ fontSize: "11px", color: C.hint, marginBottom: "4px" }}>{label}</div>
-      <input
-        value={entry[key]}
-        placeholder={placeholder}
-        onChange={(e) => setEntry((p) => ({ ...p, [key]: e.target.value }))}
-        style={{
-          width: "100%",
-          padding: "7px 9px",
-          fontSize: "13px",
-          fontFamily: FONT.mono,
-          border: `0.5px solid ${C.border}`,
-          borderRadius: "5px",
-          background: C.surface,
-          color: C.text,
-          boxSizing: "border-box",
-        }}
-      />
-    </div>
-  );
-  return (
-    <div
-      onClick={() => setEntry(null)}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 2000,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: C.bg,
-          border: `0.5px solid ${C.border}`,
-          borderRadius: "8px",
-          padding: "18px 20px",
-          width: "340px",
-          fontFamily: FONT.sans,
-        }}
-      >
-        <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, marginBottom: "14px" }}>
-          {entry.existing ? "Edit Weight Entry" : "New Weight Entry"}
-        </div>
-
-        <div style={{ marginBottom: "12px" }}>
-          <div style={{ fontSize: "11px", color: C.hint, marginBottom: "4px" }}>Date</div>
-          <div
-            style={{
-              padding: "7px 9px",
-              fontSize: "13px",
-              fontFamily: FONT.mono,
-              background: C.surface,
-              border: `0.5px solid ${C.border}`,
-              borderRadius: "5px",
-              color: C.muted,
-            }}
-          >
-            {entry.date}
-          </div>
-        </div>
-
-        {F("Week", "week", "e.g. 1")}
-        {F("Dose", "dose", "free text")}
-        {F("Projected (kg)", "projected", "e.g. 84.0")}
-        {F("Actual (kg)", "actual", "e.g. 83.4")}
-
-        <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-          <button
-            onClick={onSave}
-            style={{
-              flex: 1,
-              padding: "8px",
-              fontSize: "12px",
-              fontWeight: 600,
-              border: "none",
-              borderRadius: "5px",
-              background: C.blue,
-              color: "#fff",
-              cursor: "pointer",
-              fontFamily: FONT.sans,
-            }}
-          >
-            Save
-          </button>
-          <button
-            onClick={() => setEntry(null)}
-            style={{
-              flex: 1,
-              padding: "8px",
-              fontSize: "12px",
-              border: `0.5px solid ${C.border}`,
-              borderRadius: "5px",
-              background: C.surface,
-              color: C.text,
-              cursor: "pointer",
-              fontFamily: FONT.sans,
-            }}
-          >
-            Cancel
-          </button>
-          {entry.existing && (
-            <button
-              onClick={onDelete}
-              style={{
-                padding: "8px 10px",
-                fontSize: "12px",
-                border: `0.5px solid ${C.border}`,
-                borderRadius: "5px",
-                background: C.surface,
-                color: "#c0392b",
-                cursor: "pointer",
-                fontFamily: FONT.sans,
-              }}
-            >
-              Delete
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Calendar Sidebar ─────────────────────────────────────────────────────────
-function CalendarSidebar({
-  allDays,
-  currentDate,
-  calYear,
-  calMonth,
-  setCalYear,
-  setCalMonth,
-  switchDay,
-}) {
-  const todayStr = new Date().toISOString().split("T")[0];
-  const loggedSet = new Set(allDays.filter(dayHasContent).map((d) => d.date)); // emptied days aren't marked
-  const loggedKcal = {};
-  allDays.forEach((d) => {
-    loggedKcal[d.date] = getDayTotals(d).foodKcal;
-  });
-  const dows = ["M", "T", "W", "T", "F", "S", "S"];
-  const prevMonth = () => {
-    if (calMonth === 0) {
-      setCalMonth(11);
-      setCalYear((y) => y - 1);
-    } else setCalMonth((m) => m - 1);
-  };
-  const nextMonth = () => {
-    if (calMonth === 11) {
-      setCalMonth(0);
-      setCalYear((y) => y + 1);
-    } else setCalMonth((m) => m + 1);
-  };
-  const label = new Date(calYear, calMonth, 1).toLocaleString("default", {
-    month: "long",
-    year: "numeric",
-  });
-  const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7;
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < firstDow; i++) cells.push(<div key={"bl" + i} />);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const mm = String(calMonth + 1).padStart(2, "0"),
-      dd = String(d).padStart(2, "0");
-    const ds = `${calYear}-${mm}-${dd}`;
-    const isLogged = loggedSet.has(ds),
-      isActive = ds === currentDate,
-      isToday = ds === todayStr;
-    const kcal = loggedKcal[ds];
-    cells.push(
-      <div
-        key={ds}
-        onClick={() => switchDay(ds)}
-        title={kcal ? `${Math.round(kcal)} kcal` : ""}
-        style={{
-          textAlign: "center",
-          fontSize: "11px",
-          padding: "4px 1px",
-          borderRadius: "4px",
-          cursor: "pointer",
-          lineHeight: 1.2,
-          fontFamily: FONT.mono,
-          background: isActive ? C.blue : isLogged ? C.blueBg : "transparent",
-          color: isActive ? "#fff" : isLogged ? C.blueText : isToday ? C.blue : C.muted,
-          fontWeight: isActive || isLogged ? "500" : "400",
-          outline: isToday && !isActive ? `1px solid ${C.blue}` : "none",
-          outlineOffset: "-1px",
-        }}
-      >
-        {d}
-        {kcal ? (
-          <span style={{ fontSize: "7px", display: "block", opacity: 0.8 }}>
-            {Math.round(kcal)}
-          </span>
-        ) : null}
-      </div>,
-    );
-  }
-  return (
-    <div style={{ padding: "12px 10px" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "8px",
-        }}
-      >
-        <button
-          onClick={prevMonth}
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            color: C.muted,
-            display: "flex",
-            alignItems: "center",
-            padding: "2px",
-          }}
-        >
-          <IconChevronLeft size={12} />
-        </button>
-        <span style={{ fontSize: "11px", fontWeight: "500", color: C.text }}>{label}</span>
-        <button
-          onClick={nextMonth}
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            color: C.muted,
-            display: "flex",
-            alignItems: "center",
-            padding: "2px",
-          }}
-        >
-          <IconChevronRight size={12} />
-        </button>
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7,1fr)",
-          gap: "1px",
-          marginBottom: "2px",
-        }}
-      >
-        {dows.map((d, i) => (
-          <div
-            key={i}
-            style={{
-              textAlign: "center",
-              fontSize: "9px",
-              fontWeight: "500",
-              color: C.hint,
-              paddingBottom: "3px",
-            }}
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "1px" }}>
-        {cells}
-      </div>
-    </div>
-  );
-}
+import CalendarSidebar from "./components/CalendarSidebar";
+import WeightEntryModal from "./components/WeightEntryModal";
+import { useWeightEntry } from "./hooks/useWeightEntry";
 
 // ── Polar Log Modal ──────────────────────────────────────────────────────────
 function PolarLogModal({
@@ -773,10 +500,10 @@ export default function NutritionTracker({ userId }) {
   const [polarSyncMsg, setPolarSyncMsg] = useState(null);
   const [polarLogModal, setPolarLogModal] = useState(null);
   const [weightLog, setWeightLog] = useState([]);
+  const weight = useWeightEntry({ userId, weightLog, setWeightLog });
   const [weightPlanConfig, setWeightPlanConfig] = useState(DEFAULT_PLAN_CONFIG);
   const [editingPlan, setEditingPlan] = useState(false);
   const [editCfg, setEditCfg] = useState(DEFAULT_PLAN_CONFIG);
-  const [weightEntry, setWeightEntry] = useState(null);
   const [bodyLog, setBodyLog] = useState([]);
   const [renphoSyncing, setRenphoSyncing] = useState(false);
   const [renphoMsg, setRenphoMsg] = useState(null);
@@ -1013,17 +740,6 @@ export default function NutritionTracker({ userId }) {
       console.error("weight plan save failed", e);
     }
   };
-  const openWeightEntry = (date) => {
-    const ex = weightLog.find((r) => r.date === date) || {};
-    setWeightEntry({
-      date,
-      week: ex.week ?? "",
-      dose: ex.dose ?? "",
-      projected: ex.projected ?? "",
-      actual: ex.actual ?? "",
-      existing: !!ex.date,
-    });
-  };
   // Body tab: clicking a calendar date adds an empty row for that date (no-op if it exists).
   const addBodyRow = async (date) => {
     if (!userId || bodyLog.some((r) => r.date === date)) return;
@@ -1037,50 +753,9 @@ export default function NutritionTracker({ userId }) {
     setBodyLog((prev) => [...prev, row].sort((a, b) => (a.date || "").localeCompare(b.date || "")));
   };
   const onCalendarClick = (date) => {
-    if (activeTab === "weight") openWeightEntry(date);
+    if (activeTab === "weight") weight.open(date);
     else if (activeTab === "body") addBodyRow(date);
     else switchDay(date);
-  };
-  const num = (v) => {
-    const t = String(v).trim();
-    if (t === "") return null;
-    const n = Number(t);
-    return Number.isFinite(n) ? n : null;
-  };
-  const saveWeightEntry = async () => {
-    if (!weightEntry || !userId) return;
-    const { date, week, dose, projected, actual } = weightEntry;
-    const row = {
-      date,
-      week: num(week),
-      dose: String(dose).trim(),
-      projected: num(projected),
-      actual: num(actual),
-    };
-    try {
-      await setDoc(doc(db, "users", userId, "weight_log", date), row);
-    } catch (e) {
-      console.error("weight save failed", e);
-      return;
-    }
-    setWeightLog((prev) =>
-      [...prev.filter((r) => r.date !== date), row].sort((a, b) =>
-        (a.date || "").localeCompare(b.date || ""),
-      ),
-    );
-    setWeightEntry(null);
-  };
-  const deleteWeightEntry = async () => {
-    if (!weightEntry || !userId) return;
-    const { date } = weightEntry;
-    try {
-      await deleteDoc(doc(db, "users", userId, "weight_log", date));
-    } catch (e) {
-      console.error("weight delete failed", e);
-      return;
-    }
-    setWeightLog((prev) => prev.filter((r) => r.date !== date));
-    setWeightEntry(null);
   };
   const syncRenpho = async () => {
     if (renphoSyncing || !userId) return;
@@ -1514,10 +1189,10 @@ export default function NutritionTracker({ userId }) {
         </div>
 
         <WeightEntryModal
-          entry={weightEntry}
-          setEntry={setWeightEntry}
-          onSave={saveWeightEntry}
-          onDelete={deleteWeightEntry}
+          entry={weight.entry}
+          setEntry={weight.setEntry}
+          onSave={weight.save}
+          onDelete={weight.remove}
         />
 
         <ChatPopup

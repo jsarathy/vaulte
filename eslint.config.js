@@ -95,6 +95,12 @@ export const CLEAN_FILES = [
   "src/api/medsLog.js",
   "src/hooks/useMeds.js",
   "src/components/MedsPanel.jsx",
+  "src/lib/calendarMonth.js",
+  "src/components/CalendarSidebar.jsx",
+  "src/lib/weightEntry.js",
+  "src/api/weightLog.js",
+  "src/hooks/useWeightEntry.js",
+  "src/components/WeightEntryModal.jsx",
 ];
 
 const unused = [
