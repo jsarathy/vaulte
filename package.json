@@ -12,7 +12,9 @@
     "secrets": "gitleaks git --redact --no-banner --log-opts=\"--all -- . :!node_modules :!dist :!package-lock.json\" .",
     "lint": "eslint .",
     "quality": "node scripts/quality-report.mjs",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:api": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-vaulte \"npm run -s test:api:run\"",
+    "test:api:run": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/api/github-reporter.mjs --test-reporter-destination=stdout tests/api/*.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.19.0",
