@@ -1,4 +1,4 @@
-# Fix 10 — lint on every pull request and push to main.
+# Fix 10 / Fix 12 — lint and tests on every pull request and push to main.
 name: ci
 on:
   pull_request:
@@ -18,3 +18,30 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+  ui:
+    name: UI tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ui-test-results
+          path: test-results/
+          retention-days: 7
