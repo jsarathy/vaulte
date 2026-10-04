@@ -101,6 +101,12 @@ export const CLEAN_FILES = [
   "src/api/weightLog.js",
   "src/hooks/useWeightEntry.js",
   "src/components/WeightEntryModal.jsx",
+  "src/lib/polarLog.js",
+  "src/lib/polarHeartRate.js",
+  "src/api/polarLog.js",
+  "src/hooks/usePolarLog.js",
+  "src/components/PolarHRSparkline.jsx",
+  "src/components/PolarLogModal.jsx",
 ];
 
 const unused = [
