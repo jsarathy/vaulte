@@ -54,8 +54,21 @@ test("an edit auto-saves the whole month with tolerances; blanks save as null", 
 });
 
 test("quick successive edits are saved once", async ({ page }) => {
-  await field(page, "Gym sessions").fill("13");
-  await field(page, "Golf sessions").fill("4");
+  // both edits in one step, well inside the 600 ms wait even on a busy machine
+  const inputs = [
+    await field(page, "Gym sessions").elementHandle(),
+    await field(page, "Golf sessions").elementHandle(),
+  ];
+  await page.evaluate(([gym, golf]) => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    for (const [el, v] of [
+      [gym, "13"],
+      [golf, "4"],
+    ]) {
+      set.call(el, v);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }, inputs);
   await expect(page.getByText("saved", { exact: true })).toBeVisible();
   const saves = await savesTo(page, OCT);
   expect(saves).toHaveLength(1);

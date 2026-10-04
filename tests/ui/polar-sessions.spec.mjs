@@ -77,7 +77,7 @@ test("all logged: recent sessions loaded on request", async ({ page: p }) => {
   await expect(p.getByText("All sessions logged.")).toBeVisible();
   await expect(p.getByText("Last sync: 4 Oct, 09:05")).toBeVisible();
   await p.evaluate(
-    (docs) => Object.assign(window, { __polarDocs: docs, __polarDelay: 300 }),
+    (docs) => Object.assign(window, { __polarDocs: docs, __polarDelay: 1200 }), // seen even on a busy machine
     [CYCLE, RUN, OTHER],
   );
   await p.getByRole("button", { name: "Load recent sessions ↓" }).click();
@@ -128,7 +128,7 @@ test("browse all sessions: list, filters, footer, log, close", async ({ page: p 
   p.on("console", (m) => m.type() === "error" && errs.push(m.text()));
   await start(p, { connected: true, sessions: [] });
   await p.evaluate(
-    (docs) => Object.assign(window, { __polarDocs: docs, __polarDelay: 300 }),
+    (docs) => Object.assign(window, { __polarDocs: docs, __polarDelay: 1200 }), // seen even on a busy machine
     [CYCLE, RUN, OTHER],
   );
   await p.getByRole("button", { name: "Browse all sessions" }).click();

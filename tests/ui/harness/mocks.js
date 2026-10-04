@@ -11,8 +11,12 @@ export const doc = (...a) => ({ path: a.slice(1).join("/") });
 window.__docs = window.__docs || {};
 window.__setDocs = [];
 window.__failSetDoc = false;
+// Like Firestore, an undefined field value is rejected
+const hasUndefined = (v) =>
+  v === undefined || (v !== null && typeof v === "object" && Object.values(v).some(hasUndefined));
 export const setDoc = async (ref, data, opts) => {
   if (window.__failSetDoc) throw new Error("Mock setDoc failure");
+  if (hasUndefined(data)) throw new Error("Unsupported field value: undefined");
   const saved = { path: ref.path, data: JSON.parse(JSON.stringify(data)) };
   window.__setDocs.push(opts?.merge ? { ...saved, merge: true } : saved);
 };

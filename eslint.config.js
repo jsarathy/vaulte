@@ -111,6 +111,13 @@ export const CLEAN_FILES = [
   "src/api/trackerData.js",
   "src/hooks/useCalculatorSettings.js",
   "src/hooks/useTrackerLoad.js",
+  "src/lib/trackerDays.js",
+  "src/lib/weightSync.js",
+  "src/api/trackerActions.js",
+  "src/hooks/useTrackerDays.js",
+  "src/hooks/useWeightActions.js",
+  "src/hooks/usePolarSync.js",
+  "src/components/SidebarStats.jsx",
 ];
 
 const unused = [
