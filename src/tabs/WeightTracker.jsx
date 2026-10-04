@@ -52,7 +52,7 @@ const metricUnit = k => RENPHO_METRICS[k]?.unit ?? "";
 export default function WeightTracker({
   userId,
   weightLog, setWeightLog,
-  weightPlanConfig, setWeightPlanConfig,
+  weightPlanConfig,
   editingPlan, setEditingPlan,
   editCfg, setEditCfg,
   savePlanConfig,

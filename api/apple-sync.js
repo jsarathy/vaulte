@@ -102,7 +102,7 @@ export function buildHourly(values, starts, date) {
   if (!vals.length || vals.length !== sts.length) return null;
   const out = {};
   vals.forEach((v, i) => {
-    const n = Number(String(v).replace(/[^0-9.\-]/g, ""));
+    const n = Number(String(v).replace(/[^0-9.-]/g, ""));
     const t = parseLocal(sts[i]) || parseLoose(sts[i]);
     if (!t || t.date !== date || !isFinite(n) || n <= 0) return;
     const hh = String(Math.floor(t.min / 60)).padStart(2, "0");
@@ -137,7 +137,7 @@ export default async function handler(req, res) {
 
   // Daily-totals mode (Shortcut sends plain numbers): { date, steps, active, flights }
   if (![steps, active, flights].some(Array.isArray)) {
-    const num = x => { const n = Number(String(x ?? "").replace(/[^0-9.\-]/g, "")); return isFinite(n) ? n : 0; };
+    const num = x => { const n = Number(String(x ?? "").replace(/[^0-9.-]/g, "")); return isFinite(n) ? n : 0; };
     const totals = { steps: Math.round(num(steps)), activeMin: Math.round(num(active)), flights: Math.round(num(flights)) };
     const hourly = buildHourly(body?.hourly_steps, body?.hourly_start, date);
     try {
