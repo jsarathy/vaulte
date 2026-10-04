@@ -63,6 +63,10 @@ export const CLEAN_FILES = [
   "src/lib/recipeEdits.js",
   "src/components/RecipeEditorForm.jsx",
   "src/components/RecipeListEditors.jsx",
+  "src/lib/foodLookup.js",
+  "src/api/foodLookup.js",
+  "src/hooks/useFoodLookup.js",
+  "src/components/FoodLookupModal.jsx",
 ];
 
 const unused = [
