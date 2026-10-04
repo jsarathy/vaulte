@@ -2,8 +2,8 @@
 import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
-import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
-import { isEstimatedWeight, propagateRecipeChange } from "../api/recipeWeights";
+import { loadDay, deleteRecipe } from "../api/firestore";
+import { isEstimatedWeight } from "../api/recipeWeights";
 import { findDependentsDeep } from "../constants/recipeLinks";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
@@ -12,6 +12,8 @@ import RecipePortionModal from "../components/RecipePortionModal";
 import { useRecipePortion } from "../hooks/useRecipePortion";
 import RecipeBuilderModal from "../components/RecipeBuilderModal";
 import RecipeEditorForm from "../components/RecipeEditorForm";
+import FoodLookupModal from "../components/FoodLookupModal";
+import { useFoodLookup } from "../hooks/useFoodLookup";
 import { useRecipeBuilder } from "../hooks/useRecipeBuilder";
 import { db } from "../firebase";
 import { getDocs, collection, orderBy, query } from "firebase/firestore";
@@ -105,15 +107,15 @@ export default function AddEntry({
     setRecipeNotice,
     setShowRecipesModal,
   });
-  // Unified quantity modal — replaces old ingredientModal
-  const [qtyModal, setQtyModal] = useState(null); // { name, defaultUnit }
-  const qtyModalRef = useRef(null);
-  qtyModalRef.current = qtyModal; // live value for async callbacks
-  const [qtyValue, setQtyValue] = useState("1");
-  const [qtyUnit, setQtyUnit] = useState("portion");
-  const [qtyLoading, setQtyLoading] = useState(false);
-  const [qtyError, setQtyError] = useState("");
-  const [qtySave, setQtySave] = useState(false); // save the looked-up item to Saved recipes
+  // "Get Nutrition" box for a food that isn't a saved recipe
+  const lookup = useFoodLookup({
+    userId,
+    userRecipes,
+    setUserRecipes,
+    setAddItem,
+    addToDay: (item) => doSubmit(item),
+    startRecipe: (name) => builder.startNew({ input: name }),
+  });
   // ── Saved-recipe matching ──────────────────────────────────────────────────
   // Normalised exact match only: lowercase, trim, collapse internal whitespace.
   // Substring matching is deliberately NOT used here — "chicken curry" must not
@@ -152,7 +154,6 @@ export default function AddEntry({
   const [nameDropdown, setNameDropdown] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const nameInputRef = useRef(null);
-  const qtyInputRef = useRef(null);
   const photoInputRef = useRef(null);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -223,12 +224,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
         openPortionModal(saved);
         return;
       }
-      setQtyValue("1");
-      setQtyUnit("portion");
-      setQtyError("");
-      setQtySave(false);
-      setQtyModal({ name: addItem.name, autoSubmit: true });
-      setTimeout(() => qtyInputRef.current?.focus(), 50);
+      lookup.open(addItem.name, { autoSubmit: true });
       return;
     }
     await doSubmit(addItem);
@@ -408,7 +404,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 setTimeout(() => {
                   setShowDropdown(false);
                   // Skip if a box is already open — incl. a recipe just picked from the dropdown
-                  if (qtyModalRef.current || portion.isOpenRef.current) return;
+                  if (lookup.isOpenRef.current || portion.isOpenRef.current) return;
                   const name = addItem.name.trim();
                   if (!name) return;
                   // If already has nutrition (filled from recipe dropdown), skip
@@ -422,12 +418,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                     return;
                   }
                   // Otherwise open Get Nutrition at 1 portion. Ingredient/dish is decided on click.
-                  setQtyValue("1");
-                  setQtyUnit("portion");
-                  setQtyError("");
-                  setQtySave(false);
-                  setQtyModal({ name });
-                  setTimeout(() => qtyInputRef.current?.focus(), 50);
+                  lookup.open(name);
                 }, 150);
               }}
               onKeyDown={(e) => {
@@ -1608,307 +1599,8 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
         </div>
       )}
 
-      {/* ── Quantity Modal ── */}
-      {qtyModal && (
-        <div
-          onClick={(e) => e.target === e.currentTarget && setQtyModal(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            zIndex: 3000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "12px",
-              padding: "24px 28px",
-              width: "380px",
-              maxWidth: "95vw",
-              border: `0.5px solid ${C.border}`,
-              fontFamily: FONT.sans,
-            }}
-          >
-            <div
-              style={{ fontSize: "14px", fontWeight: "500", color: C.text, marginBottom: "4px" }}
-            >
-              {qtyModal.name}
-            </div>
-            <div style={{ fontSize: "11px", color: C.muted, marginBottom: "20px" }}>
-              How much? Claude will calculate the nutrition.
-            </div>
-
-            {/* Quantity + unit row */}
-            <div
-              style={{ display: "flex", gap: "8px", marginBottom: "16px", alignItems: "flex-end" }}
-            >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: "500",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.4px",
-                    color: C.hint,
-                    marginBottom: "4px",
-                  }}
-                >
-                  Quantity
-                </div>
-                <input
-                  ref={qtyInputRef}
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  value={qtyValue}
-                  onChange={(e) => setQtyValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") document.getElementById("qty-confirm-btn").click();
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "9px 10px",
-                    border: `1.5px solid ${C.blue}`,
-                    borderRadius: "6px",
-                    fontSize: "16px",
-                    fontFamily: FONT.mono,
-                    fontWeight: "500",
-                    outline: "none",
-                    textAlign: "center",
-                  }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: "500",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.4px",
-                    color: C.hint,
-                    marginBottom: "4px",
-                  }}
-                >
-                  Unit
-                </div>
-                <select
-                  value={qtyUnit}
-                  onChange={(e) => setQtyUnit(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "9px 8px",
-                    border: `0.5px solid ${C.borderMid}`,
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    fontFamily: FONT.sans,
-                    outline: "none",
-                    background: "#fff",
-                    height: "40px",
-                  }}
-                >
-                  <option value="portion">portion(s)</option>
-                  <option value="g">grams (g)</option>
-                  <option value="ml">millilitres (ml)</option>
-                  <option value="oz">ounces (oz)</option>
-                  <option value="cup">cup(s)</option>
-                  <option value="tbsp">tablespoon(s)</option>
-                  <option value="tsp">teaspoon(s)</option>
-                </select>
-              </div>
-            </div>
-
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                color: C.muted,
-                marginBottom: "14px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={qtySave}
-                onChange={(e) => setQtySave(e.target.checked)}
-              />
-              Save to Saved recipes
-            </label>
-
-            {qtyError && (
-              <div style={{ fontSize: "11px", color: C.danger, marginBottom: "10px" }}>
-                {qtyError}
-              </div>
-            )}
-            {qtyLoading && (
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  marginBottom: "10px",
-                  textAlign: "center",
-                }}
-              >
-                Looking up nutrition…
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setQtyModal(null)}
-                style={{
-                  background: "transparent",
-                  border: `0.5px solid ${C.borderMid}`,
-                  color: C.muted,
-                  borderRadius: "6px",
-                  padding: "8px 16px",
-                  cursor: "pointer",
-                  fontSize: "12px",
-                  fontFamily: FONT.sans,
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                id="qty-confirm-btn"
-                disabled={qtyLoading}
-                onClick={async () => {
-                  const qty = parseFloat(qtyValue) || 1;
-                  const unit = qtyUnit;
-                  const name = qtyModal.name;
-                  setQtyLoading(true);
-                  setQtyError("");
-                  try {
-                    const amount = `${qty} ${unit === "portion" ? `portion${qty !== 1 ? "s" : ""}` : unit}`;
-                    const prompt = `First decide: is "${name}" a single food eaten as-is (apple, raw carrots, milk, chicken breast, a slice of toast) or a cooked/prepared dish that needs a recipe (stew, curry, pasta bake)?
-If it is a DISH, reply with ONLY: {"kind":"DISH"}
-Otherwise give the nutrition for ${amount} of "${name}". Reply with ONLY a JSON object, no markdown, no explanation:
-{"kind":"INGREDIENT","display_name":"${name} (${qty} ${unit === "portion" ? "portion" : unit})","kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}
-Use realistic values. For portions use a typical serving size.`;
-                    const res = await fetch("/api/claude", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        model: "claude-sonnet-4-6",
-                        max_tokens: 200,
-                        messages: [{ role: "user", content: prompt }],
-                      }),
-                    });
-                    const data = await res.json();
-                    const text = (data.content?.[0]?.text || "{}")
-                      .replace(/```json|```/g, "")
-                      .trim();
-                    const n = JSON.parse(text);
-                    if (String(n.kind || "").toUpperCase() === "DISH") {
-                      // Dish → recipe builder with the name filled in
-                      setQtyModal(null);
-                      builder.startNew({ input: name });
-                      return;
-                    }
-                    if (qtySave) {
-                      // Saved as 1 portion: portions → divide by qty; any other unit → 1 portion = the amount entered
-                      const per = unit === "portion" ? qty : 1;
-                      const val = (k) => {
-                        const v = Number(n[k]);
-                        return Number.isFinite(v) ? Math.round((v / per) * 10) / 10 : 0;
-                      };
-                      // Same name already saved → overwrite it (same id) rather than add a duplicate
-                      const sameName = userRecipes.filter(
-                        (r) => normName(r.name) === normName(name),
-                      );
-                      const replaced = sameName[0] || null;
-                      const recipe = {
-                        id: replaced?.id ?? genId(),
-                        name,
-                        description: "",
-                        source: "Get Nutrition",
-                        servings: 1,
-                        prep_time: "",
-                        cook_time: "",
-                        ingredients: [
-                          {
-                            amount: unit === "portion" ? "1 portion" : `${qty} ${unit}`,
-                            item: name,
-                          },
-                        ],
-                        steps: [],
-                        notes: "",
-                        nutrition: Object.fromEntries(
-                          [
-                            "kcal",
-                            "fat",
-                            "sat_fat",
-                            "carbs",
-                            "sugar",
-                            "fibre",
-                            "net_carbs",
-                            "protein",
-                          ].map((k) => [k, val(k)]),
-                        ),
-                        ...(unit === "g" ? { portion_g: qty } : {}),
-                      };
-                      await saveRecipe(userId, recipe);
-                      for (const dup of sameName.slice(1)) await deleteRecipe(userId, dup.id); // tidy up older duplicates
-                      setUserRecipes((prev) =>
-                        [...prev.filter((r) => normName(r.name) !== normName(name)), recipe].sort(
-                          (a, b) => a.name.localeCompare(b.name),
-                        ),
-                      );
-                      propagateRecipeChange({
-                        uid: userId,
-                        oldA: replaced,
-                        newA: recipe,
-                        recipes: [
-                          ...userRecipes.filter((r) => normName(r.name) !== normName(name)),
-                          recipe,
-                        ],
-                        setUserRecipes,
-                      }).catch((e) => console.error("dependent recipe update failed", e));
-                    }
-                    const filledItem = {
-                      name: n.display_name || `${name} (${qty} ${unit})`,
-                      kcal: n.kcal ?? "",
-                      fat: n.fat ?? "",
-                      sat_fat: n.sat_fat ?? "",
-                      carbs: n.carbs ?? "",
-                      sugar: n.sugar ?? "",
-                      fibre: n.fibre ?? "",
-                      net_carbs: n.net_carbs ?? "",
-                      protein: n.protein ?? "",
-                    };
-                    const wasAutoSubmit = qtyModal.autoSubmit;
-                    setAddItem(filledItem);
-                    setQtyModal(null);
-                    if (wasAutoSubmit) await doSubmit(filledItem);
-                  } catch (e) {
-                    setQtyError("Could not fetch nutrition — fill in manually or try again.");
-                  } finally {
-                    setQtyLoading(false);
-                  }
-                }}
-                style={{
-                  background: qtyLoading ? C.hint : C.blue,
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "8px 20px",
-                  cursor: qtyLoading ? "not-allowed" : "pointer",
-                  fontSize: "12px",
-                  fontWeight: "500",
-                  fontFamily: FONT.sans,
-                }}
-              >
-                {qtyLoading ? "…" : "Get Nutrition"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Get Nutrition (quantity) Modal ── */}
+      {lookup.box && <FoodLookupModal lookup={lookup} />}
 
       {/* ── Recipe Builder Modal ── */}
       {builder.open && (
