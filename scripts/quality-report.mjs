@@ -2,7 +2,7 @@
 // Runs ESLint, keeps only the code-quality warnings (eslint.config.js QUALITY)
 // and prints a Markdown report. Usage: npm run quality [> report.md]
 import { ESLint } from "eslint";
-import { QUALITY } from "../eslint.config.js";
+import { QUALITY, TARGETS, TARGET_LENGTH, CLEAN_FILES } from "../eslint.config.js";
 
 const RULES = Object.keys(QUALITY);
 const limit = (r) => {
@@ -57,4 +57,36 @@ for (const x of rows) perFile[x.file] = (perFile[x.file] || 0) + 1;
 out += `\n## Breaches per file\n\n| File | Breaches |\n|---|---|\n`;
 for (const [f, n] of Object.entries(perFile).sort((a, b) => b[1] - a[1]))
   out += `| \`${f}\` | ${n} |\n`;
+out += await cleanCodeSection();
 console.log(out);
+
+// ── Clean Code targets (Fix 26): breaches per file against the stricter targets ──
+async function cleanCodeSection() {
+  const rule = (max) => ["warn", { max, skipBlankLines: true, skipComments: true, IIFEs: true }];
+  const warn = Object.fromEntries(Object.entries(TARGETS).map(([k, v]) => [k, ["warn", v[1]]]));
+  const lint = (files, max) =>
+    new ESLint({
+      overrideConfig: { rules: { ...warn, "max-lines-per-function": rule(max) } },
+    }).lintFiles(files);
+  const results = [
+    ...(await lint(["src/**/*.js", "api/**/*.js"], TARGET_LENGTH.logic)),
+    ...(await lint(["src/**/*.jsx"], TARGET_LENGTH.component)),
+  ];
+  const ruleIds = [...Object.keys(TARGETS), "max-lines-per-function"];
+  const rows = results
+    .map((f) => ({
+      file: f.filePath
+        .replace(/\\/g, "/")
+        .split("/")
+        .slice(-3)
+        .join("/")
+        .replace(/^.*?(src|api)\//, "$1/"),
+      n: f.messages.filter((m) => ruleIds.includes(m.ruleId)).length,
+    }))
+    .sort((a, b) => b.n - a.n || a.file.localeCompare(b.file));
+  const clean = rows.filter((r) => r.n === 0);
+  let s = `\n## Clean Code targets (Fix 26)\n\nLogic ≤ ${TARGET_LENGTH.logic} lines, components ≤ ${TARGET_LENGTH.component}, nesting ≤ 2, complexity ≤ 10, ≤ 3 params, files ≤ 300.\n\n`;
+  s += `**${clean.length} of ${rows.length} files meet every target** (${CLEAN_FILES.length} locked in as lint errors). ${rows.reduce((t, r) => t + r.n, 0)} breaches in total.\n\n| File | Breaches |\n|---|---|\n`;
+  for (const r of rows.filter((r) => r.n)) s += `| \`${r.file}\` | ${r.n} |\n`;
+  return s;
+}

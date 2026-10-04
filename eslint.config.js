@@ -20,6 +20,34 @@ export const QUALITY = {
   "max-statements-per-line": ["warn", { max: 3 }], // catches whole functions packed onto one line
 };
 
+// Fix 26 Clean Code targets (claude/Code_Quality_Report.md). Logic ≤ 20 lines per function,
+// components (markup included) ≤ 40; nesting ≤ 2; complexity ≤ 10; ≤ 3 params; files ≤ 300.
+const lengthRule = (max) => [
+  "error",
+  { max, skipBlankLines: true, skipComments: true, IIFEs: true },
+];
+export const TARGETS = {
+  complexity: ["error", 10],
+  "max-depth": ["error", 2],
+  "max-params": ["error", 3],
+  "max-lines": ["error", { max: 300, skipBlankLines: true, skipComments: true }],
+};
+export const TARGET_LENGTH = { logic: 20, component: 40 };
+
+// Ratchet: files that meet the targets. Breaking a target here fails lint.
+// Add each file as Fix 26 brings it up to standard.
+export const CLEAN_FILES = [
+  "api/claude.js",
+  "api/polar-disconnect.js",
+  "src/constants/exercises.js",
+  "src/constants/meds.js",
+  "src/constants/recipes.js",
+  "src/constants/weightPlan.js",
+  "src/firebase.js",
+  "src/constants/design.jsx",
+  "src/main.jsx",
+];
+
 const unused = [
   "error",
   {
@@ -77,5 +105,13 @@ export default [
     ],
     languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: globals.node },
     rules: { "no-unused-vars": unused, ...QUALITY },
+  },
+  {
+    files: CLEAN_FILES.filter((f) => !f.endsWith(".jsx")),
+    rules: { ...TARGETS, "max-lines-per-function": lengthRule(TARGET_LENGTH.logic) },
+  },
+  {
+    files: CLEAN_FILES.filter((f) => f.endsWith(".jsx")),
+    rules: { ...TARGETS, "max-lines-per-function": lengthRule(TARGET_LENGTH.component) },
   },
 ];
