@@ -38,8 +38,8 @@ test("meds panel", async ({ page: p }) => {
   await p.addInitScript((docs) => {
     window.__docs = docs;
     window.__getDocDelays = {
-      "users/u/routine_log/2026-10-01": 400,
-      "users/u/routine_log/2026-10-05": 900,
+      "users/u/routine_log/2026-10-01": 1200, // long enough to see "Loading…" on a busy machine
+      "users/u/routine_log/2026-10-05": 1800,
     };
   }, DOCS);
   await p.goto("/tracker.html");
@@ -127,7 +127,7 @@ test("meds panel", async ({ page: p }) => {
   await day(1);
   await expect(panel.getByText("Loading…")).toBeVisible();
   await day(5);
-  await p.waitForTimeout(600); // the earlier load has finished; the new one is still running
+  await p.waitForTimeout(1300); // the earlier load has finished; the new one is still running
   await expect(panel.getByText("Loading…")).toBeVisible();
   await expect(count).toHaveText("0/4");
   await p.waitForTimeout(500);

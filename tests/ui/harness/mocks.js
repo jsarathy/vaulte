@@ -26,7 +26,8 @@ export const getDoc = async (ref) => {
   (window.__getDocPaths ||= []).push(ref.path);
   const delay = window.__getDocDelays?.[ref.path];
   if (delay) await new Promise((res) => setTimeout(res, delay));
-  if (window.__failGetDoc) throw new Error("Mock getDoc failure");
+  if (window.__failGetDoc || window.__failPaths?.includes(ref.path))
+    throw new Error("Mock getDoc failure");
   const d = window.__docs[ref.path];
   return { exists: () => d !== undefined, data: () => d ?? null };
 };
@@ -63,7 +64,7 @@ const DAYS = [
   day("2026-10-04", [{ id: "e", name: "Cycling (30 min)", kcal: -250, is_exercise: 1 }]), // exercise only
 ];
 export const loadAllDays = async () => window.__days ?? DAYS; // __days: e.g. [] for a new user
-export const seedInitialData = async () => window.__days ?? DAYS;
+export const seedInitialData = async () => window.__seedDays ?? window.__days ?? DAYS;
 export const loadDay = async (_u, d) => DAYS.find((x) => x.date === d) || null;
 // saveDay: days recorded in window.__savedDays; window.__saveDayDelay / __failSaveDay
 export const saveDay = async (_u, day) => {
@@ -71,7 +72,11 @@ export const saveDay = async (_u, day) => {
   if (window.__failSaveDay) throw new Error("Mock saveDay failure");
   (window.__savedDays ||= []).push(JSON.parse(JSON.stringify(day)));
 };
-export const loadAllRecipes = async () => [];
+// loadAllRecipes: window.__recipes (the tracker harness); __failRecipes makes it throw
+export const loadAllRecipes = async () => {
+  if (window.__failRecipes) throw new Error("Mock recipes failure");
+  return JSON.parse(JSON.stringify(window.__recipes || []));
+};
 window.__saved = [];
 window.__deleted = [];
 export const saveRecipe = async (_uid, r) => {
@@ -83,7 +88,11 @@ export const deleteRecipe = async (_u, id) => {
 
 // ── src/api/claude.js ────────────────────────────────────────────────────────
 export const claudeParseFood = async () => [];
-export const claudeChat = async () => "";
+// claudeChat: calls recorded in window.__chatCalls; replies window.__chatReply
+export const claudeChat = async (history) => {
+  (window.__chatCalls ||= []).push(JSON.parse(JSON.stringify(history)));
+  return window.__chatReply ?? "";
+};
 window.__recalc = [];
 window.__failRecalc = false;
 export const claudeRecalculateNutrition = async (r) => {

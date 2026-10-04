@@ -107,6 +107,10 @@ export const CLEAN_FILES = [
   "src/hooks/usePolarLog.js",
   "src/components/PolarHRSparkline.jsx",
   "src/components/PolarLogModal.jsx",
+  "src/lib/trackerStart.js",
+  "src/api/trackerData.js",
+  "src/hooks/useCalculatorSettings.js",
+  "src/hooks/useTrackerLoad.js",
 ];
 
 const unused = [
