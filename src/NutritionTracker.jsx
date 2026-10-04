@@ -1,12 +1,11 @@
 // src/NutritionTracker.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { genId, makeMeals, getDayTotals, ensureMealSlots } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG } from "./constants/weightPlan";
-import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
+import { saveDay, loadDay } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
-import { backfillPortionWeights } from "./api/recipeWeights";
 import { C, FONT } from "./constants/design.jsx";
 
 import RecipeModal from "./components/RecipeModal";
@@ -22,6 +21,8 @@ import CalendarSidebar from "./components/CalendarSidebar";
 import WeightEntryModal from "./components/WeightEntryModal";
 import { useWeightEntry } from "./hooks/useWeightEntry";
 import PolarLogModal from "./components/PolarLogModal";
+import { useCalculatorSettings } from "./hooks/useCalculatorSettings";
+import { useTrackerLoad } from "./hooks/useTrackerLoad";
 
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function NutritionTracker({ userId }) {
@@ -75,154 +76,39 @@ export default function NutritionTracker({ userId }) {
   const [addMsg, setAddMsg] = useState(null);
   const [compareSlots, setCompareSlots] = useState([null, null, null, null, null]);
   const [compareData, setCompareData] = useState([null, null, null, null, null]);
-  const [calcSex, setCalcSex] = useState("m");
-  const [calcAge, setCalcAge] = useState(60);
-  const [calcHeight, setCalcHeight] = useState(165);
-  const [calcWeight, setCalcWeight] = useState(84);
-  const [calcProtein, setCalcProtein] = useState(1.4);
-  const [calcFatPct, setCalcFatPct] = useState(30);
-  // Reference calculator: save inputs whenever one changes (after the saved values have loaded)
-  const calcLoadedRef = useRef(false);
-  useEffect(() => {
-    if (!userId || !calcLoadedRef.current) return;
-    const t = setTimeout(() => {
-      setDoc(doc(db, "users", userId, "settings", "calculator"), {
-        sex: calcSex,
-        age: calcAge,
-        height: calcHeight,
-        weight: calcWeight,
-        protein: calcProtein,
-        fatPct: calcFatPct,
-        updated_at: new Date().toISOString(),
-      }).catch((e) => console.error("calculator save failed", e));
-    }, 600);
-    return () => clearTimeout(t);
-  }, [userId, calcSex, calcAge, calcHeight, calcWeight, calcProtein, calcFatPct]);
-
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    (async () => {
-      try {
-        setLoading(true);
-        let days = await loadAllDays(userId);
-        if (days.length === 0) days = await seedInitialData(userId);
-        const recipes = await loadAllRecipes(userId);
-        setUserRecipes(recipes);
-        userRecipesRef.current = recipes;
-        // Fill in an estimated Wt/portion for any saved recipe without one (background, once per load)
-        backfillPortionWeights(userId, () => userRecipesRef.current, setUserRecipes);
-        // Reference calculator inputs (Compare tab) — restore saved values
-        try {
-          const cd = await getDoc(doc(db, "users", userId, "settings", "calculator"));
-          if (cd.exists()) {
-            const c = cd.data();
-            if (c.sex) setCalcSex(c.sex);
-            if (Number.isFinite(c.age)) setCalcAge(c.age);
-            if (Number.isFinite(c.height)) setCalcHeight(c.height);
-            if (Number.isFinite(c.weight)) setCalcWeight(c.weight);
-            if (Number.isFinite(c.protein)) setCalcProtein(c.protein);
-            if (Number.isFinite(c.fatPct)) setCalcFatPct(c.fatPct);
-          }
-        } catch (e) {
-          console.error("calculator load failed", e);
-        } finally {
-          calcLoadedRef.current = true;
-        }
-        const cfgDoc = await getDoc(doc(db, "users", userId, "weight_plan", "settings"));
-        const cfg = cfgDoc.exists()
-          ? { ...DEFAULT_PLAN_CONFIG, ...cfgDoc.data() }
-          : DEFAULT_PLAN_CONFIG;
-        setWeightPlanConfig(cfg);
-        setEditCfg(cfg);
-        // Table is built ONLY from real measurements in weight_log. No projection scaffold.
-        const wSnap = await getDocs(collection(db, "users", userId, "weight_log"));
-        const rows = wSnap.docs
-          .map((d) => ({ date: d.id, ...d.data() }))
-          .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-        setWeightLog(rows);
-        const bSnap = await getDocs(collection(db, "users", userId, "body_log"));
-        setBodyLog(
-          bSnap.docs
-            .map((d) => ({ date: d.id, ...d.data() }))
-            .sort((a, b) => (a.date || "").localeCompare(b.date || "")),
-        );
-        try {
-          const chatDoc = await getDoc(doc(db, "users", userId, "claude_chat", "conversation"));
-          if (chatDoc.exists()) {
-            const { history } = chatDoc.data();
-            if (Array.isArray(history) && history.length > 0) {
-              setJustChatHistory(history);
-              setChatMessages(
-                history.map((h) => ({
-                  id: genId(),
-                  type: h.role === "user" ? "user" : "claude",
-                  text: h.content,
-                })),
-              );
-            }
-          }
-        } catch (e) {
-          console.error("chat history load failed", e);
-        }
-        const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
-        if (polarDoc.exists()) {
-          const pd = polarDoc.data();
-          setPolarConnected(pd.connected || false);
-          setPolarLastSync(pd.last_sync_at || null);
-        }
-        const polarSnap = await getDocs(collection(db, "users", userId, "polar_sessions"));
-        setPolarSessions(
-          polarSnap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((s) => !s.logged)
-            .sort((a, b) => (b.start_time || "").localeCompare(a.start_time || "")),
-        );
-        const mergedDays = days.map(ensureMealSlots);
-        setAllDays(mergedDays);
-        if (mergedDays.length > 0) {
-          const first = mergedDays[0];
-          setCurrentDate(first.date);
-          setCurrentDayData(first);
-          setChatDate(first.date);
-          const logged = mergedDays
-            .filter((d) => d.meals?.some((m) => m.items?.length))
-            .slice(0, 5);
-          const slots = logged.map((d) => d.date);
-          setCompareSlots([...slots, ...Array(5 - slots.length).fill(null)].slice(0, 5));
-          setCompareData(logged.concat(Array(5).fill(null)).slice(0, 5));
-        }
-      } catch (err) {
-        console.error("Init error:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [userId]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const pp = params.get("polar");
-    if (pp === "connected") {
-      (async () => {
-        const polarDoc = await getDoc(doc(db, "users", userId, "polar", "connection"));
-        if (polarDoc.exists()) {
-          const pd = polarDoc.data();
-          setPolarConnected(pd.connected || false);
-          setPolarLastSync(pd.last_sync_at || null);
-        }
-      })();
-      window.history.replaceState({}, "", window.location.pathname);
-      setPolarSyncMsg({ ok: true, text: "Polar connected — click Sync to pull sessions." });
-      setTimeout(() => setPolarSyncMsg(null), 6000);
-    } else if (pp === "error") {
-      window.history.replaceState({}, "", window.location.pathname);
-      setPolarSyncMsg({ ok: false, text: "Polar connection failed." });
-      setTimeout(() => setPolarSyncMsg(null), 6000);
-    }
-  }, [userId]);
+  const calc = useCalculatorSettings(userId);
+  const {
+    sex: calcSex,
+    age: calcAge,
+    height: calcHeight,
+    weight: calcWeight,
+    protein: calcProtein,
+    fatPct: calcFatPct,
+  } = calc.values;
+  const { setCalcSex, setCalcAge, setCalcHeight, setCalcWeight, setCalcProtein, setCalcFatPct } =
+    calc.setters;
+  useTrackerLoad(userId, {
+    loading: setLoading,
+    userRecipes: setUserRecipes,
+    userRecipesRef,
+    calc,
+    weightPlanConfig: setWeightPlanConfig,
+    editCfg: setEditCfg,
+    weightLog: setWeightLog,
+    bodyLog: setBodyLog,
+    justChatHistory: setJustChatHistory,
+    chatMessages: setChatMessages,
+    polarConnected: setPolarConnected,
+    polarLastSync: setPolarLastSync,
+    polarSessions: setPolarSessions,
+    polarSyncMsg: setPolarSyncMsg,
+    allDays: setAllDays,
+    currentDate: setCurrentDate,
+    currentDayData: setCurrentDayData,
+    chatDate: setChatDate,
+    compareSlots: setCompareSlots,
+    compareData: setCompareData,
+  });
 
   const switchDay = async (date) => {
     setCurrentDate(date);

@@ -3,6 +3,6 @@ import { createRoot } from "react-dom/client";
 import NutritionTracker from "../../../src/NutritionTracker.jsx";
 createRoot(document.getElementById("root")).render(
   <div className="fade-up" style={{ transform: "translateY(0)", height: "100vh" }}>
-    <NutritionTracker userId="u" />
+    <NutritionTracker userId={window.__userId ?? "u"} />
   </div>,
 );

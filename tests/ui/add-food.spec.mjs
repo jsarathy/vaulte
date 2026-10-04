@@ -329,11 +329,12 @@ test("add food form", async ({ page: p }) => {
   await expect(lookupOpen).toHaveCount(0);
   await expect(msg("✅ Item added!")).toHaveCount(0, { timeout: 4000 });
 
-  // the last message fades 3 s after it appears; wait for that so it can't hide the next one
+  // Each add clears its message 3 s later, and those timers overlap, so from here on the
+  // save itself is checked rather than the passing "✅ Item added!"
   const addAndSee = async () => {
-    await expect(msg("✅ Item added!")).toHaveCount(0, { timeout: 4000 });
+    const before = await ev(() => window.__persisted.length);
     await add();
-    await expect(msg("✅ Item added!")).toBeVisible();
+    await expect.poll(() => ev(() => window.__persisted.length)).toBe(before + 1);
   };
   // Today: the day view is updated too; a slot resolves to that day's meal by name
   await ev(() => {
@@ -359,6 +360,7 @@ test("add food form", async ({ page: p }) => {
   expect(saved.notes).toBe("");
   expect(saved.meals.find((m) => m.name === "🌙 Dinner").items[0].name).toBe("Toast");
   // a stored day without that slot: error, or a new meal when a meal name is given
+  await p.waitForTimeout(3100); // earlier messages' timers have all fired
   await date.fill("2026-10-01");
   await meal.selectOption({ label: "🌙 Dinner" });
   await fillToast();
