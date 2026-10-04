@@ -42,7 +42,17 @@ export default [
     },
   },
   {
-    files: ["api/**/*.js", "scripts/**/*.mjs", "tests/**/*.mjs", "*.config.js"],
+    // UI tests: Node test code that also runs callbacks in the browser (page.evaluate)
+    files: ["tests/ui/**/*.{js,jsx,mjs}"],
+    languageOptions: {
+      ecmaVersion: "latest", sourceType: "module", globals: { ...globals.browser, ...globals.node },
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    plugins: { react },
+    rules: { "react/jsx-uses-vars": "error", "no-unused-vars": unused },
+  },
+  {
+    files: ["api/**/*.js", "scripts/**/*.mjs", "tests/*.mjs", "*.config.{js,mjs}"],
     languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: globals.node },
     rules: { "no-unused-vars": unused, ...QUALITY },
   },

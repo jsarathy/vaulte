@@ -12,3 +12,6 @@ Claude outputs/
 *service-account*.json
 *firebase-adminsdk*.json
 vaulte_pat.txt
+# UI test output (Fix 12)
+test-results/
+playwright-report/
