@@ -101,13 +101,23 @@ const B = {
 test("relink: unrelated recipe has no rows", () => {
   const C = { id: "c", name: "Toast", ingredients: [{ amount: "1", item: "Bread" }] };
   assert.equal(
-    relinkDependent(C, A, { ...A, nutrition: { kcal: 400 } }, recipes, recipes).rows.length,
+    relinkDependent(C, {
+      oldA: A,
+      newA: { ...A, nutrition: { kcal: 400 } },
+      recipesOld: recipes,
+      recipesNew: recipes,
+    }).rows.length,
     0,
   );
 });
 test("A's kcal 338 → 400: B changes by (400−338)×250/328 ÷ 2", () => {
   const A2 = { ...A, nutrition: { ...A.nutrition, kcal: 400 } };
-  const { rows, deltaOk, ingredients } = relinkDependent(B, A, A2, recipes, [A2, N]);
+  const { rows, deltaOk, ingredients } = relinkDependent(B, {
+    oldA: A,
+    newA: A2,
+    recipesOld: recipes,
+    recipesNew: [A2, N],
+  });
   assert.equal(deltaOk, true);
   assert.deepEqual(ingredients, B.ingredients);
   const { nutrition, weight } = applyLinkDelta(B, rows);
@@ -117,7 +127,12 @@ test("A's kcal 338 → 400: B changes by (400−338)×250/328 ÷ 2", () => {
 });
 test("A's Wt/portion 328 → 400: grams link re-scales, B's weight unchanged", () => {
   const A2 = { ...A, portion_g: 400 };
-  const { rows } = relinkDependent(B, A, A2, recipes, [A2, N]);
+  const { rows } = relinkDependent(B, {
+    oldA: A,
+    newA: A2,
+    recipesOld: recipes,
+    recipesNew: [A2, N],
+  });
   const { nutrition } = applyLinkDelta(B, rows);
   assert.equal(
     nutrition.kcal,
@@ -130,7 +145,12 @@ test("portions link: A's weight change moves B's estimated weight; weighed B kep
     ingredients: [{ amount: "1 portion", item: "Pinto Bean Stew" }, B.ingredients[1]],
   };
   const A2 = { ...A, portion_g: 340 };
-  const { rows } = relinkDependent(Bp, A, A2, recipes, [A2, N]);
+  const { rows } = relinkDependent(Bp, {
+    oldA: A,
+    newA: A2,
+    recipesOld: recipes,
+    recipesNew: [A2, N],
+  });
   assert.deepEqual(applyLinkDelta(Bp, rows).weight, {
     portion_g: 306,
     portion_g_source: "estimated",
@@ -142,19 +162,34 @@ test("portions link: A's weight change moves B's estimated weight; weighed B kep
 });
 test("rename: B's ingredient follows the new name", () => {
   const A2 = { ...A, name: "Pinto Stew v2" };
-  const { ingredients, deltaOk } = relinkDependent(B, A, A2, recipes, [A2, N]);
+  const { ingredients, deltaOk } = relinkDependent(B, {
+    oldA: A,
+    newA: A2,
+    recipesOld: recipes,
+    recipesNew: [A2, N],
+  });
   assert.equal(ingredients[0].item, "Pinto Stew v2");
   assert.equal(deltaOk, true);
 });
 test("not usable before (no Wt/portion) → full recalculation needed", () => {
   const A0 = { ...A, portion_g: undefined };
-  const { deltaOk, rows } = relinkDependent(B, A0, A, [A0, N], recipes);
+  const { deltaOk, rows } = relinkDependent(B, {
+    oldA: A0,
+    newA: A,
+    recipesOld: [A0, N],
+    recipesNew: recipes,
+  });
   assert.equal(rows.length, 1);
   assert.equal(deltaOk, false);
 });
 test("new recipe matching an ingredient name → full recalculation", () => {
   const R = { id: "r", name: "Cooked basmati rice", portion_g: 150, nutrition: { kcal: 190 } };
-  const { rows, deltaOk } = relinkDependent(B, null, R, recipes, [...recipes, R]);
+  const { rows, deltaOk } = relinkDependent(B, {
+    oldA: null,
+    newA: R,
+    recipesOld: recipes,
+    recipesNew: [...recipes, R],
+  });
   assert.equal(rows.length, 1);
   assert.equal(deltaOk, false);
 });

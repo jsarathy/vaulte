@@ -311,7 +311,11 @@ export default function LogTab({
   else if (exerciseBurned > 0) activeTierIdx = 1;
   const activeTier = ACTIVITY_LEVELS[activeTierIdx];
   const tdee = Math.round(BMR * activeTier.factor);
-  const macroTgt = calcMacros(tdee, calcWeight, calcProtein, calcFatPct / 100);
+  const macroTgt = calcMacros(tdee, {
+    weight: calcWeight,
+    proteinPerKg: calcProtein,
+    fatPct: calcFatPct / 100,
+  });
   const netKcal = totals.foodKcal - exerciseBurned;
   const netRemaining = tdee - netKcal;
   const netPct = Math.min(100, Math.round((netKcal / tdee) * 100));

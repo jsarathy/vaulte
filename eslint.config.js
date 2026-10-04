@@ -51,6 +51,9 @@ export const CLEAN_FILES = [
   "src/components/MonthlyTargetsCard.jsx",
   "src/constants/design.jsx",
   "src/main.jsx",
+  "src/api/recipeWeights.js",
+  "src/constants/helpers.js",
+  "src/constants/recipeLinks.js",
 ];
 
 const unused = [

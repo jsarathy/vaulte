@@ -62,7 +62,7 @@ export default function AppleActivityCard({
 
   const hasData =
     (!!activity?.slots && Object.keys(activity.slots).length > 0) || !!activity?.totals;
-  const a = calcAppleActivity(activity?.slots, sessions, weightKg, activity?.totals);
+  const a = calcAppleActivity(activity, sessions, weightKg);
   const ex = a.excluded;
   const hasExcluded = ex.steps || ex.activeMin || ex.flights;
   const synced = activity?.updated_at
