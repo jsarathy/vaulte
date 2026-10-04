@@ -1,0 +1,9 @@
+# Prettier (Fix 26) — files not formatted
+dist/
+node_modules/
+package-lock.json
+Claude outputs/
+docs/
+test-results/
+playwright-report/
+*.md

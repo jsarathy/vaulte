@@ -22,8 +22,26 @@ const SUCCESS_CODES = new Set([0, "0", 101, "101", 200, "200", 20000, "20000"]);
 
 // Device type codes for body-weight scales (ES-20M is in this family).
 const BODY_WEIGHT_SCALES = [
-  "01","02","03","04","05","06","07","08","09","0A",
-  "0B","0C","0D","0E","0F","10","11","12","13","14",
+  "01",
+  "02",
+  "03",
+  "04",
+  "05",
+  "06",
+  "07",
+  "08",
+  "09",
+  "0A",
+  "0B",
+  "0C",
+  "0D",
+  "0E",
+  "0F",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
 ];
 
 const ENDPOINTS = {
@@ -37,11 +55,18 @@ const ENDPOINTS = {
 // Smart Tape Measure: Renpho field -> Body tab key (all cm). The overall
 // arm/thigh/calf fields and the custom slots are not used.
 const GIRTH_FIELDS = {
-  neckValue:"neck", shoulderValue:"shoulder", chestValue:"chest", waistValue:"waist",
-  abdomenValue:"abdomen", hipValue:"hip",
-  leftArmValue:"bicepL", rightArmValue:"bicepR",
-  leftThighValue:"thighL", rightThighValue:"thighR",
-  leftCalfValue:"calfL", rightCalfValue:"calfR",
+  neckValue: "neck",
+  shoulderValue: "shoulder",
+  chestValue: "chest",
+  waistValue: "waist",
+  abdomenValue: "abdomen",
+  hipValue: "hip",
+  leftArmValue: "bicepL",
+  rightArmValue: "bicepR",
+  leftThighValue: "thighL",
+  rightThighValue: "thighR",
+  leftCalfValue: "calfL",
+  rightCalfValue: "calfR",
 };
 
 // ── AES-128-ECB envelope ─────────────────────────────────────────────────────
@@ -78,7 +103,9 @@ async function post(endpoint, body, { token, userId } = {}) {
     headers.platform = PLATFORM;
   }
   const res = await fetch(`${API_BASE}/${endpoint}`, {
-    method: "POST", headers, body: JSON.stringify(body),
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${endpoint} HTTP ${res.status}`);
   return res.json();
@@ -89,8 +116,13 @@ async function login(email, password) {
   const payload = {
     questionnaire: {},
     login: {
-      password, areaCode: "US", appRevision: APP_VERSION,
-      cellphoneType: "VaulteSync", systemType: "11", email, platform: PLATFORM,
+      password,
+      areaCode: "US",
+      appRevision: APP_VERSION,
+      cellphoneType: "VaulteSync",
+      systemType: "11",
+      email,
+      platform: PLATFORM,
     },
     bindingList: { deviceTypes: BODY_WEIGHT_SCALES },
   };
@@ -120,7 +152,7 @@ async function fetchPaged(endpoint, tableName, uid, auth, pageSize = 50) {
     const result = await post(
       endpoint,
       encryptRequest({ pageNum: page, pageSize, userIds: [String(uid)], tableName }),
-      auth
+      auth,
     );
     checkResponse(result, `${endpoint} page ${page}`);
     if (!result.data) break;
@@ -133,7 +165,8 @@ async function fetchPaged(endpoint, tableName, uid, auth, pageSize = 50) {
 }
 
 // Fields that describe the record rather than the body — never surfaced as metrics.
-const NON_METRIC = /(^id$|id$|Id$|ids$|time|stamp|date|created|updated|unit|type|flag|status|version|mac|^sn$|serial|scale|table|device|sex|gender|^age$|height|method|mode|^local|timezone|source|deleted|sync|^tz)/i;
+const NON_METRIC =
+  /(^id$|id$|Id$|ids$|time|stamp|date|created|updated|unit|type|flag|status|version|mac|^sn$|serial|scale|table|device|sex|gender|^age$|height|method|mode|^local|timezone|source|deleted|sync|^tz)/i;
 
 // Every finite, non-zero number on the record except bookkeeping fields.
 // Renpho reports 0 for anything the scale didn't measure, so zeros are dropped.
@@ -213,9 +246,10 @@ export default async function handler(req, res) {
 
   // Hard cutoff: measurements dated before this are rejected outright, so stale
   // readings already sitting in the Renpho cloud can never re-enter the log.
-  const fromDate = typeof req.body?.fromDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.fromDate)
-    ? req.body.fromDate
-    : null;
+  const fromDate =
+    typeof req.body?.fromDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.fromDate)
+      ? req.body.fromDate
+      : null;
 
   const email = process.env.RENPHO_EMAIL;
   const password = process.env.RENPHO_PASSWORD;
@@ -234,7 +268,8 @@ export default async function handler(req, res) {
 
     if (!scales.length) {
       return res.status(200).json({
-        records: [], count: 0,
+        records: [],
+        count: 0,
         warning: "No scale found on the account. Open the Renpho Health app and let it sync.",
       });
     }
@@ -259,18 +294,29 @@ export default async function handler(req, res) {
       const date = toISODate(m.timeStamp ?? m.timestamp ?? m.created_at);
       const weight = Number(m.weight);
       if (!date || !Number.isFinite(weight) || weight <= 0) continue;
-      if (fromDate && date < fromDate) { rejected++; continue; }
+      if (fromDate && date < fromDate) {
+        rejected++;
+        continue;
+      }
       const ts = Number(m.timeStamp ?? m.timestamp ?? 0);
       const prev = byDate.get(date);
-      if (!prev || ts >= prev.ts) byDate.set(date, { date, weight: +weight.toFixed(2), metrics: extractMetrics(m), ts });
+      if (!prev || ts >= prev.ts)
+        byDate.set(date, { date, weight: +weight.toFixed(2), metrics: extractMetrics(m), ts });
     }
 
     const records = [...byDate.values()]
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(({ date, weight, metrics }) => ({ date, weight, metrics }));
-    const metricKeys = [...new Set(records.flatMap(r => Object.keys(r.metrics)))].sort();
+    const metricKeys = [...new Set(records.flatMap((r) => Object.keys(r.metrics)))].sort();
 
-    return res.status(200).json({ records, count: records.length, rawCount: raw.length, rejected, fromDate, metricKeys });
+    return res.status(200).json({
+      records,
+      count: records.length,
+      rawCount: raw.length,
+      rejected,
+      fromDate,
+      metricKeys,
+    });
   } catch (err) {
     console.error("renpho-sync error:", err);
     return res.status(502).json({ error: err.message || "Renpho sync failed" });

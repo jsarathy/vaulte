@@ -39,21 +39,21 @@ export default async function handler(req, res) {
     return res.redirect(302, `${appUrl}/?polar=error&reason=bad_state`);
   }
 
-  const clientId     = process.env.POLAR_CLIENT_ID;
+  const clientId = process.env.POLAR_CLIENT_ID;
   const clientSecret = process.env.POLAR_CLIENT_SECRET;
-  const redirectUri  = process.env.POLAR_REDIRECT_URI;
+  const redirectUri = process.env.POLAR_REDIRECT_URI;
 
   try {
     // ── Step 1: Exchange auth code for tokens ──────────────────────────────────
     const tokenRes = await fetch("https://polarremote.com/v2/oauth2/token", {
       method: "POST",
       headers: {
-        "Content-Type":  "application/x-www-form-urlencoded",
-        "Authorization": "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
-        "Accept":        "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
+        Accept: "application/json",
       },
       body: new URLSearchParams({
-        grant_type:   "authorization_code",
+        grant_type: "authorization_code",
         code,
         redirect_uri: redirectUri,
       }).toString(),
@@ -74,9 +74,9 @@ export default async function handler(req, res) {
     const regRes = await fetch("https://www.polaraccesslink.com/v3/users", {
       method: "POST",
       headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${access_token}`,
-        "Accept":        "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${access_token}`,
+        Accept: "application/json",
       },
       body: JSON.stringify({ "member-id": firebaseUid }),
     });
@@ -92,15 +92,14 @@ export default async function handler(req, res) {
     // ── Step 3: Save to Firestore ──────────────────────────────────────────────
     const db = getAdminDb();
     await db.doc(`users/${firebaseUid}/polar/connection`).set({
-      connected:        true,
+      connected: true,
       access_token,
-      polar_user_id:    String(polarUserId),
-      connected_at:     new Date().toISOString(),
-      last_sync_at:     null,
+      polar_user_id: String(polarUserId),
+      connected_at: new Date().toISOString(),
+      last_sync_at: null,
     });
 
     return res.redirect(302, `${appUrl}/?polar=connected`);
-
   } catch (err) {
     console.error("Polar callback error:", err);
     return res.redirect(302, `${appUrl}/?polar=error&reason=server_error`);

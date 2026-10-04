@@ -15,7 +15,9 @@
     "test:ui": "playwright test",
     "test:api": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-vaulte \"npm run -s test:api:run\"",
     "test:api:run": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/api/github-reporter.mjs --test-reporter-destination=stdout tests/api/*.test.mjs",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=tests/** tests/*.test.mjs"
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=tests/** tests/*.test.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "firebase": "^12.19.0",
@@ -32,6 +34,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
+    "prettier": "^3.9.9",
     "vite": "^8.3.2"
   }
 }

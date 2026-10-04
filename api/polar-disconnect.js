@@ -31,13 +31,13 @@ export default async function handler(req, res) {
     }
 
     const { access_token, polar_user_id } = connDoc.data();
-    const AUTH_HDR = { "Authorization": `Bearer ${access_token}`, "Accept": "application/json" };
+    const AUTH_HDR = { Authorization: `Bearer ${access_token}`, Accept: "application/json" };
 
     // Step 1: Delete from Accesslink (revokes the OAuth grant on Polar's side)
-    const delRes = await fetch(
-      `https://www.polaraccesslink.com/v3/users/${polar_user_id}`,
-      { method: "DELETE", headers: AUTH_HDR }
-    );
+    const delRes = await fetch(`https://www.polaraccesslink.com/v3/users/${polar_user_id}`, {
+      method: "DELETE",
+      headers: AUTH_HDR,
+    });
     console.log("Polar DELETE /v3/users status:", delRes.status);
     // 204 = deleted, 404 = already gone — both are acceptable
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     // This re-creates the Accesslink account in a clean state so the callback
     // won't fail with anything other than 200/409 on the next auth.
     // We use a small delay to let Polar process the deletion.
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 500));
 
     const regRes = await fetch("https://www.polaraccesslink.com/v3/users", {
       method: "POST",
@@ -63,16 +63,18 @@ export default async function handler(req, res) {
     });
 
     return res.json({ ok: true, action: "deregistered_and_reregistered" });
-
   } catch (err) {
     console.error("polar-disconnect error:", err);
     // Still mark as disconnected even if Polar API calls failed
     try {
       const db = getAdminDb();
       await db.doc(`users/${userId}/polar/connection`).update({
-        connected: false, access_token: null,
+        connected: false,
+        access_token: null,
       });
-    } catch { /* best effort — the original error is returned below */ }
+    } catch {
+      /* best effort — the original error is returned below */
+    }
     return res.status(500).json({ error: err.message });
   }
 }

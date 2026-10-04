@@ -2,12 +2,12 @@
 
 export async function claudeParseFood(text) {
   const res = await fetch("/api/claude", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:1000,
-      system:`You are a precise nutrition analysis assistant. The user will describe food they ate.
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: `You are a precise nutrition analysis assistant. The user will describe food they ate.
 Return ONLY a JSON array of food items — no other text, no markdown, no explanation whatsoever.
 Each item must have exactly these fields:
 - name (string): descriptive name including quantity/weight e.g. "Walnuts (30g)"
@@ -20,23 +20,23 @@ Each item must have exactly these fields:
 - net_carbs (number): carbs minus fibre
 - protein (number): protein in grams
 Use accurate nutritional database values. Round to 1 decimal place. Return ONLY valid JSON array.`,
-      messages:[{role:"user", content:text}]
-    })
+      messages: [{ role: "user", content: text }],
+    }),
   });
   const data = await res.json();
   let raw = data.content?.[0]?.text?.trim() || "";
-  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
+  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/, "").trim() || raw;
   return JSON.parse(raw);
 }
 
 export async function claudeCreateRecipe(description) {
   const res = await fetch("/api/claude", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:1000,
-      system:`You are a recipe and nutrition expert. The user will describe a recipe.
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: `You are a recipe and nutrition expert. The user will describe a recipe.
 Return ONLY a JSON object — no markdown, no explanation. The object must have exactly these fields:
 {
   "name": string,
@@ -51,25 +51,26 @@ Return ONLY a JSON object — no markdown, no explanation. The object must have 
   "nutrition": { "kcal": number, "fat": number, "sat_fat": number, "carbs": number, "sugar": number, "fibre": number, "net_carbs": number, "protein": number }
 }
 nutrition is PER SERVING. Use accurate nutritional database values. Return ONLY valid JSON.`,
-      messages:[{role:"user", content:description}]
-    })
+      messages: [{ role: "user", content: description }],
+    }),
   });
   const data = await res.json();
   let raw = data.content?.[0]?.text?.trim() || "";
-  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/,"").trim() || raw;
+  if (raw.startsWith("```")) raw = raw.split("```")[1]?.replace(/^json/, "").trim() || raw;
   return JSON.parse(raw);
 }
 
 export async function claudeChat(messages) {
   const res = await fetch("/api/claude", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:1000,
-      system:"You are a helpful nutrition and health assistant. Answer naturally and conversationally.",
-      messages
-    })
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system:
+        "You are a helpful nutrition and health assistant. Answer naturally and conversationally.",
+      messages,
+    }),
   });
   const data = await res.json();
   return data.content?.[0]?.text || "";
