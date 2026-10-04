@@ -6,3 +6,9 @@ dist
 .env*.local
 .env*
 Claude outputs/
+# secrets — never commit (Fix 11)
+*.pem
+*.key
+*service-account*.json
+*firebase-adminsdk*.json
+vaulte_pat.txt

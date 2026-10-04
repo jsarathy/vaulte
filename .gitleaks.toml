@@ -1,0 +1,12 @@
+# Secret-scan config (Fix 11). Default gitleaks rules + reviewed exceptions.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Firebase web config apiKey (src/firebase.js) — public by design: it identifies the project; access is enforced by Firebase Auth + Firestore rules. Only this exact value is allowed. Reviewed 2026-10-04."
+regexTarget = "secret"
+regexes = ['''^AIzaSyC_L5NoFXe\-WVZdy9NBqkb4YI8vmLQxe2M$''']
+
+[[allowlists]]
+description = "Build output and installed packages are never committed going forward; old history has node_modules commits."
+paths = ['''(^|/)node_modules/''', '''^dist/''', '''^package-lock\.json$''']

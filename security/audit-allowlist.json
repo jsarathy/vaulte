@@ -1,0 +1,21 @@
+{
+  "_about": "High-severity advisories in runtime dependencies that were reviewed and accepted (Fix 11). Critical is never allowed. Remove an entry once the fix is available; re-review by the date given.",
+  "advisories": [
+    {
+      "id": "GHSA-m9gg-hp2v-232j",
+      "package": "@grpc/grpc-js",
+      "via": "firebase → @firebase/firestore (Node build)",
+      "reason": "Server-side getAuthContext issue in gRPC servers. Vaulte runs Firestore in the browser (WebChannel transport) and runs no gRPC server; not reachable. No firebase release with grpc-js >= 1.13.6 yet (latest firebase 12.19.0).",
+      "reviewed": "2026-10-04",
+      "review_by": "2027-01-04"
+    },
+    {
+      "id": "GHSA-f596-whhp-79r4",
+      "package": "@grpc/grpc-js",
+      "via": "firebase → @firebase/firestore (Node build)",
+      "reason": "gRPC server leaks error messages from method handlers. Vaulte runs no gRPC server; not reachable.",
+      "reviewed": "2026-10-04",
+      "review_by": "2027-01-04"
+    }
+  ]
+}
