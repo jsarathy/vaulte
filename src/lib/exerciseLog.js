@@ -1,5 +1,6 @@
 // src/lib/exerciseLog.js — "Log Manual Exercise": calories, HR zone and fat burn from MET values.
 import { DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers.js";
+import { withItemsInMeal } from "./dayMeals.js";
 
 export const WEIGHT_KG = 84; // fixed for now (the form shows it read-only)
 
@@ -84,13 +85,5 @@ export function mealSlotOptions(allDays, date) {
   }));
 }
 
-/** The chosen slot's meal id in the day ("__slot__Name" → that meal's id), or null. */
-export function mealIdIn(day, value) {
-  if (!value.startsWith("__slot__")) return value;
-  return day.meals.find((m) => m.name === value.replace("__slot__", ""))?.id || null;
-}
-
-export const withItemInMeal = (day, mealId, item) => ({
-  ...day,
-  meals: day.meals.map((m) => (m.id === mealId ? { ...m, items: [...(m.items || []), item] } : m)),
-});
+export { mealIdIn } from "./dayMeals.js";
+export const withItemInMeal = (day, mealId, item) => withItemsInMeal(day, mealId, [item]);
