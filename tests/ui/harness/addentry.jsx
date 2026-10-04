@@ -53,7 +53,7 @@ function H() {
           setAddDate={setAddDate}
           addMealId={addMealId}
           setAddMealId={setAddMealId}
-          addMealName={addMealName}
+          addMealName={window.__addMealName ?? addMealName}
           setAddMealName={setAddMealName}
           addItem={addItem}
           setAddItem={setAddItem}

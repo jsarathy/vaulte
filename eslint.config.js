@@ -83,6 +83,10 @@ export const CLEAN_FILES = [
   "src/api/photoLog.js",
   "src/hooks/usePhotoLog.js",
   "src/components/PhotoLogCard.jsx",
+  "src/api/dayForEdit.js",
+  "src/lib/addFood.js",
+  "src/hooks/useAddFood.js",
+  "src/components/AddFoodCard.jsx",
 ];
 
 const unused = [
