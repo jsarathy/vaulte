@@ -59,14 +59,14 @@ function H() {
           setAddItem={setAddItem}
           addMsg={addMsg}
           setAddMsg={setAddMsg}
-          polarConnected={false}
-          polarSessions={[]}
+          polarConnected={!!window.__polar?.connected}
+          polarSessions={window.__polar?.sessions || []}
           setPolarSessions={() => {}}
           polarSyncing={false}
-          polarLastSync={null}
+          polarLastSync={window.__polar?.lastSync || null}
           polarSyncMsg={null}
           syncPolar={() => {}}
-          setPolarLogModal={() => {}}
+          setPolarLogModal={(s) => (window.__polarLog = s)}
           persistDay={async () => {}}
           setRecipeModal={setRecipeModal}
         />
