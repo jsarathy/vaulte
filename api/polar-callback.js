@@ -9,6 +9,9 @@
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
+const TOKEN_URL = "https://polarremote.com/v2/oauth2/token";
+const POLAR_USERS = "https://www.polaraccesslink.com/v3/users";
+
 function getAdminDb() {
   if (!getApps().length) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
@@ -17,91 +20,96 @@ function getAdminDb() {
   return getFirestore();
 }
 
-export default async function handler(req, res) {
-  const { code, state, error } = req.query;
-  const appUrl = process.env.VAULTE_APP_URL || "https://vaulte-roan.vercel.app";
+const appUrl = () => process.env.VAULTE_APP_URL || "https://vaulte-roan.vercel.app";
 
-  // User denied access
-  if (error) {
-    return res.redirect(302, `${appUrl}/?polar=denied`);
-  }
-
-  if (!code || !state) {
-    return res.redirect(302, `${appUrl}/?polar=error&reason=missing_params`);
-  }
-
-  // Decode the Firebase userId from state
-  let firebaseUid;
+// The Firebase userId from the OAuth state (see polar-auth.js); null if the state is unreadable.
+function decodeState(state) {
   try {
-    const decoded = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
-    firebaseUid = decoded.uid;
+    return { uid: JSON.parse(Buffer.from(state, "base64url").toString("utf8")).uid };
   } catch {
-    return res.redirect(302, `${appUrl}/?polar=error&reason=bad_state`);
+    return null;
   }
+}
 
-  const clientId = process.env.POLAR_CLIENT_ID;
-  const clientSecret = process.env.POLAR_CLIENT_SECRET;
-  const redirectUri = process.env.POLAR_REDIRECT_URI;
+function tokenRequest(code) {
+  const { POLAR_CLIENT_ID: id, POLAR_CLIENT_SECRET: secret, POLAR_REDIRECT_URI } = process.env;
+  const basic = Buffer.from(`${id}:${secret}`).toString("base64");
+  return {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+      Accept: "application/json",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: POLAR_REDIRECT_URI,
+    }).toString(),
+  };
+}
 
-  try {
-    // ── Step 1: Exchange auth code for tokens ──────────────────────────────────
-    const tokenRes = await fetch("https://polarremote.com/v2/oauth2/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64"),
-        Accept: "application/json",
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-      }).toString(),
-    });
+// Step 1: auth code → { accessToken, polarUserId }, or null if Polar refuses.
+async function exchangeCode(code) {
+  const tokenRes = await fetch(TOKEN_URL, tokenRequest(code));
+  if (!tokenRes.ok) {
+    console.error("Token exchange failed:", await tokenRes.text());
+    return null;
+  }
+  const { access_token, x_user_id } = await tokenRes.json();
+  return { accessToken: access_token, polarUserId: x_user_id };
+}
 
-    if (!tokenRes.ok) {
-      const err = await tokenRes.text();
-      console.error("Token exchange failed:", err);
-      return res.redirect(302, `${appUrl}/?polar=error&reason=token_exchange`);
-    }
+// Step 2: 200 = new registration, 409 = already registered. Anything else is logged but not
+// fatal — the new access token is valid either way.
+async function registerWithAccessLink(accessToken, uid) {
+  const regRes = await fetch(POLAR_USERS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ "member-id": uid }),
+  });
+  console.log("Polar registration status:", regRes.status);
+  if (!regRes.ok && regRes.status !== 409) {
+    console.warn("Polar registration non-fatal error:", regRes.status, await regRes.text());
+  }
+}
 
-    const tokenData = await tokenRes.json();
-    const { access_token, x_user_id: polarUserId } = tokenData;
-
-    // ── Step 2: Register user with AccessLink ──────────────────────────────────
-    // 200 = new registration, 409 = already registered — both are fine.
-    // We always continue because we have a valid new access_token regardless.
-    const regRes = await fetch("https://www.polaraccesslink.com/v3/users", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${access_token}`,
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ "member-id": firebaseUid }),
-    });
-
-    const regStatus = regRes.status;
-    console.log("Polar registration status:", regStatus);
-    if (!regRes.ok && regStatus !== 409) {
-      const regBody = await regRes.text();
-      console.warn("Polar registration non-fatal error:", regStatus, regBody);
-      // Continue anyway — we still have a valid token
-    }
-
-    // ── Step 3: Save to Firestore ──────────────────────────────────────────────
-    const db = getAdminDb();
-    await db.doc(`users/${firebaseUid}/polar/connection`).set({
+// Step 3
+const saveConnection = (uid, { accessToken, polarUserId }) =>
+  getAdminDb()
+    .doc(`users/${uid}/polar/connection`)
+    .set({
       connected: true,
-      access_token,
+      access_token: accessToken,
       polar_user_id: String(polarUserId),
       connected_at: new Date().toISOString(),
       last_sync_at: null,
     });
 
-    return res.redirect(302, `${appUrl}/?polar=connected`);
+// Steps 1–3; returns the outcome for the redirect.
+async function connect(code, uid) {
+  const token = await exchangeCode(code);
+  if (!token) return "error&reason=token_exchange";
+  await registerWithAccessLink(token.accessToken, uid);
+  await saveConnection(uid, token);
+  return "connected";
+}
+
+export default async function handler(req, res) {
+  const { code, state, error } = req.query;
+  const back = (outcome) => res.redirect(302, `${appUrl()}/?polar=${outcome}`);
+  if (error) return back("denied");
+  if (!code || !state) return back("error&reason=missing_params");
+  const decoded = decodeState(state);
+  if (!decoded) return back("error&reason=bad_state");
+  try {
+    return back(await connect(code, decoded.uid));
   } catch (err) {
     console.error("Polar callback error:", err);
-    return res.redirect(302, `${appUrl}/?polar=error&reason=server_error`);
+    return back("error&reason=server_error");
   }
 }

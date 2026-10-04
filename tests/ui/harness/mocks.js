@@ -6,9 +6,20 @@
 export const db = {};
 export const auth = {};
 export const doc = (...a) => ({ path: a.slice(1).join("/") });
-export const setDoc = async () => {};
+// setDoc/getDoc: saves are recorded in window.__setDocs; reads come from window.__docs
+// (keyed by path, e.g. "users/u/monthly_targets/2026-10"), which tests may seed first.
+window.__docs = window.__docs || {};
+window.__setDocs = [];
+window.__failSetDoc = false;
+export const setDoc = async (ref, data) => {
+  if (window.__failSetDoc) throw new Error("Mock setDoc failure");
+  window.__setDocs.push({ path: ref.path, data: JSON.parse(JSON.stringify(data)) });
+};
 export const deleteDoc = async () => {};
-export const getDoc = async () => ({ exists: () => false, data: () => null });
+export const getDoc = async (ref) => {
+  const d = window.__docs[ref.path];
+  return { exists: () => d !== undefined, data: () => d ?? null };
+};
 export const getDocs = async () => ({ forEach() {}, docs: [], empty: true });
 export const collection = () => ({});
 export const orderBy = () => ({});

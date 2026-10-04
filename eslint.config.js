@@ -38,12 +38,17 @@ export const TARGET_LENGTH = { logic: 20, component: 40 };
 // Add each file as Fix 26 brings it up to standard.
 export const CLEAN_FILES = [
   "api/claude.js",
+  "api/polar-auth.js",
+  "api/polar-callback.js",
   "api/polar-disconnect.js",
   "src/constants/exercises.js",
   "src/constants/meds.js",
   "src/constants/recipes.js",
   "src/constants/weightPlan.js",
   "src/firebase.js",
+  "src/hooks/useMonthlyTargets.js",
+  "src/lib/monthlyTargets.js",
+  "src/components/MonthlyTargetsCard.jsx",
   "src/constants/design.jsx",
   "src/main.jsx",
 ];
