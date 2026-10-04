@@ -65,7 +65,12 @@ const DAYS = [
 export const loadAllDays = async () => window.__days ?? DAYS; // __days: e.g. [] for a new user
 export const seedInitialData = async () => window.__days ?? DAYS;
 export const loadDay = async (_u, d) => DAYS.find((x) => x.date === d) || null;
-export const saveDay = async () => {};
+// saveDay: days recorded in window.__savedDays; window.__saveDayDelay / __failSaveDay
+export const saveDay = async (_u, day) => {
+  if (window.__saveDayDelay) await new Promise((res) => setTimeout(res, window.__saveDayDelay));
+  if (window.__failSaveDay) throw new Error("Mock saveDay failure");
+  (window.__savedDays ||= []).push(JSON.parse(JSON.stringify(day)));
+};
 export const loadAllRecipes = async () => [];
 window.__saved = [];
 window.__deleted = [];
