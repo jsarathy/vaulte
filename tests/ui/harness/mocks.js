@@ -20,7 +20,13 @@ export const getDoc = async (ref) => {
   const d = window.__docs[ref.path];
   return { exists: () => d !== undefined, data: () => d ?? null };
 };
-export const getDocs = async () => ({ forEach() {}, docs: [], empty: true });
+// getDocs: window.__polarDocs (Polar sessions) when a test sets it; __polarDelay / __failGetDocs
+export const getDocs = async () => {
+  await new Promise((res) => setTimeout(res, window.__polarDelay || 0));
+  if (window.__failGetDocs) throw new Error("Mock getDocs failure");
+  const docs = (window.__polarDocs || []).map((d) => ({ id: d.id, data: () => d }));
+  return { forEach: (f) => docs.forEach(f), docs, empty: docs.length === 0 };
+};
 export const collection = () => ({});
 export const orderBy = () => ({});
 export const query = () => ({});

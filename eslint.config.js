@@ -70,6 +70,11 @@ export const CLEAN_FILES = [
   "src/lib/savedRecipes.js",
   "src/hooks/useSavedRecipes.js",
   "src/components/SavedRecipesModal.jsx",
+  "src/lib/polarSessions.js",
+  "src/api/polarSessions.js",
+  "src/hooks/usePolarBrowse.js",
+  "src/components/PolarSessionsPanel.jsx",
+  "src/components/PolarBrowseModal.jsx",
 ];
 
 const unused = [
