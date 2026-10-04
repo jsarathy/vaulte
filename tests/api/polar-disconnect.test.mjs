@@ -33,7 +33,7 @@ test("connected: deregisters + re-registers with Polar, then clears the token", 
   await db().doc(PATH).set({ connected: true, access_token: "tok-abc", polar_user_id: 9876 });
   stubPolar(async (url, opts) => ({ status: opts.method === "DELETE" ? 204 : 200 }));
   const out = await call({ userId: UID });
-  assert.equal(out.body.action, "deregistered_and_reregistered");
+  assert.equal(out.body.action, "deregistered_and_reregistered", `handler replied ${out.statusCode} ${JSON.stringify(out.body)}`);
   assert.equal(calls.length, 2);
   assert.equal(calls[0].method, "DELETE"); assert.match(calls[0].url, /\/v3\/users\/9876$/);
   assert.equal(calls[0].headers.Authorization, "Bearer tok-abc");
