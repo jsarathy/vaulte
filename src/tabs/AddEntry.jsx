@@ -2,9 +2,7 @@
 import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
-import { loadDay, deleteRecipe } from "../api/firestore";
-import { isEstimatedWeight } from "../api/recipeWeights";
-import { findDependentsDeep } from "../constants/recipeLinks";
+import { loadDay } from "../api/firestore";
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
@@ -13,6 +11,8 @@ import { useRecipePortion } from "../hooks/useRecipePortion";
 import RecipeBuilderModal from "../components/RecipeBuilderModal";
 import RecipeEditorForm from "../components/RecipeEditorForm";
 import FoodLookupModal from "../components/FoodLookupModal";
+import SavedRecipesModal from "../components/SavedRecipesModal";
+import { useSavedRecipes } from "../hooks/useSavedRecipes";
 import { useFoodLookup } from "../hooks/useFoodLookup";
 import { useRecipeBuilder } from "../hooks/useRecipeBuilder";
 import { db } from "../firebase";
@@ -97,15 +97,14 @@ export default function AddEntry({
   const [browseAll, setBrowseAll] = useState([]);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseSearch, setBrowseSearch] = useState("");
-  const [showRecipesModal, setShowRecipesModal] = useState(false);
-  const [recipeNotice, setRecipeNotice] = useState(null); // { ok, text } — dependent recipes updated after a save
+  const saved = useSavedRecipes({ userId, userRecipes, setUserRecipes });
   const builder = useRecipeBuilder({
     userId,
     userRecipes,
     setUserRecipes,
     setAddItem,
-    setRecipeNotice,
-    setShowRecipesModal,
+    setRecipeNotice: saved.setNotice,
+    setShowRecipesModal: saved.setOpen,
   });
   // "Get Nutrition" box for a food that isn't a saved recipe
   const lookup = useFoodLookup({
@@ -148,7 +147,7 @@ export default function AddEntry({
   const loadPortion = (item) => {
     setAddItem(item);
     portion.close();
-    setShowRecipesModal(false);
+    saved.setOpen(false);
   };
 
   const [nameDropdown, setNameDropdown] = useState([]);
@@ -805,7 +804,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
         {/* Recipe action buttons */}
         <div style={{ display: "flex", gap: "10px" }}>
           <button
-            onClick={() => setShowRecipesModal(true)}
+            onClick={() => saved.setOpen(true)}
             style={{
               flex: 1,
               background: "#378ADD",
@@ -1611,206 +1610,12 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
       )}
 
       {/* ── Saved Recipes Modal ── */}
-      {showRecipesModal && (
-        <div
-          onClick={(e) => e.target === e.currentTarget && setShowRecipesModal(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 3000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "12px",
-              width: "520px",
-              maxWidth: "95vw",
-              maxHeight: "88vh",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div
-              style={{
-                background: "#185FA5",
-                color: "#fff",
-                padding: "14px 18px",
-                borderRadius: "12px 12px 0 0",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ fontWeight: "bold", fontSize: "15px" }}>📖 Saved Recipes</div>
-              <button
-                onClick={() => {
-                  setShowRecipesModal(false);
-                  setRecipeNotice(null);
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#fff",
-                  fontSize: "22px",
-                  cursor: "pointer",
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-            {recipeNotice && (
-              <div
-                data-recipe-notice
-                style={{
-                  margin: "8px 8px 0",
-                  padding: "7px 10px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  background: recipeNotice.ok ? "#E8F5E9" : "#FFF8E1",
-                  color: recipeNotice.ok ? "#2E7D32" : "#8D6E00",
-                }}
-              >
-                {recipeNotice.text}
-              </div>
-            )}
-            <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-              {userRecipes.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "30px",
-                    color: "#6b7280",
-                    fontSize: "13px",
-                  }}
-                >
-                  No saved recipes yet. Use "Create with Claude" to build your first recipe.
-                </div>
-              ) : (
-                userRecipes.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "10px 12px",
-                      borderBottom: "0.5px solid #e5e7eb",
-                      borderRadius: "6px",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = "#F0F4F8")}
-                    onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <div style={{ flex: 1, cursor: "pointer" }} onClick={() => portion.open(r)}>
-                      <div style={{ fontWeight: "bold", fontSize: "13px", color: "#185FA5" }}>
-                        {r.name}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#6b7280" }}>{r.description}</div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        marginLeft: "12px",
-                      }}
-                    >
-                      <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                        <div style={{ fontSize: "12px", color: "#378ADD", fontWeight: "bold" }}>
-                          {r.nutrition?.kcal} kcal
-                        </div>
-                        {r.portion_g != null && (
-                          <div style={{ fontSize: "11px", color: "#6b7280" }}>
-                            {r.portion_g} g{isEstimatedWeight(r) ? " (est.)" : ""}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          builder.openEditor(r);
-                        }}
-                        title="Edit recipe"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#378ADD",
-                          cursor: "pointer",
-                          fontSize: "11px",
-                          padding: "0 3px",
-                        }}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRecipeModal(r);
-                        }}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#378ADD",
-                          cursor: "pointer",
-                          fontSize: "11px",
-                          padding: "0 3px",
-                        }}
-                      >
-                        👁
-                      </button>
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          // Recipes built on this one (directly or indirectly) go too — they can't be worked out without it
-                          const deps = findDependentsDeep(r, userRecipes);
-                          if (
-                            !confirm(
-                              deps.length
-                                ? `Delete "${r.name}"?\n\nThis also deletes ${deps.length} recipe${deps.length === 1 ? "" : "s"} that use${deps.length === 1 ? "s" : ""} it:\n• ${deps.map((d) => d.name).join("\n• ")}\n\nFood already logged isn't affected.`
-                                : `Delete "${r.name}"?`,
-                            )
-                          )
-                            return;
-                          const gone = [r, ...deps];
-                          for (const x of gone) await deleteRecipe(userId, x.id);
-                          const ids = new Set(gone.map((x) => x.id));
-                          setUserRecipes((prev) => prev.filter((ur) => !ids.has(ur.id)));
-                          setRecipeNotice(
-                            deps.length
-                              ? {
-                                  ok: true,
-                                  text: `Deleted ${r.name} and ${deps.length} recipe${deps.length === 1 ? "" : "s"} that used it: ${deps.map((d) => d.name).join(", ")}`,
-                                }
-                              : null,
-                          );
-                        }}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#c62828",
-                          cursor: "pointer",
-                          fontSize: "11px",
-                          opacity: 0.5,
-                          padding: "0 3px",
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+      {saved.open && (
+        <SavedRecipesModal
+          saved={saved}
+          recipes={userRecipes}
+          on={{ pick: portion.open, edit: builder.openEditor, view: setRecipeModal }}
+        />
       )}
 
       {/* ── Recipe Portion Modal ── */}

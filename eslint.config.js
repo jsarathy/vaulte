@@ -67,6 +67,9 @@ export const CLEAN_FILES = [
   "src/api/foodLookup.js",
   "src/hooks/useFoodLookup.js",
   "src/components/FoodLookupModal.jsx",
+  "src/lib/savedRecipes.js",
+  "src/hooks/useSavedRecipes.js",
+  "src/components/SavedRecipesModal.jsx",
 ];
 
 const unused = [
