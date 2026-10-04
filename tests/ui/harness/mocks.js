@@ -16,7 +16,11 @@ export const setDoc = async (ref, data, opts) => {
   const saved = { path: ref.path, data: JSON.parse(JSON.stringify(data)) };
   window.__setDocs.push(opts?.merge ? { ...saved, merge: true } : saved);
 };
-export const deleteDoc = async () => {};
+// deleteDoc: paths recorded in window.__deletedDocs; window.__failDeleteDoc makes it throw
+export const deleteDoc = async (ref) => {
+  if (window.__failDeleteDoc) throw new Error("Mock deleteDoc failure");
+  (window.__deletedDocs ||= []).push(ref.path);
+};
 // reads can be slowed per path (window.__getDocDelays) or made to fail (window.__failGetDoc)
 export const getDoc = async (ref) => {
   (window.__getDocPaths ||= []).push(ref.path);
@@ -26,14 +30,18 @@ export const getDoc = async (ref) => {
   const d = window.__docs[ref.path];
   return { exists: () => d !== undefined, data: () => d ?? null };
 };
-// getDocs: window.__polarDocs (Polar sessions) when a test sets it; __polarDelay / __failGetDocs
-export const getDocs = async () => {
+// getDocs: window.__collections[path] (e.g. "users/u/weight_log") when a test sets it, else
+// window.__polarDocs (Polar sessions); __polarDelay / __failGetDocs
+export const getDocs = async (ref) => {
   await new Promise((res) => setTimeout(res, window.__polarDelay || 0));
   if (window.__failGetDocs) throw new Error("Mock getDocs failure");
-  const docs = (window.__polarDocs || []).map((d) => ({ id: d.id, data: () => d }));
+  const own = window.__collections?.[ref?.path];
+  const rows = own ?? (window.__polarDocs || []);
+  // a collection's rows are stored as { id, ...fields }; data() gives the fields only
+  const docs = rows.map(({ id, ...rest }) => ({ id, data: () => (own ? rest : { id, ...rest }) }));
   return { forEach: (f) => docs.forEach(f), docs, empty: docs.length === 0 };
 };
-export const collection = () => ({});
+export const collection = (...a) => ({ path: a.slice(1).join("/") });
 export const orderBy = () => ({});
 export const query = () => ({});
 export const where = () => ({});
