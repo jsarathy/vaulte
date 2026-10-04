@@ -15,7 +15,6 @@ import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "
 import { claudeParseFood, claudeChat } from "./api/claude";
 import { backfillPortionWeights } from "./api/recipeWeights";
 import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
-import { medsForDate, hasText } from "./constants/meds";
 
 import RecipeModal from "./components/RecipeModal";
 import ChatPopup from "./components/ChatPopup";
@@ -25,132 +24,7 @@ import AddEntry from "./tabs/AddEntry";
 import WeightTracker from "./tabs/WeightTracker";
 import BodyTracker from "./tabs/BodyTracker";
 import MonthlyTargetsCard from "./components/MonthlyTargetsCard";
-
-// ── Meds panel (Daily log sidebar) ───────────────────────────────────────────
-// Reads and writes the SAME routine_log/{date} documents as RoutineTracker,
-// so anything logged here shows up in the weekly routine grid and vice versa.
-function MedsPanel({ userId, date }) {
-  const [entries, setEntries] = useState({});
-  const [busy, setBusy] = useState(true);
-  const entriesRef = useRef({});
-
-  useEffect(() => {
-    entriesRef.current = entries;
-  }, [entries]);
-
-  useEffect(() => {
-    if (!userId || !date) return;
-    let cancelled = false;
-    setBusy(true);
-    getDoc(doc(db, "users", userId, "routine_log", date))
-      .then((snap) => {
-        if (!cancelled) setEntries(snap.exists() ? snap.data().entries || {} : {});
-      })
-      .catch((e) => console.error("Meds load error:", e))
-      .finally(() => {
-        if (!cancelled) setBusy(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, date]);
-
-  const persist = async () => {
-    try {
-      // Merge, never replace: the routine tasks live in the same document.
-      await setDoc(
-        doc(db, "users", userId, "routine_log", date),
-        { entries: entriesRef.current, date, updatedAt: new Date().toISOString() },
-        { merge: true },
-      );
-    } catch (e) {
-      console.error("Meds save error:", e);
-    }
-  };
-
-  const applicable = medsForDate(date);
-  const doneCount = applicable.filter((t) => hasText(entries[t.id])).length;
-
-  return (
-    <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "10px 12px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: "6px",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "11px",
-            fontWeight: "600",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            color: C.muted,
-          }}
-        >
-          Meds
-        </span>
-        <span
-          style={{
-            fontSize: "12px",
-            fontFamily: FONT.mono,
-            color: doneCount === applicable.length ? "#2E7D32" : C.hint,
-          }}
-        >
-          {doneCount}/{applicable.length}
-        </span>
-      </div>
-      {busy ? (
-        <div style={{ fontSize: "12px", color: C.hint }}>Loading…</div>
-      ) : (
-        applicable.map((t) => {
-          const val = entries[t.id]?.text || "";
-          const filled = hasText(entries[t.id]);
-          return (
-            <div key={t.id} style={{ marginBottom: "7px" }}>
-              <div
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
-              >
-                <span
-                  style={{ fontSize: "12px", color: filled ? C.text : C.hint, lineHeight: "1.35" }}
-                >
-                  {t.name}
-                </span>
-                {t.time && (
-                  <span style={{ fontSize: "10px", fontFamily: FONT.mono, color: C.hint }}>
-                    {t.time}
-                  </span>
-                )}
-              </div>
-              <input
-                value={val}
-                placeholder="—"
-                onChange={(e) =>
-                  setEntries((prev) => ({ ...prev, [t.id]: { text: e.target.value } }))
-                }
-                onBlur={persist}
-                style={{
-                  width: "100%",
-                  padding: "5px 7px",
-                  marginTop: "3px",
-                  fontSize: "13px",
-                  fontFamily: FONT.sans,
-                  border: `0.5px solid ${filled ? "#2E7D32" : C.border}`,
-                  borderRadius: "4px",
-                  background: filled ? "#F1F8F2" : C.bg,
-                  color: C.text,
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
+import MedsPanel from "./components/MedsPanel";
 
 // ── Weight Entry Modal ───────────────────────────────────────────────────────
 function WeightEntryModal({ entry, setEntry, onSave, onDelete }) {

@@ -91,6 +91,10 @@ export const CLEAN_FILES = [
   "src/components/PolarCard.jsx",
   "src/hooks/useAddEntry.js",
   "src/tabs/AddEntry.jsx",
+  "src/lib/medsLog.js",
+  "src/api/medsLog.js",
+  "src/hooks/useMeds.js",
+  "src/components/MedsPanel.jsx",
 ];
 
 const unused = [
