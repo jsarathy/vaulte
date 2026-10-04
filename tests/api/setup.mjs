@@ -28,7 +28,8 @@ export function res() {
   return r;
 }
 
-// Wipe all emulator data between tests.
+// Wipe all emulator data between tests. The emulator is shared, so test files
+// run one at a time (--test-concurrency=1 in test:api:run).
 export async function clearFirestore() {
   const url = `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`;
   const r = await fetch(url, { method: "DELETE" });
