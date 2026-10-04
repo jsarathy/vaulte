@@ -191,7 +191,7 @@ test("polar log box: meal slot and logging", async ({ page: p }) => {
   // Failure: message with the reason; the button works again
   await ev(() => {
     window.__failSaveDay = true;
-    window.__saveDayDelay = 300;
+    window.__saveDayDelay = 1200; // long enough to check the busy state on a busy machine
   });
   await logBtn.click();
   await expect(logBtn).toHaveText("Logging…");

@@ -91,10 +91,19 @@ export const deleteRecipe = async (_u, id) => {
 };
 
 // ── src/api/claude.js ────────────────────────────────────────────────────────
-export const claudeParseFood = async () => [];
-// claudeChat: calls recorded in window.__chatCalls; replies window.__chatReply
-export const claudeChat = async (history) => {
+// claudeParseFood: calls in window.__parseCalls; replies window.__parseReply; __failParse throws
+export const claudeParseFood = async (text) => {
+  (window.__parseCalls ||= []).push(text);
+  if (window.__failParse) throw new Error("Mock parse failure");
+  return JSON.parse(JSON.stringify(window.__parseReply || []));
+};
+// claudeChat: calls recorded in window.__chatCalls (recipes in __chatRecipes); replies
+// window.__chatReply after __chatDelay ms; __failChat throws
+export const claudeChat = async (history, recipes) => {
   (window.__chatCalls ||= []).push(JSON.parse(JSON.stringify(history)));
+  (window.__chatRecipes ||= []).push((recipes || []).map((r) => r.name));
+  if (window.__chatDelay) await new Promise((res) => setTimeout(res, window.__chatDelay));
+  if (window.__failChat) throw new Error("Mock chat failure");
   return window.__chatReply ?? "";
 };
 window.__recalc = [];
