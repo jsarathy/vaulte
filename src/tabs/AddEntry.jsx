@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { genId, makeMeals, DEFAULT_MEAL_SLOTS, ensureMealSlots } from "../constants/helpers";
 import { EXERCISE_COMPENDIUM } from "../constants/exercises";
 import { loadDay, saveRecipe, deleteRecipe } from "../api/firestore";
-import { claudeCreateRecipe, claudeScaleRecipeNutrition } from "../api/claude";
+import { claudeCreateRecipe } from "../api/claude";
 import {
   computeRecipeFields,
   hasPortionWeight,
@@ -19,6 +19,8 @@ import {
 import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUtils";
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
+import RecipePortionModal from "../components/RecipePortionModal";
+import { useRecipePortion } from "../hooks/useRecipePortion";
 import { db } from "../firebase";
 import { getDocs, collection, orderBy, query } from "firebase/firestore";
 
@@ -186,25 +188,17 @@ export default function AddEntry({
     const hit = userRecipes.find((r) => normName(r.name) === q);
     return hit && hasUsableMacros(hit) ? hit : null;
   };
+  // Recipe portion box — lets user scale macros before adding a saved recipe
+  const portion = useRecipePortion();
   const openPortionModal = (recipe) => {
     setShowDropdown(false);
-    recipePortionModalRef.current = { recipe }; // set now so the pending blur timer sees it
-    setRecipePortionModal({ recipe });
-    setRecipePortionQty("1");
-    setRecipePortionUnit("portion");
-    setRecipePortionScaled(null);
-    setRecipePortionError("");
+    portion.open(recipe);
   };
-
-  // Recipe portion modal — lets user scale macros before adding a saved recipe
-  const [recipePortionModal, setRecipePortionModal] = useState(null); // { recipe }
-  const recipePortionModalRef = useRef(null);
-  recipePortionModalRef.current = recipePortionModal; // live value for the name-box blur timer
-  const [recipePortionQty, setRecipePortionQty] = useState("1");
-  const [recipePortionUnit, setRecipePortionUnit] = useState("portion");
-  const [recipePortionScaled, setRecipePortionScaled] = useState(null);
-  const [recipePortionLoading, setRecipePortionLoading] = useState(false);
-  const [recipePortionError, setRecipePortionError] = useState("");
+  const loadPortion = (item) => {
+    setAddItem(item);
+    portion.close();
+    setShowRecipesModal(false);
+  };
 
   const [nameDropdown, setNameDropdown] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -465,7 +459,7 @@ Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal
                 setTimeout(() => {
                   setShowDropdown(false);
                   // Skip if a box is already open — incl. a recipe just picked from the dropdown
-                  if (qtyModalRef.current || recipePortionModalRef.current) return;
+                  if (qtyModalRef.current || portion.isOpenRef.current) return;
                   const name = addItem.name.trim();
                   if (!name) return;
                   // If already has nutrition (filled from recipe dropdown), skip
@@ -2921,16 +2915,7 @@ Use realistic values. For portions use a typical serving size.`;
                     onMouseOver={(e) => (e.currentTarget.style.background = "#F0F4F8")}
                     onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                   >
-                    <div
-                      style={{ flex: 1, cursor: "pointer" }}
-                      onClick={() => {
-                        setRecipePortionModal({ recipe: r });
-                        setRecipePortionQty("1");
-                        setRecipePortionUnit("portion");
-                        setRecipePortionScaled(null);
-                        setRecipePortionError("");
-                      }}
-                    >
+                    <div style={{ flex: 1, cursor: "pointer" }} onClick={() => portion.open(r)}>
                       <div style={{ fontWeight: "bold", fontSize: "13px", color: "#185FA5" }}>
                         {r.name}
                       </div>
@@ -3035,420 +3020,7 @@ Use realistic values. For portions use a typical serving size.`;
       )}
 
       {/* ── Recipe Portion Modal ── */}
-      {recipePortionModal &&
-        (() => {
-          const r = recipePortionModal.recipe;
-          const base = r.nutrition || {};
-          const qty = parseFloat(recipePortionQty) || 1;
-          const isPortion = recipePortionUnit === "portion";
-
-          const portionG = parseFloat(r.portion_g) > 0 ? parseFloat(r.portion_g) : null;
-          const GRAMS_PER_UNIT = { g: 1, oz: 28.3495 };
-          // Scaled locally (no API call): portions always; g / oz when the recipe has a Wt/portion
-          const localFactor = isPortion
-            ? qty
-            : portionG && GRAMS_PER_UNIT[recipePortionUnit]
-              ? (qty * GRAMS_PER_UNIT[recipePortionUnit]) / portionG
-              : null;
-          const isLocal = localFactor != null;
-          const liveScaled = isLocal
-            ? Object.fromEntries(
-                ["kcal", "fat", "sat_fat", "carbs", "sugar", "fibre", "net_carbs", "protein"].map(
-                  (k) => [k, +((Number(base[k]) || 0) * localFactor).toFixed(1)],
-                ),
-              )
-            : recipePortionScaled;
-
-          const macroDisplay = liveScaled || base;
-          const macroLabel = liveScaled
-            ? `${qty} ${isPortion ? `portion${qty !== 1 ? "s" : ""}` : recipePortionUnit} of`
-            : "Per serving of";
-
-          const loadItem = (macros, label) => {
-            const suffix = label || `(${qty} ${recipePortionUnit})`;
-            setAddItem({
-              name: `${r.name} ${suffix}`,
-              kcal: macros.kcal ?? "",
-              fat: macros.fat ?? "",
-              sat_fat: macros.sat_fat ?? "",
-              carbs: macros.carbs ?? "",
-              sugar: macros.sugar ?? "",
-              fibre: macros.fibre ?? "",
-              net_carbs: macros.net_carbs ?? "",
-              protein: macros.protein ?? "",
-            });
-            setRecipePortionModal(null);
-            setShowRecipesModal(false);
-          };
-
-          return (
-            <div
-              onClick={(e) => e.target === e.currentTarget && setRecipePortionModal(null)}
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.55)",
-                zIndex: 4000,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                style={{
-                  background: "#fff",
-                  borderRadius: "12px",
-                  width: "440px",
-                  maxWidth: "95vw",
-                  boxShadow: "0 8px 40px rgba(0,0,0,0.3)",
-                  fontFamily: FONT.sans,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Header */}
-                <div
-                  style={{
-                    background: "#185FA5",
-                    color: "#fff",
-                    padding: "14px 18px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: "bold", fontSize: "14px" }}>{r.name}</div>
-                    <div style={{ fontSize: "11px", opacity: 0.8, marginTop: "2px" }}>
-                      {r.servings
-                        ? `Recipe makes ${r.servings} servings`
-                        : "Adjust quantity before adding"}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setRecipePortionModal(null)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#fff",
-                      fontSize: "22px",
-                      cursor: "pointer",
-                      lineHeight: 1,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div style={{ padding: "20px" }}>
-                  {/* Base nutrition reference */}
-                  <div
-                    style={{
-                      background: "#F0F4F8",
-                      borderRadius: "8px",
-                      padding: "10px 12px",
-                      marginBottom: "18px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.4px",
-                        marginBottom: "7px",
-                      }}
-                    >
-                      Per serving (base)
-                      {portionG ? ` · ${portionG} g${isEstimatedWeight(r) ? " (est.)" : ""}` : ""}
-                    </div>
-                    <div
-                      style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "4px" }}
-                    >
-                      {[
-                        ["kcal", "Kcal"],
-                        ["protein", "Prot"],
-                        ["carbs", "Carbs"],
-                        ["fat", "Fat"],
-                      ].map(([k, l]) => (
-                        <div
-                          key={k}
-                          style={{
-                            textAlign: "center",
-                            background: "#fff",
-                            borderRadius: "6px",
-                            padding: "5px 2px",
-                            border: "0.5px solid #e5e7eb",
-                          }}
-                        >
-                          <div style={{ fontWeight: "bold", color: "#185FA5", fontSize: "13px" }}>
-                            {base[k] ?? "—"}
-                          </div>
-                          <div style={{ fontSize: "9px", color: "#6b7280" }}>{l}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quantity + unit */}
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: "500",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.4px",
-                      color: "#6b7280",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    How much?
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={recipePortionQty}
-                      onChange={(e) => {
-                        setRecipePortionQty(e.target.value);
-                        setRecipePortionScaled(null); // clear any Claude result when qty changes
-                        setRecipePortionError("");
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: "10px",
-                        border: `1.5px solid ${C.blue}`,
-                        borderRadius: "6px",
-                        fontSize: "18px",
-                        fontFamily: FONT.mono,
-                        fontWeight: "500",
-                        outline: "none",
-                        textAlign: "center",
-                      }}
-                    />
-                    <select
-                      value={recipePortionUnit}
-                      onChange={(e) => {
-                        setRecipePortionUnit(e.target.value);
-                        setRecipePortionScaled(null);
-                        setRecipePortionError("");
-                      }}
-                      style={{
-                        flex: 1.4,
-                        padding: "10px 8px",
-                        border: `0.5px solid ${C.borderMid}`,
-                        borderRadius: "6px",
-                        fontSize: "13px",
-                        fontFamily: FONT.sans,
-                        outline: "none",
-                        background: "#fff",
-                      }}
-                    >
-                      <option value="portion">portion(s)</option>
-                      <option value="g">grams (g)</option>
-                      <option value="ml">millilitres (ml)</option>
-                      <option value="oz">ounces (oz)</option>
-                    </select>
-                  </div>
-                  {!isPortion && !isLocal && (
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "#8D6E00",
-                        background: "#FFF8E1",
-                        border: "1px solid #FFE082",
-                        borderRadius: "6px",
-                        padding: "6px 10px",
-                        marginTop: "-8px",
-                        marginBottom: "14px",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {recipePortionUnit === "ml"
-                        ? "Millilitres are worked out by Claude."
-                        : "This recipe has no Wt/portion, so Claude will estimate the portion weight."}{" "}
-                      Add a Wt/portion with ✏️ in Saved Recipes for instant results in g / oz.
-                    </div>
-                  )}
-
-                  {/* Scaled macro preview */}
-                  {(liveScaled || recipePortionScaled) && (
-                    <div
-                      style={{
-                        background: "#E8F5E9",
-                        borderRadius: "8px",
-                        padding: "10px 12px",
-                        marginBottom: "16px",
-                        border: "0.5px solid #A5D6A7",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "10px",
-                          color: "#2E7D32",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.4px",
-                          marginBottom: "7px",
-                          fontWeight: "500",
-                        }}
-                      >
-                        ✓ {macroLabel} {r.name}
-                      </div>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(4,1fr)",
-                          gap: "4px",
-                        }}
-                      >
-                        {[
-                          ["kcal", "Kcal"],
-                          ["protein", "Prot"],
-                          ["carbs", "Carbs"],
-                          ["fat", "Fat"],
-                          ["sat_fat", "Sat F"],
-                          ["sugar", "Sugar"],
-                          ["fibre", "Fibre"],
-                          ["net_carbs", "Net C"],
-                        ].map(([k, l]) => (
-                          <div
-                            key={k}
-                            style={{
-                              textAlign: "center",
-                              background: "#fff",
-                              borderRadius: "6px",
-                              padding: "5px 2px",
-                              border: "0.5px solid #C8E6C9",
-                            }}
-                          >
-                            <div style={{ fontWeight: "bold", color: "#2E7D32", fontSize: "13px" }}>
-                              {macroDisplay[k] ?? "—"}
-                            </div>
-                            <div style={{ fontSize: "9px", color: "#6b7280" }}>{l}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {recipePortionError && (
-                    <div style={{ fontSize: "12px", color: "#c62828", marginBottom: "12px" }}>
-                      {recipePortionError}
-                    </div>
-                  )}
-                  {recipePortionLoading && (
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#6b7280",
-                        marginBottom: "12px",
-                        textAlign: "center",
-                      }}
-                    >
-                      Calculating nutrition…
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                    <button
-                      onClick={() => setRecipePortionModal(null)}
-                      style={{
-                        background: "transparent",
-                        border: `0.5px solid ${C.borderMid}`,
-                        color: "#6b7280",
-                        borderRadius: "6px",
-                        padding: "9px 16px",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontFamily: FONT.sans,
-                      }}
-                    >
-                      Cancel
-                    </button>
-
-                    {/* For non-portion units: "Calculate" first, then "Add" */}
-                    {!isLocal && !recipePortionScaled && (
-                      <button
-                        disabled={recipePortionLoading}
-                        onClick={async () => {
-                          const qtyNum = parseFloat(recipePortionQty) || 1;
-                          setRecipePortionLoading(true);
-                          setRecipePortionError("");
-                          try {
-                            const n = await claudeScaleRecipeNutrition(
-                              r,
-                              qtyNum,
-                              recipePortionUnit,
-                            );
-                            setRecipePortionScaled(
-                              Object.fromEntries(
-                                [
-                                  "kcal",
-                                  "fat",
-                                  "sat_fat",
-                                  "carbs",
-                                  "sugar",
-                                  "fibre",
-                                  "net_carbs",
-                                  "protein",
-                                ].map((k) => [k, +(Number(n[k]) || 0).toFixed(1)]),
-                              ),
-                            );
-                          } catch (err) {
-                            setRecipePortionError(
-                              `Could not calculate (${err.message || "unknown error"}) — try portions, or add a Wt/portion to the recipe.`,
-                            );
-                          } finally {
-                            setRecipePortionLoading(false);
-                          }
-                        }}
-                        style={{
-                          background: recipePortionLoading ? C.hint : "#378ADD",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: "6px",
-                          padding: "9px 18px",
-                          cursor: recipePortionLoading ? "not-allowed" : "pointer",
-                          fontSize: "12px",
-                          fontWeight: "500",
-                          fontFamily: FONT.sans,
-                        }}
-                      >
-                        {recipePortionLoading ? "…" : "Calculate"}
-                      </button>
-                    )}
-
-                    {/* Add button — always shown for portions (live calc), shown after Calculate for g/ml */}
-                    {(isLocal || recipePortionScaled) && (
-                      <button
-                        onClick={() => {
-                          const macros = liveScaled;
-                          const unitLabel = isPortion
-                            ? `(${qty} portion${qty !== 1 ? "s" : ""})`
-                            : `(${qty}${recipePortionUnit})`;
-                          loadItem(macros, unitLabel);
-                        }}
-                        style={{
-                          background: "#2E7D32",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: "6px",
-                          padding: "9px 20px",
-                          cursor: "pointer",
-                          fontSize: "13px",
-                          fontWeight: "500",
-                          fontFamily: FONT.sans,
-                        }}
-                      >
-                        ✓ Load into Form
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+      {portion.recipe && <RecipePortionModal box={portion} onLoad={loadPortion} />}
 
       {/* ── Exercise Picker Modal ── */}
       {showExModal && (

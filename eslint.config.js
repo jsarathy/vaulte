@@ -54,6 +54,9 @@ export const CLEAN_FILES = [
   "src/api/recipeWeights.js",
   "src/constants/helpers.js",
   "src/constants/recipeLinks.js",
+  "src/lib/recipePortion.js",
+  "src/hooks/useRecipePortion.js",
+  "src/components/RecipePortionModal.jsx",
 ];
 
 const unused = [
