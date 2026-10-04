@@ -26,7 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm test
+      - name: Unit tests with coverage report (report only — no minimum yet)
+        run: npm run test:coverage
   ui:
     name: UI tests
     runs-on: ubuntu-latest
