@@ -13,12 +13,12 @@ const firebaseConfig = {
   projectId: "vaulte-1ea20",
   storageBucket: "vaulte-1ea20.firebasestorage.app",
   messagingSenderId: "597290506759",
-  appId: "1:597290506759:web:a5165ff8a43627f52be8a2"
+  appId: "1:597290506759:web:a5165ff8a43627f52be8a2",
 };
 
-const app    = initializeApp(firebaseConfig);
-export const auth    = getAuth(app);
-export const db      = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
 // If photos show 404, explicitly set your bucket here:
 // export const storage = getStorage(app, "vaulte-1ea20.firebasestorage.app");
 export const storage = getStorage(app);

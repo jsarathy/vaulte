@@ -9,15 +9,27 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 // Fix 24 standards (see claude/Code_Quality_Report.md)
 export const QUALITY = {
-  "max-lines-per-function": ["warn", { max: 80, skipBlankLines: true, skipComments: true, IIFEs: true }],
-  "complexity": ["warn", 15],
+  "max-lines-per-function": [
+    "warn",
+    { max: 80, skipBlankLines: true, skipComments: true, IIFEs: true },
+  ],
+  complexity: ["warn", 15],
   "max-depth": ["warn", 4],
   "max-lines": ["warn", { max: 500, skipBlankLines: true, skipComments: true }],
   "max-params": ["warn", 5],
   "max-statements-per-line": ["warn", { max: 3 }], // catches whole functions packed onto one line
 };
 
-const unused = ["error", { args: "after-used", ignoreRestSiblings: true, varsIgnorePattern: "^_", argsIgnorePattern: "^_", caughtErrors: "none" }];
+const unused = [
+  "error",
+  {
+    args: "after-used",
+    ignoreRestSiblings: true,
+    varsIgnorePattern: "^_",
+    argsIgnorePattern: "^_",
+    caughtErrors: "none",
+  },
+];
 
 export default [
   { ignores: ["dist/**", "node_modules/**", "Claude outputs/**", "docs/**"] },
@@ -25,7 +37,9 @@ export default [
   {
     files: ["src/**/*.{js,jsx}"],
     languageOptions: {
-      ecmaVersion: "latest", sourceType: "module", globals: globals.browser,
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     settings: { react: { version: "18.2" } },
@@ -33,7 +47,7 @@ export default [
     rules: {
       ...react.configs.recommended.rules,
       ...react.configs["jsx-runtime"].rules,
-      "react/prop-types": "off",            // no PropTypes in this codebase
+      "react/prop-types": "off", // no PropTypes in this codebase
       "react/no-unescaped-entities": "off", // apostrophes in UI copy are fine
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
@@ -45,14 +59,22 @@ export default [
     // UI tests: Node test code that also runs callbacks in the browser (page.evaluate)
     files: ["tests/ui/**/*.{js,jsx,mjs}"],
     languageOptions: {
-      ecmaVersion: "latest", sourceType: "module", globals: { ...globals.browser, ...globals.node },
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.browser, ...globals.node },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     plugins: { react },
     rules: { "react/jsx-uses-vars": "error", "no-unused-vars": unused },
   },
   {
-    files: ["api/**/*.js", "scripts/**/*.mjs", "tests/*.mjs", "tests/api/**/*.mjs", "*.config.{js,mjs}"],
+    files: [
+      "api/**/*.js",
+      "scripts/**/*.mjs",
+      "tests/*.mjs",
+      "tests/api/**/*.mjs",
+      "*.config.{js,mjs}",
+    ],
     languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: globals.node },
     rules: { "no-unused-vars": unused, ...QUALITY },
   },

@@ -7,11 +7,16 @@
 //                    and is never overwritten.
 import { saveRecipe } from "./firestore";
 import { claudeEstimatePortionWeight, claudeRecalculateNutrition } from "./claude";
-import { splitIngredients, combineNutrition, relinkDependent, applyLinkDelta } from "../constants/recipeLinks";
+import {
+  splitIngredients,
+  combineNutrition,
+  relinkDependent,
+  applyLinkDelta,
+} from "../constants/recipeLinks";
 
-export const hasPortionWeight = r => Number(r?.portion_g) > 0;
-export const isEstimatedWeight = r => hasPortionWeight(r) && r.portion_g_source === "estimated";
-const contentKey = r => JSON.stringify([Number(r?.servings) || 0, r?.ingredients || []]);
+export const hasPortionWeight = (r) => Number(r?.portion_g) > 0;
+export const isEstimatedWeight = (r) => hasPortionWeight(r) && r.portion_g_source === "estimated";
+const contentKey = (r) => JSON.stringify([Number(r?.servings) || 0, r?.ingredients || []]);
 
 // Fields to merge into a recipe, or null if the estimate fails / is unusable.
 // Saved recipes used as ingredients count at their own weight; Claude only
@@ -24,11 +29,23 @@ export async function estimatePortionWeight(recipe, recipes = []) {
       ({ portion_g } = await claudeEstimatePortionWeight(recipe));
     } else {
       // Linked recipes with no known weight are weighed by Claude with the rest
-      const known = linked.filter(l => l.grams != null);
-      const toWeigh = [...other, ...linked.filter(l => l.grams == null).map(l => l.ing)];
-      const rest = toWeigh.length ? Number((await claudeEstimatePortionWeight({ name: recipe.name, servings: 1, ingredients: toWeigh })).total_g) : 0;
+      const known = linked.filter((l) => l.grams != null);
+      const toWeigh = [...other, ...linked.filter((l) => l.grams == null).map((l) => l.ing)];
+      const rest = toWeigh.length
+        ? Number(
+            (
+              await claudeEstimatePortionWeight({
+                name: recipe.name,
+                servings: 1,
+                ingredients: toWeigh,
+              })
+            ).total_g,
+          )
+        : 0;
       if (!Number.isFinite(rest)) return null;
-      portion_g = (known.reduce((t, l) => t + l.grams, 0) + rest) / (Number(recipe.servings) > 0 ? Number(recipe.servings) : 1);
+      portion_g =
+        (known.reduce((t, l) => t + l.grams, 0) + rest) /
+        (Number(recipe.servings) > 0 ? Number(recipe.servings) : 1);
     }
     const g = Math.round(Number(portion_g));
     return g > 0 ? { portion_g: g, portion_g_source: "estimated" } : null;
@@ -47,7 +64,9 @@ export async function computeRecipeFields(recipe, recipes = [], { keepWeight = f
   if (!linked.length) {
     nutrition = await claudeRecalculateNutrition(recipe);
   } else {
-    const otherTotal = other.length ? await claudeRecalculateNutrition({ servings: 1, ingredients: other }) : null;
+    const otherTotal = other.length
+      ? await claudeRecalculateNutrition({ servings: 1, ingredients: other })
+      : null;
     nutrition = combineNutrition(linked, otherTotal, recipe.servings);
   }
   const weight = keepWeight ? null : await estimatePortionWeight(recipe, recipes);
@@ -59,14 +78,23 @@ export async function computeRecipeFields(recipe, recipes = [], { keepWeight = f
 // A's contribution where both old and new links are usable (no Claude call);
 // otherwise recalculates the recipe in full. Each recipe is saved as it's done.
 // recipesNew: the recipe list including newA. Returns { list, updated: [names] }.
-export async function propagateRecipeChange(uid, oldA, newA, recipesNew, setUserRecipes, path = new Set()) {
+export async function propagateRecipeChange(
+  uid,
+  oldA,
+  newA,
+  recipesNew,
+  setUserRecipes,
+  path = new Set(),
+) {
   const onPath = new Set(path).add(newA.id);
   let list = recipesNew;
-  const recipesOld = oldA ? list.map(r => r.id === newA.id ? oldA : r) : list.filter(r => r.id !== newA.id);
+  const recipesOld = oldA
+    ? list.map((r) => (r.id === newA.id ? oldA : r))
+    : list.filter((r) => r.id !== newA.id);
   const updated = [];
-  for (const id of list.map(r => r.id)) {
-    if (onPath.has(id)) continue;                       // never itself, no cycles
-    const B = list.find(r => r.id === id);              // latest copy (may have been updated deeper down)
+  for (const id of list.map((r) => r.id)) {
+    if (onPath.has(id)) continue; // never itself, no cycles
+    const B = list.find((r) => r.id === id); // latest copy (may have been updated deeper down)
     const { ingredients, rows, deltaOk } = relinkDependent(B, oldA, newA, recipesOld, list);
     if (!rows.length) continue;
     const keepWeight = hasPortionWeight(B) && !isEstimatedWeight(B);
@@ -80,11 +108,12 @@ export async function propagateRecipeChange(uid, oldA, newA, recipesNew, setUser
     }
     const B2 = { ...B1, ...fields };
     await saveRecipe(uid, B2);
-    list = list.map(r => r.id === B2.id ? B2 : r);
-    setUserRecipes(prev => prev.map(r => r.id === B2.id ? B2 : r));
+    list = list.map((r) => (r.id === B2.id ? B2 : r));
+    setUserRecipes((prev) => prev.map((r) => (r.id === B2.id ? B2 : r)));
     updated.push(B2.name);
     const deeper = await propagateRecipeChange(uid, B, B2, list, setUserRecipes, onPath);
-    list = deeper.list; updated.push(...deeper.updated);
+    list = deeper.list;
+    updated.push(...deeper.updated);
   }
   return { list, updated };
 }
@@ -97,17 +126,24 @@ export async function backfillPortionWeights(uid, getRecipes, setUserRecipes) {
   if (running) return;
   running = true;
   try {
-    for (const r of getRecipes().filter(x => !hasPortionWeight(x))) {
+    for (const r of getRecipes().filter((x) => !hasPortionWeight(x))) {
       const w = await estimatePortionWeight(r, getRecipes());
       if (!w) continue;
-      const latest = getRecipes().find(x => x.id === r.id);
+      const latest = getRecipes().find((x) => x.id === r.id);
       if (!latest || hasPortionWeight(latest) || contentKey(latest) !== contentKey(r)) continue;
       const updated = { ...latest, ...w };
       await saveRecipe(uid, updated);
-      setUserRecipes(prev => prev.map(x => x.id === updated.id && !hasPortionWeight(x) ? updated : x));
+      setUserRecipes((prev) =>
+        prev.map((x) => (x.id === updated.id && !hasPortionWeight(x) ? updated : x)),
+      );
       // Recipes built on this one may now link properly (grams need a Wt/portion)
-      await propagateRecipeChange(uid, latest, updated, getRecipes().map(x => x.id === updated.id ? updated : x), setUserRecipes)
-        .catch(e => console.error("dependent recipe update failed", e));
+      await propagateRecipeChange(
+        uid,
+        latest,
+        updated,
+        getRecipes().map((x) => (x.id === updated.id ? updated : x)),
+        setUserRecipes,
+      ).catch((e) => console.error("dependent recipe update failed", e));
     }
   } catch (e) {
     console.error("portion weight backfill failed", e);

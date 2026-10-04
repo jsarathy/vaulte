@@ -27,16 +27,30 @@ function compressImage(file) {
       URL.revokeObjectURL(url);
       const MAX = 1200;
       let { width, height } = img;
-      if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+      if (width > MAX) {
+        height = Math.round((height * MAX) / width);
+        width = MAX;
+      }
       const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
+      canvas.width = width;
+      canvas.height = height;
       canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      canvas.toBlob(blob => {
-        if (!blob) { reject(new Error("Canvas compression failed")); return; }
-        resolve(new File([blob], "photo.jpg", { type: "image/jpeg" }));
-      }, "image/jpeg", 0.82);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Canvas compression failed"));
+            return;
+          }
+          resolve(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.82,
+      );
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image load failed"));
+    };
     img.src = url;
   });
 }

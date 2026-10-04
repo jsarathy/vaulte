@@ -25,15 +25,18 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Polar account not connected" });
     }
     const { access_token, polar_user_id } = connDoc.data();
-    const AUTH = { "Authorization": `Bearer ${access_token}`, "Accept": "application/json" };
+    const AUTH = { Authorization: `Bearer ${access_token}`, Accept: "application/json" };
     const POLAR = "https://www.polaraccesslink.com";
 
     // ── Step 1: Create exercise transaction ───────────────────────────────────
     const txRes = await fetch(`${POLAR}/v3/users/${polar_user_id}/exercise-transactions`, {
-      method: "POST", headers: AUTH,
+      method: "POST",
+      headers: AUTH,
     });
     if (txRes.status === 204) {
-      await db.doc(`users/${userId}/polar/connection`).update({ last_sync_at: new Date().toISOString() });
+      await db
+        .doc(`users/${userId}/polar/connection`)
+        .update({ last_sync_at: new Date().toISOString() });
       return res.json({ newSessions: 0, sessions: [] });
     }
     if (!txRes.ok) {
@@ -46,7 +49,7 @@ export default async function handler(req, res) {
     // ── Step 2: List exercises in transaction ─────────────────────────────────
     const listRes = await fetch(
       `${POLAR}/v3/users/${polar_user_id}/exercise-transactions/${transactionId}`,
-      { headers: AUTH }
+      { headers: AUTH },
     );
     if (!listRes.ok) return res.status(502).json({ error: "Failed to list exercises" });
     const listData = await listRes.json();
@@ -69,14 +72,13 @@ export default async function handler(req, res) {
           if (samplesRes.ok) {
             const samplesData = await samplesRes.json();
             const sampleSets = samplesData["samples"] || [];
-            const hrSet = sampleSets.find(s => String(s["sample-type"]) === "0");
+            const hrSet = sampleSets.find((s) => String(s["sample-type"]) === "0");
             if (hrSet?.data) {
-              const raw = hrSet.data.split(",").map(v => parseInt(v.trim(), 10));
+              const raw = hrSet.data.split(",").map((v) => parseInt(v.trim(), 10));
               // Strip leading zeros (pre-start padding) but keep internal zeros → null
-              const firstNonZero = raw.findIndex(v => v > 0);
-              hr_samples = firstNonZero >= 0
-                ? raw.slice(firstNonZero).map(v => v > 0 ? v : null)
-                : null;
+              const firstNonZero = raw.findIndex((v) => v > 0);
+              hr_samples =
+                firstNonZero >= 0 ? raw.slice(firstNonZero).map((v) => (v > 0 ? v : null)) : null;
               recording_rate_s = hrSet["recording-rate"] || 5;
             }
           }
@@ -85,22 +87,22 @@ export default async function handler(req, res) {
         }
 
         sessions.push({
-          id:               String(ex.id),
-          sport:            ex["detailed-sport-info"] || ex.sport || "OTHER",
-          start_time:       ex["start-time"],
-          duration_min:     parseDurationMin(ex.duration),
-          calories:         ex.calories || 0,
-          hr_avg:           ex["heart-rate"]?.average || null,
-          hr_max:           ex["heart-rate"]?.maximum || null,
-          fat_pct:          ex["fat-percentage"] || null,
-          has_route:        ex["has-route"] || false,
-          device:           ex.device || null,
-          hr_samples,         // int[] bpm at recording_rate_s intervals, null if unavailable
-          recording_rate_s,   // seconds between samples, typically 5
-          exercise_url:     url,  // stored so HR can be re-fetched on demand
+          id: String(ex.id),
+          sport: ex["detailed-sport-info"] || ex.sport || "OTHER",
+          start_time: ex["start-time"],
+          duration_min: parseDurationMin(ex.duration),
+          calories: ex.calories || 0,
+          hr_avg: ex["heart-rate"]?.average || null,
+          hr_max: ex["heart-rate"]?.maximum || null,
+          fat_pct: ex["fat-percentage"] || null,
+          has_route: ex["has-route"] || false,
+          device: ex.device || null,
+          hr_samples, // int[] bpm at recording_rate_s intervals, null if unavailable
+          recording_rate_s, // seconds between samples, typically 5
+          exercise_url: url, // stored so HR can be re-fetched on demand
           polar_user_id,
-          fetched_at:       new Date().toISOString(),
-          logged:           false,
+          fetched_at: new Date().toISOString(),
+          logged: false,
         });
       } catch (exErr) {
         console.warn("Failed to fetch exercise:", url, exErr);
@@ -108,10 +110,10 @@ export default async function handler(req, res) {
     }
 
     // ── Step 4: Commit transaction ────────────────────────────────────────────
-    await fetch(
-      `${POLAR}/v3/users/${polar_user_id}/exercise-transactions/${transactionId}`,
-      { method: "PUT", headers: AUTH }
-    );
+    await fetch(`${POLAR}/v3/users/${polar_user_id}/exercise-transactions/${transactionId}`, {
+      method: "PUT",
+      headers: AUTH,
+    });
 
     // ── Step 5: Save to Firestore ─────────────────────────────────────────────
     const batch = db.batch();
@@ -124,7 +126,6 @@ export default async function handler(req, res) {
     await batch.commit();
 
     return res.json({ newSessions: sessions.length, sessions });
-
   } catch (err) {
     console.error("Polar sync error:", err);
     return res.status(500).json({ error: err.message });

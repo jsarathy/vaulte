@@ -9,12 +9,14 @@ export default defineConfig({
   root: here,
   plugins: [react()],
   server: { fs: { allow: [path.resolve(here, "../../..")] } },
-  resolve: { alias: [
-    { find: /^firebase\/firestore$/, replacement: mocks },
-    { find: /^(\.\.?\/)+firebase$/, replacement: mocks },
-    { find: /^(\.\.?\/)+api\/firestore$/, replacement: mocks },
-    { find: /^(\.\.?\/)+api\/claude$/, replacement: mocks },
-    { find: /^\.\/firestore$/, replacement: mocks },
-    { find: /^\.\/claude$/, replacement: mocks },
-  ] },
+  resolve: {
+    alias: [
+      { find: /^firebase\/firestore$/, replacement: mocks },
+      { find: /^(\.\.?\/)+firebase$/, replacement: mocks },
+      { find: /^(\.\.?\/)+api\/firestore$/, replacement: mocks },
+      { find: /^(\.\.?\/)+api\/claude$/, replacement: mocks },
+      { find: /^\.\/firestore$/, replacement: mocks },
+      { find: /^\.\/claude$/, replacement: mocks },
+    ],
+  },
 });

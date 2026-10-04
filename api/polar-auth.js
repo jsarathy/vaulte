@@ -9,7 +9,7 @@ export default function handler(req, res) {
     return res.status(400).json({ error: "Missing userId parameter" });
   }
 
-  const clientId    = process.env.POLAR_CLIENT_ID;
+  const clientId = process.env.POLAR_CLIENT_ID;
   const redirectUri = process.env.POLAR_REDIRECT_URI;
 
   if (!clientId || !redirectUri) {
@@ -21,9 +21,9 @@ export default function handler(req, res) {
 
   const params = new URLSearchParams({
     response_type: "code",
-    client_id:     clientId,
-    redirect_uri:  redirectUri,
-    scope:         "accesslink.read_all",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: "accesslink.read_all",
     state,
   });
 

@@ -29,11 +29,11 @@ export default async function handler(req, res) {
     // FUNCTION_INVOCATION_FAILED) *before* our catch block below ever runs,
     // since it's enforced by the platform rather than raised as a JS error.
     if (Array.isArray(data.content)) {
-      data.content = data.content.map(block => {
+      data.content = data.content.map((block) => {
         if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
           return {
             ...block,
-            content: block.content.map(({ encrypted_content, ...rest }) => rest)
+            content: block.content.map(({ encrypted_content, ...rest }) => rest),
           };
         }
         return block;
