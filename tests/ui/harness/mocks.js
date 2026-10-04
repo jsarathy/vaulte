@@ -11,12 +11,18 @@ export const doc = (...a) => ({ path: a.slice(1).join("/") });
 window.__docs = window.__docs || {};
 window.__setDocs = [];
 window.__failSetDoc = false;
-export const setDoc = async (ref, data) => {
+export const setDoc = async (ref, data, opts) => {
   if (window.__failSetDoc) throw new Error("Mock setDoc failure");
-  window.__setDocs.push({ path: ref.path, data: JSON.parse(JSON.stringify(data)) });
+  const saved = { path: ref.path, data: JSON.parse(JSON.stringify(data)) };
+  window.__setDocs.push(opts?.merge ? { ...saved, merge: true } : saved);
 };
 export const deleteDoc = async () => {};
+// reads can be slowed per path (window.__getDocDelays) or made to fail (window.__failGetDoc)
 export const getDoc = async (ref) => {
+  (window.__getDocPaths ||= []).push(ref.path);
+  const delay = window.__getDocDelays?.[ref.path];
+  if (delay) await new Promise((res) => setTimeout(res, delay));
+  if (window.__failGetDoc) throw new Error("Mock getDoc failure");
   const d = window.__docs[ref.path];
   return { exists: () => d !== undefined, data: () => d ?? null };
 };
@@ -48,8 +54,8 @@ const DAYS = [
   day("2026-10-03", [], "Rest day"), // notes only
   day("2026-10-04", [{ id: "e", name: "Cycling (30 min)", kcal: -250, is_exercise: 1 }]), // exercise only
 ];
-export const loadAllDays = async () => DAYS;
-export const seedInitialData = async () => DAYS;
+export const loadAllDays = async () => window.__days ?? DAYS; // __days: e.g. [] for a new user
+export const seedInitialData = async () => window.__days ?? DAYS;
 export const loadDay = async (_u, d) => DAYS.find((x) => x.date === d) || null;
 export const saveDay = async () => {};
 export const loadAllRecipes = async () => [];
