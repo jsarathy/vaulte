@@ -52,7 +52,7 @@ export default [
     rules: { "react/jsx-uses-vars": "error", "no-unused-vars": unused },
   },
   {
-    files: ["api/**/*.js", "scripts/**/*.mjs", "tests/*.mjs", "*.config.{js,mjs}"],
+    files: ["api/**/*.js", "scripts/**/*.mjs", "tests/*.mjs", "tests/api/**/*.mjs", "*.config.{js,mjs}"],
     languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: globals.node },
     rules: { "no-unused-vars": unused, ...QUALITY },
   },
