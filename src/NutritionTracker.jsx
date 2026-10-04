@@ -1,10 +1,10 @@
 // src/NutritionTracker.jsx
 import { useState, useRef } from "react";
 import { db } from "./firebase";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
-import { genId, makeMeals, getDayTotals, ensureMealSlots } from "./constants/helpers";
+import { doc, setDoc } from "firebase/firestore";
+import { genId, makeMeals } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG } from "./constants/weightPlan";
-import { saveDay, loadDay } from "./api/firestore";
+import { loadDay } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
 import { C, FONT } from "./constants/design.jsx";
 
@@ -23,6 +23,10 @@ import { useWeightEntry } from "./hooks/useWeightEntry";
 import PolarLogModal from "./components/PolarLogModal";
 import { useCalculatorSettings } from "./hooks/useCalculatorSettings";
 import { useTrackerLoad } from "./hooks/useTrackerLoad";
+import { useTrackerDays } from "./hooks/useTrackerDays";
+import { useWeightActions } from "./hooks/useWeightActions";
+import { usePolarSync } from "./hooks/usePolarSync";
+import SidebarStats from "./components/SidebarStats";
 
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function NutritionTracker({ userId }) {
@@ -39,7 +43,6 @@ export default function NutritionTracker({ userId }) {
   userRecipesRef.current = userRecipes;
   const [polarConnected, setPolarConnected] = useState(false);
   const [polarSessions, setPolarSessions] = useState([]);
-  const [polarSyncing, setPolarSyncing] = useState(false);
   const [polarLastSync, setPolarLastSync] = useState(null);
   const [polarSyncMsg, setPolarSyncMsg] = useState(null);
   const [polarLogModal, setPolarLogModal] = useState(null);
@@ -49,8 +52,6 @@ export default function NutritionTracker({ userId }) {
   const [editingPlan, setEditingPlan] = useState(false);
   const [editCfg, setEditCfg] = useState(DEFAULT_PLAN_CONFIG);
   const [bodyLog, setBodyLog] = useState([]);
-  const [renphoSyncing, setRenphoSyncing] = useState(false);
-  const [renphoMsg, setRenphoMsg] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatMealId, setChatMealId] = useState("__chat__");
@@ -110,133 +111,41 @@ export default function NutritionTracker({ userId }) {
     compareData: setCompareData,
   });
 
-  const switchDay = async (date) => {
-    setCurrentDate(date);
-    let data = allDays.find((d) => d.date === date) || null;
-    if (!data) data = await loadDay(userId, date);
-    setCurrentDayData(ensureMealSlots(data));
-    setChatDate(date);
-    setChatMealId("__chat__");
-  };
-  const persistDay = async (dayData) => {
-    await saveDay(userId, dayData);
-    setAllDays((prev) =>
-      [dayData, ...prev.filter((d) => d.date !== dayData.date)].sort((a, b) =>
-        b.date.localeCompare(a.date),
-      ),
-    );
-    setCurrentDayData(dayData);
-    const hasEntries = (d) => !!d?.meals?.some((m) => m.items?.length);
-    if (hasEntries(dayData)) {
-      // A newly logged day that is newer than every Compare slot moves into the first slot (oldest drops off), so Compare shows it without a reload.
-      if (
-        !compareSlots.includes(dayData.date) &&
-        !compareSlots.some((d) => d && d > dayData.date)
-      ) {
-        setCompareSlots([dayData.date, ...compareSlots.slice(0, 4)]);
-        setCompareData([dayData, ...compareData.slice(0, 4)]);
-      }
-    } else {
-      // Day emptied (last entry deleted): drop it from Compare and backfill with the most recent logged day not already shown.
-      const idx = compareSlots.indexOf(dayData.date);
-      if (idx >= 0) {
-        const fill =
-          allDays.find(
-            (d) => d.date !== dayData.date && hasEntries(d) && !compareSlots.includes(d.date),
-          ) || null;
-        setCompareSlots([...compareSlots.filter((_, i) => i !== idx), fill?.date || null]);
-        setCompareData([...compareData.filter((_, i) => i !== idx), fill]);
-      }
-    }
-  };
-  const deleteItem = async (mealId, itemId) => {
-    if (!currentDayData) return;
-    const updated = {
-      ...currentDayData,
-      meals: currentDayData.meals.map((m) =>
-        m.id === mealId ? { ...m, items: m.items.filter((i) => i.id !== itemId) } : m,
-      ),
-    };
-    await persistDay(updated);
-  };
-  const savePlanConfig = async (cfg) => {
-    setWeightPlanConfig(cfg);
-    setEditCfg(cfg);
-    setEditingPlan(false);
-    try {
-      await setDoc(doc(db, "users", userId, "weight_plan", "settings"), cfg);
-    } catch (e) {
-      console.error("weight plan save failed", e);
-    }
-  };
-  // Body tab: clicking a calendar date adds an empty row for that date (no-op if it exists).
-  const addBodyRow = async (date) => {
-    if (!userId || bodyLog.some((r) => r.date === date)) return;
-    const row = { date };
-    try {
-      await setDoc(doc(db, "users", userId, "body_log", date), row);
-    } catch (e) {
-      console.error("body row create failed", e);
-      return;
-    }
-    setBodyLog((prev) => [...prev, row].sort((a, b) => (a.date || "").localeCompare(b.date || "")));
-  };
+  const { persistDay, switchDay, deleteItem } = useTrackerDays({
+    userId,
+    allDays,
+    setAllDays,
+    currentDayData,
+    setCurrentDate,
+    setCurrentDayData,
+    compare: { slots: compareSlots, data: compareData },
+    setCompareSlots,
+    setCompareData,
+    setChatDate,
+    setChatMealId,
+  });
+  const { renphoSyncing, renphoMsg, syncRenpho, purgeBefore, savePlanConfig, addBodyRow } =
+    useWeightActions({
+      userId,
+      weightLog,
+      setWeightLog,
+      bodyLog,
+      setBodyLog,
+      weightPlanConfig,
+      setWeightPlanConfig,
+      setEditCfg,
+      setEditingPlan,
+    });
+  const { polarSyncing, syncPolar } = usePolarSync({
+    userId,
+    setPolarSessions,
+    setPolarSyncMsg,
+    setPolarLastSync,
+  });
   const onCalendarClick = (date) => {
     if (activeTab === "weight") weight.open(date);
     else if (activeTab === "body") addBodyRow(date);
     else switchDay(date);
-  };
-  const syncRenpho = async () => {
-    if (renphoSyncing || !userId) return;
-    setRenphoSyncing(true);
-    setRenphoMsg(null);
-    try {
-      const fromDate = weightPlanConfig?.syncFromDate || weightPlanConfig?.startDate || null;
-      const res = await fetch("/api/renpho-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, fromDate }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Sync failed");
-      const recs = data.records || [];
-      if (recs.length === 0) {
-        setRenphoMsg({ ok: true, text: data.warning || "No measurements found." });
-      } else {
-        const existing = new Map(weightLog.map((r) => [r.date, r]));
-        // Sync wins on `actual` and `renpho` (all scale metrics); manual week/dose/projected are preserved.
-        const merged = recs.map((rec) => ({
-          ...(existing.get(rec.date) || {}),
-          date: rec.date,
-          actual: rec.weight,
-          ...(rec.metrics ? { renpho: rec.metrics } : {}),
-        }));
-        await Promise.all(
-          merged.map((row) => setDoc(doc(db, "users", userId, "weight_log", row.date), row)),
-        );
-        const next = new Map(weightLog.map((r) => [r.date, r]));
-        merged.forEach((row) => next.set(row.date, row));
-        setWeightLog([...next.values()].sort((a, b) => (a.date || "").localeCompare(b.date || "")));
-        const rej = data.rejected ? ` (${data.rejected} before ${data.fromDate} ignored)` : "";
-        setRenphoMsg({
-          ok: true,
-          text: `Synced ${merged.length} measurement${merged.length !== 1 ? "s" : ""}${rej}.`,
-        });
-      }
-    } catch (err) {
-      setRenphoMsg({ ok: false, text: err.message });
-    }
-    setRenphoSyncing(false);
-    setTimeout(() => setRenphoMsg(null), 6000);
-  };
-  // Delete every logged record dated before the cutoff, in Firestore and state.
-  const purgeBefore = async (cutoff) => {
-    if (!userId || !cutoff) return { deleted: 0 };
-    const doomed = weightLog.filter((r) => r.date && r.date < cutoff);
-    if (!doomed.length) return { deleted: 0 };
-    await Promise.all(doomed.map((r) => deleteDoc(doc(db, "users", userId, "weight_log", r.date))));
-    setWeightLog((prev) => prev.filter((r) => !(r.date && r.date < cutoff)));
-    return { deleted: doomed.length };
   };
   const persistChatHistory = async (history) => {
     if (!userId) return;
@@ -321,41 +230,6 @@ export default function NutritionTracker({ userId }) {
     await persistDay(updated);
     setChatMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, confirmed: true } : m)));
   };
-  const syncPolar = async () => {
-    if (polarSyncing) return;
-    setPolarSyncing(true);
-    setPolarSyncMsg(null);
-    try {
-      const res = await fetch("/api/polar-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Sync failed");
-      if (data.newSessions === 0) {
-        setPolarSyncMsg({ ok: true, text: "All up to date." });
-      } else {
-        setPolarSessions((prev) => {
-          const ids = new Set(prev.map((s) => s.id));
-          return [...data.sessions.filter((s) => !ids.has(s.id) && !s.logged), ...prev].sort(
-            (a, b) => (b.start_time || "").localeCompare(a.start_time || ""),
-          );
-        });
-        setPolarSyncMsg({
-          ok: true,
-          text: `Synced ${data.newSessions} session${data.newSessions !== 1 ? "s" : ""}.`,
-        });
-      }
-      setPolarLastSync(new Date().toISOString());
-      setTimeout(() => setPolarSyncMsg(null), 5000);
-    } catch (err) {
-      setPolarSyncMsg({ ok: false, text: err.message });
-      setTimeout(() => setPolarSyncMsg(null), 6000);
-    }
-    setPolarSyncing(false);
-  };
-
   if (loading)
     return (
       <div style={{ padding: "40px", textAlign: "center", color: C.muted, fontFamily: FONT.sans }}>
@@ -470,49 +344,7 @@ export default function NutritionTracker({ userId }) {
             <MonthlyTargetsCard userId={userId} year={calYear} month={calMonth} />
           </div>
           {activeTab === "log" && <MedsPanel userId={userId} date={currentDate} />}
-          {allDays.length > 0 &&
-            (() => {
-              const last7 = allDays.slice(0, 7);
-              const avg = Math.round(
-                last7.reduce((s, d) => s + getDayTotals(d).foodKcal, 0) / last7.length,
-              );
-              const streak = (() => {
-                let s = 0;
-                const today = new Date();
-                for (let i = 0; i < 30; i++) {
-                  const dt = new Date(today);
-                  dt.setDate(today.getDate() - i);
-                  const ds = dt.toISOString().split("T")[0];
-                  if (allDays.find((d) => d.date === ds)) s++;
-                  else break;
-                }
-                return s;
-              })();
-              return (
-                <div style={{ borderTop: `0.5px solid ${C.border}`, padding: "10px 12px" }}>
-                  {[
-                    ["7-day avg", avg ? avg.toLocaleString() + " kcal" : "—"],
-                    ["Streak", streak + " days"],
-                  ].map(([k, v]) => (
-                    <div
-                      key={k}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "baseline",
-                        padding: "3px 0",
-                        fontSize: "11px",
-                      }}
-                    >
-                      <span style={{ color: C.hint }}>{k}</span>
-                      <span style={{ fontFamily: FONT.mono, fontWeight: "500", color: C.text }}>
-                        {v}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+          {allDays.length > 0 && <SidebarStats days={allDays} />}
         </div>
 
         {/* Tab content */}
