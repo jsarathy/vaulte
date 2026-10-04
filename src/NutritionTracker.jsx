@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { db } from "./firebase";
 import { doc, setDoc, getDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
-import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS } from "./constants/helpers";
+import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS, dayHasContent } from "./constants/helpers";
 import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
@@ -137,7 +137,7 @@ function WeightEntryModal({ entry, setEntry, onSave, onDelete }) {
 // ── Calendar Sidebar ─────────────────────────────────────────────────────────
 function CalendarSidebar({ allDays, currentDate, calYear, calMonth, setCalYear, setCalMonth, switchDay }) {
   const todayStr = new Date().toISOString().split("T")[0];
-  const loggedSet = new Set(allDays.map(d => d.date));
+  const loggedSet = new Set(allDays.filter(dayHasContent).map(d => d.date)); // emptied days aren't marked
   const loggedKcal = {};
   allDays.forEach(d => { loggedKcal[d.date] = getDayTotals(d).foodKcal; });
   const dows = ["M","T","W","T","F","S","S"];

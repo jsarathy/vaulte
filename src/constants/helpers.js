@@ -55,6 +55,14 @@ export function getDayTotals(dayData) {
 
 // Merge any missing DEFAULT_MEAL_SLOTS into an existing day without changing existing meal IDs.
 // Safe to call on any day loaded from Firestore — only adds, never removes.
+// A day counts as logged (calendar) if it has at least one food/exercise entry
+// or some notes — an emptied day's leftover record doesn't.
+export function dayHasContent(day) {
+  if (!day) return false;
+  if ((day.meals || []).some(m => (m.items || []).length > 0)) return true;
+  return String(day.notes ?? "").trim() !== "";
+}
+
 export function ensureMealSlots(day) {
   if (!day) return day;
   const existing = day.meals || [];
