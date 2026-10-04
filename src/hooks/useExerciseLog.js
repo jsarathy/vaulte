@@ -1,8 +1,8 @@
 // src/hooks/useExerciseLog.js — state and actions of "Log Manual Exercise".
 // ctx = { userId, allDays, addDate, currentDate, setCurrentDayData, persistDay }
 import { useState } from "react";
-import { genId, makeMeals, ensureMealSlots } from "../constants/helpers";
-import { loadDay } from "../api/firestore";
+import { genId, ensureMealSlots } from "../constants/helpers";
+import { dayForEdit } from "../api/dayForEdit";
 import { exerciseEstimate, exerciseItem, mealIdIn, withItemInMeal } from "../lib/exerciseLog.js";
 
 const START = {
@@ -16,11 +16,8 @@ const START = {
   mealId: "",
 };
 
-async function dayFor(ctx) {
-  const saved =
-    ctx.allDays.find((d) => d.date === ctx.addDate) || (await loadDay(ctx.userId, ctx.addDate));
-  return ensureMealSlots(saved || { date: ctx.addDate, notes: "", meals: makeMeals() });
-}
+const dayFor = async (ctx) =>
+  ensureMealSlots(await dayForEdit(ctx.userId, ctx.allDays, ctx.addDate));
 
 async function logExercise(ctx, state, update) {
   if (!state.mealId) return update({ msg: { ok: false, text: "Select a meal slot" } });

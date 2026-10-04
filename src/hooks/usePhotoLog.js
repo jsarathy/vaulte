@@ -2,8 +2,8 @@
 // ctx = { userId, allDays, addDate, addMealId, currentDate, setCurrentDayData, persistDay,
 //         setAddItem, setAddMsg, startRecipe(preview) }
 import { useRef, useState } from "react";
-import { genId, makeMeals } from "../constants/helpers";
-import { loadDay } from "../api/firestore";
+import { genId } from "../constants/helpers";
+import { dayForEdit } from "../api/dayForEdit";
 import { preparePhoto, claudeIdentifyFoods } from "../api/photoLog";
 import { fileToPreviewURL } from "../utils/imageUtils";
 import { PHOTO_ERROR, formItemFromPhoto, photoRecipe } from "../lib/photoLog.js";
@@ -29,12 +29,7 @@ async function analyse(raw, set) {
 }
 
 async function logAll(ctx, items, clear) {
-  const day = ctx.allDays.find((d) => d.date === ctx.addDate) ||
-    (await loadDay(ctx.userId, ctx.addDate)) || {
-      date: ctx.addDate,
-      notes: "",
-      meals: makeMeals(),
-    };
+  const day = await dayForEdit(ctx.userId, ctx.allDays, ctx.addDate);
   const mealId = mealIdIn(day, ctx.addMealId);
   if (!mealId) return ctx.setAddMsg({ ok: false, text: "Select a meal slot first" });
   const added = items.map((i) => ({ ...i, id: genId() }));

@@ -1,8 +1,4 @@
 // src/tabs/AddEntry.jsx
-import { useState, useRef } from "react";
-import { genId, makeMeals, DEFAULT_MEAL_SLOTS } from "../constants/helpers";
-import { loadDay } from "../api/firestore";
-import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
 import RecipePortionModal from "../components/RecipePortionModal";
 import { useRecipePortion } from "../hooks/useRecipePortion";
@@ -14,6 +10,8 @@ import { useSavedRecipes } from "../hooks/useSavedRecipes";
 import PolarSessionsPanel from "../components/PolarSessionsPanel";
 import PolarBrowseModal from "../components/PolarBrowseModal";
 import { usePolarBrowse } from "../hooks/usePolarBrowse";
+import AddFoodCard from "../components/AddFoodCard";
+import { useAddFood } from "../hooks/useAddFood";
 import PhotoLogCard from "../components/PhotoLogCard";
 import { usePhotoLog } from "../hooks/usePhotoLog";
 import ExerciseLogModal from "../components/ExerciseLogModal";
@@ -25,42 +23,6 @@ import { useRecipeBuilder } from "../hooks/useRecipeBuilder";
 // Local style shorthand
 const S = {
   main: { flex: 1, overflowY: "auto", padding: "14px 16px", background: "#f9fafb" },
-  btn: (variant) =>
-    ({
-      primary: {
-        background: C.blue,
-        color: "#fff",
-        border: "none",
-        borderRadius: "5px",
-        padding: "7px 13px",
-        cursor: "pointer",
-        fontSize: "12px",
-        fontWeight: "500",
-        fontFamily: FONT.sans,
-      },
-      success: {
-        background: "#3B6D11",
-        color: "#fff",
-        border: "none",
-        borderRadius: "5px",
-        padding: "7px 13px",
-        cursor: "pointer",
-        fontSize: "12px",
-        fontWeight: "500",
-        fontFamily: FONT.sans,
-      },
-      outline: {
-        background: "transparent",
-        color: C.blueText,
-        border: `0.5px solid ${C.blue}`,
-        borderRadius: "5px",
-        padding: "7px 13px",
-        cursor: "pointer",
-        fontSize: "12px",
-        fontFamily: FONT.sans,
-      },
-      sm: { padding: "4px 9px", fontSize: "11px" },
-    })[variant] || {},
 };
 
 export default function AddEntry({
@@ -113,47 +75,17 @@ export default function AddEntry({
     userRecipes,
     setUserRecipes,
     setAddItem,
-    addToDay: (item) => doSubmit(item),
+    addToDay: (item) => food.addToDay(item),
     startRecipe: (name) => builder.startNew({ input: name }),
   });
-  // ── Saved-recipe matching ──────────────────────────────────────────────────
-  // Normalised exact match only: lowercase, trim, collapse internal whitespace.
-  // Substring matching is deliberately NOT used here — "chicken curry" must not
-  // silently resolve to "Thai Chicken Curry" and attach the wrong macros.
-  // Partial names are served by the dropdown, where the user picks explicitly.
-  const normName = (v) =>
-    String(v ?? "")
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, " ");
-  const hasUsableMacros = (r) => {
-    const n = r?.nutrition;
-    if (!n) return false;
-    return ["kcal", "protein", "fat", "carbs"].some((k) => Number(n[k]) > 0);
-  };
-  // Returns a saved recipe only if it matches exactly AND carries real macros;
-  // a macro-less recipe falls through so generation can still fill the gap.
-  const findSavedRecipe = (name) => {
-    const q = normName(name);
-    if (!q) return null;
-    const hit = userRecipes.find((r) => normName(r.name) === q);
-    return hit && hasUsableMacros(hit) ? hit : null;
-  };
   // Recipe portion box — lets user scale macros before adding a saved recipe
   const portion = useRecipePortion();
-  const openPortionModal = (recipe) => {
-    setShowDropdown(false);
-    portion.open(recipe);
-  };
   const loadPortion = (item) => {
     setAddItem(item);
     portion.close();
     saved.setOpen(false);
   };
 
-  const [nameDropdown, setNameDropdown] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const nameInputRef = useRef(null);
   const photo = usePhotoLog({
     userId,
     allDays,
@@ -167,78 +99,25 @@ export default function AddEntry({
     startRecipe: (preview) => builder.startNew({ preview }),
   });
 
-  const submitAddItem = async () => {
-    if (!addItem.name) {
-      setAddMsg({ ok: false, text: "Please enter a food name" });
-      return;
-    }
-    const hasNutrition = addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
-    if (!hasNutrition) {
-      // Open qty modal (user can switch to recipe builder from there if needed)
-      const saved = findSavedRecipe(addItem.name);
-      if (saved) {
-        openPortionModal(saved);
-        return;
-      }
-      lookup.open(addItem.name, { autoSubmit: true });
-      return;
-    }
-    await doSubmit(addItem);
-  };
-
-  const doSubmit = async (item) => {
-    let day = allDays.find((d) => d.date === addDate) || (await loadDay(userId, addDate));
-    if (!day) {
-      day = { date: addDate, notes: "", meals: makeMeals() };
-    }
-    let targetMealId = addMealId;
-    if (targetMealId?.startsWith("__slot__")) {
-      const match = day.meals.find((m) => m.name === targetMealId.replace("__slot__", ""));
-      targetMealId = match?.id || null;
-    }
-    if (!targetMealId && addMealName) {
-      const newMeal = { id: genId(), name: addMealName, is_exercise: 0, items: [] };
-      day = { ...day, meals: [...day.meals, newMeal] };
-      targetMealId = newMeal.id;
-    }
-    if (!targetMealId) {
-      setAddMsg({ ok: false, text: "Please select or create a meal" });
-      return;
-    }
-    const newItem = {
-      id: genId(),
-      name: item.name,
-      kcal: parseFloat(item.kcal) || 0,
-      fat: parseFloat(item.fat) || 0,
-      sat_fat: parseFloat(item.sat_fat) || 0,
-      carbs: parseFloat(item.carbs) || 0,
-      sugar: parseFloat(item.sugar) || 0,
-      fibre: parseFloat(item.fibre) || 0,
-      net_carbs: parseFloat(item.net_carbs) || 0,
-      protein: parseFloat(item.protein) || 0,
-    };
-    const updated = {
-      ...day,
-      meals: day.meals.map((m) =>
-        m.id === targetMealId ? { ...m, items: [...(m.items || []), newItem] } : m,
-      ),
-    };
-    await persistDay(updated);
-    if (addDate === currentDate) setCurrentDayData(updated);
-    setAddMsg({ ok: true, text: "✅ Item added!" });
-    setAddItem({
-      name: "",
-      kcal: "",
-      fat: "",
-      sat_fat: "",
-      carbs: "",
-      sugar: "",
-      fibre: "",
-      net_carbs: "",
-      protein: "",
-    });
-    setTimeout(() => setAddMsg(null), 3000);
-  };
+  const food = useAddFood({
+    userId,
+    allDays,
+    userRecipes,
+    addDate,
+    setAddDate,
+    addMealId,
+    setAddMealId,
+    addMealName,
+    currentDate,
+    addItem,
+    setAddItem,
+    addMsg,
+    setAddMsg,
+    persistDay,
+    setCurrentDayData,
+    lookup,
+    portion,
+  });
 
   return (
     <div style={{ ...S.main, display: "flex", gap: "14px", alignItems: "flex-start" }}>
@@ -249,305 +128,7 @@ export default function AddEntry({
         >
           🥗 Add Food Entry
         </div>
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "8px",
-            border: "0.5px solid #e5e7eb",
-            padding: "14px",
-            marginBottom: "12px",
-          }}
-        >
-          <div
-            style={{ fontWeight: "bold", color: "#185FA5", marginBottom: "10px", fontSize: "13px" }}
-          >
-            Add Food Item
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "8px",
-              marginBottom: "10px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  marginBottom: "2px",
-                }}
-              >
-                Day
-              </div>
-              <input
-                type="date"
-                value={addDate}
-                onChange={(e) => setAddDate(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "5px 7px",
-                  border: "0.5px solid #e5e7eb",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-              />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  marginBottom: "2px",
-                }}
-              >
-                Meal
-              </div>
-              <select
-                value={addMealId}
-                onChange={(e) => setAddMealId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "5px 7px",
-                  border: "0.5px solid #e5e7eb",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-              >
-                <option value="">— select —</option>
-                {(() => {
-                  const existing = allDays.find((d) => d.date === addDate);
-                  const meals = existing ? existing.meals : DEFAULT_MEAL_SLOTS;
-                  return meals.map((m, i) => (
-                    <option key={m.id || i} value={m.id || "__slot__" + m.name}>
-                      {m.name}
-                    </option>
-                  ));
-                })()}
-              </select>
-            </div>
-          </div>
-
-          {/* Food name with autocomplete */}
-          <div style={{ marginBottom: "10px", position: "relative" }}>
-            <div
-              style={{
-                fontSize: "10px",
-                color: "#6b7280",
-                textTransform: "uppercase",
-                marginBottom: "2px",
-              }}
-            >
-              Food Item Name
-            </div>
-            <input
-              ref={nameInputRef}
-              value={addItem.name}
-              onChange={(e) => {
-                const val = e.target.value;
-                setAddItem({ ...addItem, name: val });
-                if (val.length > 1) {
-                  const q = normName(val);
-                  const matches = userRecipes.filter((r) => normName(r.name).includes(q));
-                  setNameDropdown(matches);
-                  setShowDropdown(matches.length > 0);
-                } else setShowDropdown(false);
-              }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setShowDropdown(false);
-                  // Skip if a box is already open — incl. a recipe just picked from the dropdown
-                  if (lookup.isOpenRef.current || portion.isOpenRef.current) return;
-                  const name = addItem.name.trim();
-                  if (!name) return;
-                  // If already has nutrition (filled from recipe dropdown), skip
-                  const hasNutrition =
-                    addItem.kcal || addItem.fat || addItem.carbs || addItem.protein;
-                  if (hasNutrition) return;
-                  // Already saved? Use it — no Claude call.
-                  const saved = findSavedRecipe(name);
-                  if (saved) {
-                    openPortionModal(saved);
-                    return;
-                  }
-                  // Otherwise open Get Nutrition at 1 portion. Ingredient/dish is decided on click.
-                  lookup.open(name);
-                }, 150);
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                const name = addItem.name.trim();
-                if (!name) return;
-                // Normalised exact match in saved recipes → open portion modal
-                const saved = findSavedRecipe(name);
-                if (saved) {
-                  e.preventDefault();
-                  openPortionModal(saved);
-                }
-                // If no match, onBlur opens the Get Nutrition box
-              }}
-              onFocus={() => {
-                if (nameDropdown.length > 0) setShowDropdown(true);
-              }}
-              placeholder="e.g. Pinto bean stew (1 portion)"
-              style={{
-                width: "100%",
-                padding: "5px 9px",
-                border: "0.5px solid #e5e7eb",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            />
-            {showDropdown && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  background: "#fff",
-                  border: "0.5px solid #e5e7eb",
-                  borderRadius: "0 0 6px 6px",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                  zIndex: 100,
-                  maxHeight: "180px",
-                  overflowY: "auto",
-                }}
-              >
-                {nameDropdown.map((r) => (
-                  <div
-                    key={r.id}
-                    onMouseDown={() => openPortionModal(r)}
-                    style={{
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      borderBottom: "1px solid #F0F4F8",
-                      fontSize: "12px",
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = "#F0F4F8")}
-                    onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  >
-                    <div style={{ fontWeight: "bold", color: "#185FA5" }}>{r.name}</div>
-                    <div style={{ fontSize: "11px", color: "#6b7280" }}>
-                      {r.nutrition?.kcal} kcal · P:{r.nutrition?.protein}g F:{r.nutrition?.fat}g C:
-                      {r.nutrition?.carbs}g · tap to set portions
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Macro inputs */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill,minmax(100px,1fr))",
-              gap: "8px",
-              marginBottom: "10px",
-            }}
-          >
-            {[
-              ["kcal", "kcal"],
-              ["fat", "Fat (g)"],
-              ["sat_fat", "Sat Fat (g)"],
-              ["carbs", "Carbs (g)"],
-              ["sugar", "Sugar (g)"],
-              ["fibre", "Fibre (g)"],
-              ["net_carbs", "Net Carbs (g)"],
-              ["protein", "Protein (g)"],
-            ].map(([key, label]) => (
-              <div key={key}>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    marginBottom: "2px",
-                  }}
-                >
-                  {label}
-                </div>
-                <input
-                  type="number"
-                  value={addItem[key]}
-                  onChange={(e) => {
-                    const updated = { ...addItem, [key]: e.target.value };
-                    if (key === "carbs" || key === "fibre") {
-                      const c =
-                        key === "carbs"
-                          ? parseFloat(e.target.value) || 0
-                          : parseFloat(addItem.carbs) || 0;
-                      const f =
-                        key === "fibre"
-                          ? parseFloat(e.target.value) || 0
-                          : parseFloat(addItem.fibre) || 0;
-                      updated.net_carbs = Math.max(0, c - f).toFixed(1);
-                    }
-                    setAddItem(updated);
-                  }}
-                  placeholder="0"
-                  step="0.1"
-                  style={{
-                    width: "100%",
-                    padding: "5px 7px",
-                    border: "0.5px solid #e5e7eb",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    background: key === "net_carbs" ? "#F0F4F8" : "#fff",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              justifyContent: "flex-end",
-              alignItems: "center",
-            }}
-          >
-            <button
-              onClick={() =>
-                setAddItem({
-                  name: "",
-                  kcal: "",
-                  fat: "",
-                  sat_fat: "",
-                  carbs: "",
-                  sugar: "",
-                  fibre: "",
-                  net_carbs: "",
-                  protein: "",
-                })
-              }
-              style={{ ...S.btn("outline"), ...S.btn("sm") }}
-            >
-              ✕ Clear
-            </button>
-            <button onClick={submitAddItem} style={S.btn("success")}>
-              Add Item
-            </button>
-          </div>
-          {addMsg && (
-            <div
-              style={{
-                marginTop: "8px",
-                padding: "7px 10px",
-                borderRadius: "4px",
-                fontSize: "12px",
-                background: addMsg.ok ? "#E8F5E9" : "#FFEBEE",
-                color: addMsg.ok ? "#2E7D32" : "#c62828",
-              }}
-            >
-              {addMsg.text}
-            </div>
-          )}
-        </div>
+        <AddFoodCard food={food} />
 
         {/* Photo Log */}
         <PhotoLogCard photo={photo} />
