@@ -1,6 +1,6 @@
 // src/tabs/CompareTab.jsx
 import { fmt, formatDateShort, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
-import { C, FONT, border } from "../constants/design";
+import { C, FONT } from "../constants/design";
 
 export default function CompareTab({ compareSlots, setCompareSlots, compareData, setCompareData, allDays, calcSex, setCalcSex, calcAge, setCalcAge, calcHeight, setCalcHeight, calcWeight, setCalcWeight, calcProtein, setCalcProtein, calcFatPct, setCalcFatPct }) {
   const todayStr = new Date().toISOString().split("T")[0];

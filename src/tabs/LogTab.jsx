@@ -13,7 +13,7 @@ function loadCollapsed() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch { return {}; }
 }
 function saveCollapsed(state) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch { /* storage unavailable — not remembered */ }
 }
 
 // ── Polar Detail Modal ────────────────────────────────────────────────────────
@@ -148,8 +148,6 @@ export default function LogTab({ userId, currentDate, currentDayData, allDays, s
   const activeTier = ACTIVITY_LEVELS[activeTierIdx];
   const tdee = Math.round(BMR * activeTier.factor);
   const macroTgt = calcMacros(tdee, calcWeight, calcProtein, calcFatPct/100);
-  const pct = Math.min(100, Math.round((totals.foodKcal/tdee)*100));
-  const remaining = tdee - totals.foodKcal;
   const netKcal = totals.foodKcal - exerciseBurned;
   const netRemaining = tdee - netKcal;
   const netPct = Math.min(100, Math.round((netKcal/tdee)*100));

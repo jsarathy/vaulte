@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { fmt } from "../constants/helpers";
-import { C, FONT, border, IconChat, IconSend, IconX, IconTrash } from "../constants/design";
+import { C, FONT, border, IconChat, IconSend, IconTrash } from "../constants/design";
 
 export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChatMessages, chatInput, setChatInput, chatMealId, setChatMealId, chatDate, setChatDate, chatLoading, justChatHistory, CHAT_CONTEXT_LIMIT, clearChat, sendChat, confirmLog, allDays, currentDayData }) {
   const chatBottomRef = useRef(null);
@@ -24,7 +24,7 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
     y: Math.round(Math.min(Math.max(y, M), Math.max(M, vh() - h - M))),
   });
   const [size, setSize] = useState(() => {
-    try { const v = JSON.parse(localStorage.getItem("vaulte_chat_size") || "null"); if (v?.w && v?.h) return clampSize(v.w, v.h); } catch {}
+    try { const v = JSON.parse(localStorage.getItem("vaulte_chat_size") || "null"); if (v?.w && v?.h) return clampSize(v.w, v.h); } catch { /* storage unavailable — use default size */ }
     return clampSize(540, 680);
   });
   const [pos, setPos] = useState(null); // top-left of the floating window; null until placed
@@ -83,7 +83,7 @@ export default function ChatPopup({ chatOpen, setChatOpen, chatMessages, setChat
       const s = clampSize(want.w, want.h);
       setSize(s);
       setPos({ x: dx < 0 ? right - s.w : p0.x, y: dy < 0 ? bottom - s.h : p0.y });
-    }, () => { try { localStorage.setItem("vaulte_chat_size", JSON.stringify(sizeRef.current)); } catch {} });
+    }, () => { try { localStorage.setItem("vaulte_chat_size", JSON.stringify(sizeRef.current)); } catch { /* storage unavailable — size not remembered */ } });
   };
   const H = 6, CR = 14; // edge handle thickness, corner handle size
   const handles = [

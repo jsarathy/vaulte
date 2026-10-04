@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       await db.doc(`users/${userId}/polar/connection`).update({
         connected: false, access_token: null,
       });
-    } catch {}
+    } catch { /* best effort — the original error is returned below */ }
     return res.status(500).json({ error: err.message });
   }
 }

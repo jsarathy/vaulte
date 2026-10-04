@@ -1,7 +1,7 @@
 // src/api/firestore.js — all Firestore read/write helpers
 import { db } from "../firebase";
 import { doc, setDoc, getDoc, getDocs, deleteDoc, collection } from "firebase/firestore";
-import { genId, makeMeals } from "../constants/helpers";
+import { genId } from "../constants/helpers";
 import { INITIAL_RECIPES } from "../constants/recipes";
 
 const dayRef   = (uid, date) => doc(db, "users", uid, "nutrition_days", date);

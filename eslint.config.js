@@ -1,0 +1,49 @@
+// eslint.config.js — Fix 10 (lint) + Fix 24 (code-quality measurement)
+// Errors block check-in (npm run lint, and the "Lint" check on every PR).
+// Code-quality thresholds are warnings only for now; `npm run quality`
+// reports them worst-first. Fix 26 turns them into errors area by area.
+import js from "@eslint/js";
+import globals from "globals";
+import react from "eslint-plugin-react";
+import reactHooks from "eslint-plugin-react-hooks";
+
+// Fix 24 standards (see claude/Code_Quality_Report.md)
+export const QUALITY = {
+  "max-lines-per-function": ["warn", { max: 80, skipBlankLines: true, skipComments: true, IIFEs: true }],
+  "complexity": ["warn", 15],
+  "max-depth": ["warn", 4],
+  "max-lines": ["warn", { max: 500, skipBlankLines: true, skipComments: true }],
+  "max-params": ["warn", 5],
+  "max-statements-per-line": ["warn", { max: 3 }], // catches whole functions packed onto one line
+};
+
+const unused = ["error", { args: "after-used", ignoreRestSiblings: true, varsIgnorePattern: "^_", argsIgnorePattern: "^_", caughtErrors: "none" }];
+
+export default [
+  { ignores: ["dist/**", "node_modules/**", "Claude outputs/**", "docs/**"] },
+  js.configs.recommended,
+  {
+    files: ["src/**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest", sourceType: "module", globals: globals.browser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    settings: { react: { version: "18.2" } },
+    plugins: { react, "react-hooks": reactHooks },
+    rules: {
+      ...react.configs.recommended.rules,
+      ...react.configs["jsx-runtime"].rules,
+      "react/prop-types": "off",            // no PropTypes in this codebase
+      "react/no-unescaped-entities": "off", // apostrophes in UI copy are fine
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+      "no-unused-vars": unused,
+      ...QUALITY,
+    },
+  },
+  {
+    files: ["api/**/*.js", "scripts/**/*.mjs", "tests/**/*.mjs", "*.config.js"],
+    languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: globals.node },
+    rules: { "no-unused-vars": unused, ...QUALITY },
+  },
+];

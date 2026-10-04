@@ -3,12 +3,12 @@ import { useState, useEffect, useRef } from "react";
 import { db } from "./firebase";
 import { doc, setDoc, getDoc, getDocs, collection, deleteDoc } from "firebase/firestore";
 import { genId, makeMeals, getDayTotals, ensureMealSlots, DEFAULT_MEAL_SLOTS, dayHasContent } from "./constants/helpers";
-import { DEFAULT_PLAN_CONFIG, generateWeightProjection } from "./constants/weightPlan";
+import { DEFAULT_PLAN_CONFIG } from "./constants/weightPlan";
 import { loadAllDays, saveDay, loadDay, loadAllRecipes, seedInitialData } from "./api/firestore";
 import { claudeParseFood, claudeChat } from "./api/claude";
 import { backfillPortionWeights } from "./api/recipeWeights";
 import { C, FONT, border, IconChevronLeft, IconChevronRight } from "./constants/design.jsx";
-import { MEDS_TASKS, medsForDate, hasText } from "./constants/meds";
+import { medsForDate, hasText } from "./constants/meds";
 
 import RecipeModal   from "./components/RecipeModal";
 import ChatPopup     from "./components/ChatPopup";
@@ -193,7 +193,6 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
   const dateStr = d ? d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}) : (s.date||"");
   const timeStr = d ? d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "";
   const sessionDate = s.start_time ? s.start_time.split("T")[0] : (s.date||new Date().toISOString().split("T")[0]);
-  const SLOTS = DEFAULT_MEAL_SLOTS;
   const stats = [["Duration",`${Math.round(s.duration_min||0)} min`],["Calories",`${s.calories} kcal`],s.hr_avg?["Avg HR",`${s.hr_avg} bpm`]:null,s.hr_max?["Max HR",`${s.hr_max} bpm`]:null,s.fat_pct!=null?["Fat burn",`${s.fat_pct}%`]:null,s.fat_pct!=null?["Fat burned",`${Math.round(s.calories*s.fat_pct/100/9)}g`]:null].filter(Boolean);
   const existing = allDays.find(d=>d.date===sessionDate);
   const mealOptions = existing ? ensureMealSlots(existing).meals : DEFAULT_MEAL_SLOTS;
@@ -218,7 +217,6 @@ function PolarLogModal({ session, userId, allDays, persistDay, setCurrentDayData
     }
     const polyline = pts.join(" ");
     // HR zones (rough): <60% = blue, 60-70% = green, 70-80% = yellow, 80-90% = orange, >90% = red
-    const totalMin = Math.round(s.duration_min || 0);
     const rateS = s.recording_rate_s || 5;
     const zones = { z1:0, z2:0, z3:0, z4:0, z5:0 };
     const hrMax = s.hr_max || 180;
@@ -380,7 +378,7 @@ export default function NutritionTracker({ userId }) {
         setWeightLog(rows);
         const bSnap=await getDocs(collection(db,"users",userId,"body_log"));
         setBodyLog(bSnap.docs.map(d=>({date:d.id,...d.data()})).sort((a,b)=>(a.date||"").localeCompare(b.date||"")));
-        try{const chatDoc=await getDoc(doc(db,"users",userId,"claude_chat","conversation"));if(chatDoc.exists()){const{history}=chatDoc.data();if(Array.isArray(history)&&history.length>0){setJustChatHistory(history);setChatMessages(history.map(h=>({id:genId(),type:h.role==="user"?"user":"claude",text:h.content})));}}}catch(e){}
+        try{const chatDoc=await getDoc(doc(db,"users",userId,"claude_chat","conversation"));if(chatDoc.exists()){const{history}=chatDoc.data();if(Array.isArray(history)&&history.length>0){setJustChatHistory(history);setChatMessages(history.map(h=>({id:genId(),type:h.role==="user"?"user":"claude",text:h.content})));}}}catch(e){console.error("chat history load failed",e);}
         const polarDoc=await getDoc(doc(db,"users",userId,"polar","connection"));if(polarDoc.exists()){const pd=polarDoc.data();setPolarConnected(pd.connected||false);setPolarLastSync(pd.last_sync_at||null);}
         const polarSnap=await getDocs(collection(db,"users",userId,"polar_sessions"));
         setPolarSessions(polarSnap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>!s.logged).sort((a,b)=>(b.start_time||"").localeCompare(a.start_time||"")));
@@ -410,7 +408,7 @@ export default function NutritionTracker({ userId }) {
     }
   };
   const deleteItem=async(mealId,itemId)=>{if(!currentDayData)return;const updated={...currentDayData,meals:currentDayData.meals.map(m=>m.id===mealId?{...m,items:m.items.filter(i=>i.id!==itemId)}:m)};await persistDay(updated);};
-  const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){}};
+  const savePlanConfig=async(cfg)=>{setWeightPlanConfig(cfg);setEditCfg(cfg);setEditingPlan(false);try{await setDoc(doc(db,"users",userId,"weight_plan","settings"),cfg);}catch(e){console.error("weight plan save failed",e);}};
   const openWeightEntry=(date)=>{const ex=weightLog.find(r=>r.date===date)||{};setWeightEntry({date,week:ex.week??"",dose:ex.dose??"",projected:ex.projected??"",actual:ex.actual??"",existing:!!ex.date});};
   // Body tab: clicking a calendar date adds an empty row for that date (no-op if it exists).
   const addBodyRow=async(date)=>{if(!userId||bodyLog.some(r=>r.date===date))return;const row={date};
@@ -460,8 +458,8 @@ export default function NutritionTracker({ userId }) {
     setWeightLog(prev=>prev.filter(r=>!(r.date&&r.date<cutoff)));
     return{deleted:doomed.length};
   };
-  const persistChatHistory=async(history)=>{if(!userId)return;try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history,updatedAt:new Date().toISOString()});}catch(e){}};
-  const clearChat=async()=>{setJustChatHistory([]);setChatMessages([]);if(userId)try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history:[],updatedAt:new Date().toISOString()});}catch(e){}};
+  const persistChatHistory=async(history)=>{if(!userId)return;try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history,updatedAt:new Date().toISOString()});}catch(e){console.error("chat history save failed",e);}};
+  const clearChat=async()=>{setJustChatHistory([]);setChatMessages([]);if(userId)try{await setDoc(doc(db,"users",userId,"claude_chat","conversation"),{history:[],updatedAt:new Date().toISOString()});}catch(e){console.error("chat history clear failed",e);}};
   const sendChat=async()=>{const text=chatInput.trim();if(!text||chatLoading)return;setChatInput("");setChatLoading(true);const userMsg={id:genId(),type:"user",text};const thinkMsg={id:genId(),type:"claude",text:"…"};setChatMessages(prev=>[...prev,userMsg,thinkMsg]);try{if(chatMealId==="__chat__"){const newHistory=[...justChatHistory,{role:"user",content:text}];const reply=await claudeChat(newHistory.slice(-CHAT_CONTEXT_LIMIT),userRecipes);const updatedHistory=[...newHistory,{role:"assistant",content:reply}].slice(-CHAT_CONTEXT_LIMIT);setJustChatHistory(updatedHistory);await persistChatHistory(updatedHistory);setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,text:reply}:m));}else{const items=await claudeParseFood(text);const mealName=(allDays.find(d=>d.date===chatDate)||currentDayData)?.meals?.find(m=>m.id===chatMealId)?.name||"Meal";setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,type:"preview",items,mealId:chatMealId,mealName,confirmed:false}:m));}}catch(err){setChatMessages(prev=>prev.map(m=>m.id===thinkMsg.id?{...m,type:"error",text:err.message}:m));}setChatLoading(false);};
   const confirmLog=async(msgId)=>{const msg=chatMessages.find(m=>m.id===msgId);if(!msg)return;let day=currentDayData;if(!day||day.date!==chatDate){day=await loadDay(userId,chatDate);if(!day)day={date:chatDate,notes:"",meals:makeMeals()};}const newItems=msg.items.map(i=>({...i,id:genId()}));const updated={...day,meals:day.meals.map(m=>m.id===msg.mealId?{...m,items:[...m.items,...newItems]}:m)};await persistDay(updated);setChatMessages(prev=>prev.map(m=>m.id===msgId?{...m,confirmed:true}:m));};
   const syncPolar=async()=>{if(polarSyncing)return;setPolarSyncing(true);setPolarSyncMsg(null);try{const res=await fetch("/api/polar-sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId})});const data=await res.json();if(!res.ok)throw new Error(data.error||"Sync failed");if(data.newSessions===0){setPolarSyncMsg({ok:true,text:"All up to date."});}else{setPolarSessions(prev=>{const ids=new Set(prev.map(s=>s.id));return[...data.sessions.filter(s=>!ids.has(s.id)&&!s.logged),...prev].sort((a,b)=>(b.start_time||"").localeCompare(a.start_time||""));});setPolarSyncMsg({ok:true,text:`Synced ${data.newSessions} session${data.newSessions!==1?"s":""}.`});}setPolarLastSync(new Date().toISOString());setTimeout(()=>setPolarSyncMsg(null),5000);}catch(err){setPolarSyncMsg({ok:false,text:err.message});setTimeout(()=>setPolarSyncMsg(null),6000);}setPolarSyncing(false);};

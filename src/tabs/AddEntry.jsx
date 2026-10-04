@@ -10,7 +10,7 @@ import { normaliseImage, fileToBase64, fileToPreviewURL } from "../utils/imageUt
 import { C, FONT } from "../constants/design.jsx";
 import HourlyStepsCard from "../components/HourlyStepsCard";
 import { db } from "../firebase";
-import { doc, setDoc, getDocs, collection, orderBy, query } from "firebase/firestore";
+import { getDocs, collection, orderBy, query } from "firebase/firestore";
 
 // Local style shorthand
 const S = {
@@ -25,14 +25,14 @@ const S = {
 
 export default function AddEntry({
   userId,
-  allDays, currentDate, currentDayData, setCurrentDayData,
+  allDays, currentDate, setCurrentDayData,
   userRecipes, setUserRecipes,
   addDate, setAddDate,
   addMealId, setAddMealId,
-  addMealName, setAddMealName,
+  addMealName,
   addItem, setAddItem,
   addMsg, setAddMsg,
-  polarConnected, polarSessions, setPolarSessions,
+  polarConnected, polarSessions,
   polarSyncing, polarLastSync, polarSyncMsg,
   syncPolar, setPolarLogModal,
   persistDay,
@@ -42,7 +42,6 @@ export default function AddEntry({
   const [exSelected, setExSelected] = useState(null);
   const [exDuration, setExDuration] = useState("30");
   const [exHRavg, setExHRavg] = useState("");
-  const [exHRmax, setExHRmax] = useState("");
   const [exResult, setExResult] = useState(null);
   const [exMsg, setExMsg] = useState(null);
   const [showExModal, setShowExModal] = useState(false);
@@ -1094,7 +1093,6 @@ Use realistic values. For portions use a typical serving size.`;
       {recipePortionModal && (() => {
         const r = recipePortionModal.recipe;
         const base = r.nutrition || {};
-        const servings = parseFloat(r.servings) || 1;
         const qty = parseFloat(recipePortionQty) || 1;
         const isPortion = recipePortionUnit === "portion";
 
@@ -1362,7 +1360,7 @@ Use realistic values. For portions use a typical serving size.`;
                         await persistDay(updated);
                         if (addDate===currentDate) setCurrentDayData(updated);
                         setShowExModal(false); setExResult(null); setExSelected(null); setExSearch("");
-                        setExDuration("30"); setExHRavg(""); setExHRmax(""); setExMealId("");
+                        setExDuration("30"); setExHRavg(""); setExMealId("");
                       } catch(e) {
                         setExMsg({ok:false,text:"Failed to log: "+e.message});
                       }
