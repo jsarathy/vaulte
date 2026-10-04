@@ -329,6 +329,12 @@ test("add food form", async ({ page: p }) => {
   await expect(lookupOpen).toHaveCount(0);
   await expect(msg("✅ Item added!")).toHaveCount(0, { timeout: 4000 });
 
+  // the last message fades 3 s after it appears; wait for that so it can't hide the next one
+  const addAndSee = async () => {
+    await expect(msg("✅ Item added!")).toHaveCount(0, { timeout: 4000 });
+    await add();
+    await expect(msg("✅ Item added!")).toBeVisible();
+  };
   // Today: the day view is updated too; a slot resolves to that day's meal by name
   await ev(() => {
     window.__allDays = [
@@ -339,8 +345,7 @@ test("add food form", async ({ page: p }) => {
   await date.fill("2026-10-03");
   await meal.selectOption("t1");
   await fillToast();
-  await add();
-  await expect(msg("✅ Item added!")).toBeVisible();
+  await addAndSee();
   expect((await ev(() => window.__currentDay)).meals[0].items[0].name).toBe("Toast");
 
   // A day not loaded: loaded from Firestore, else default slots; slot resolved by name
@@ -348,8 +353,7 @@ test("add food form", async ({ page: p }) => {
   await date.fill("2026-10-09");
   await meal.selectOption({ label: "🌙 Dinner" });
   await fillToast();
-  await add();
-  await expect(msg("✅ Item added!")).toBeVisible();
+  await addAndSee();
   saved = await ev(() => window.__persisted.at(-1));
   expect(saved.date).toBe("2026-10-09");
   expect(saved.notes).toBe("");
@@ -363,8 +367,7 @@ test("add food form", async ({ page: p }) => {
   await ev(() => (window.__addMealName = "Late snack"));
   await date.fill("2026-10-02");
   await date.fill("2026-10-01");
-  await add();
-  await expect(msg("✅ Item added!")).toBeVisible();
+  await addAndSee();
   saved = await ev(() => window.__persisted.at(-1));
   expect(saved.date).toBe("2026-10-01");
   expect(saved.meals.map((m) => m.name)).toEqual(["Breakfast", "Late snack"]);
@@ -379,8 +382,7 @@ test("add food form", async ({ page: p }) => {
   await date.fill("2026-10-01");
   await meal.selectOption("q");
   await fillToast();
-  await add();
-  await expect(msg("✅ Item added!")).toBeVisible();
+  await addAndSee();
   saved = await ev(() => window.__persisted.at(-1));
   expect(saved.meals.map((m) => m.name)).toEqual(["Q"]);
   expect(saved.meals[0].items.map((i) => i.name)).toEqual(["Toast"]);

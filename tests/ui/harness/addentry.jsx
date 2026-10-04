@@ -42,7 +42,7 @@ function H() {
         style={{ transform: "translateY(0)", flex: 1, display: "flex", overflow: "hidden" }}
       >
         <AddEntry
-          userId="u"
+          userId={window.__userId ?? "u"}
           allDays={window.__allDays || []}
           currentDate="2026-10-03"
           currentDayData={null}
@@ -62,10 +62,10 @@ function H() {
           polarConnected={!!window.__polar?.connected}
           polarSessions={window.__polar?.sessions || []}
           setPolarSessions={() => {}}
-          polarSyncing={false}
+          polarSyncing={!!window.__polar?.syncing}
           polarLastSync={window.__polar?.lastSync || null}
-          polarSyncMsg={null}
-          syncPolar={() => {}}
+          polarSyncMsg={window.__polar?.syncMsg || null}
+          syncPolar={() => (window.__synced = (window.__synced || 0) + 1)}
           setPolarLogModal={(s) => (window.__polarLog = s)}
           persistDay={async (d) => {
             if (window.__failPersist) throw new Error("Mock persist failure");

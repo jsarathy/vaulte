@@ -87,6 +87,10 @@ export const CLEAN_FILES = [
   "src/lib/addFood.js",
   "src/hooks/useAddFood.js",
   "src/components/AddFoodCard.jsx",
+  "src/api/polarReconnect.js",
+  "src/components/PolarCard.jsx",
+  "src/hooks/useAddEntry.js",
+  "src/tabs/AddEntry.jsx",
 ];
 
 const unused = [
