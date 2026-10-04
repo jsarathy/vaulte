@@ -118,6 +118,14 @@ export const CLEAN_FILES = [
   "src/hooks/useWeightActions.js",
   "src/hooks/usePolarSync.js",
   "src/components/SidebarStats.jsx",
+  "src/hooks/useTrackerState.js",
+  "src/lib/chatLog.js",
+  "src/api/chatHistory.js",
+  "src/hooks/useChat.js",
+  "src/hooks/useTracker.js",
+  "src/components/TrackerTabs.jsx",
+  "src/components/TrackerFrame.jsx",
+  "src/NutritionTracker.jsx",
 ];
 
 const unused = [
