@@ -30,7 +30,7 @@ if (!getApps().length) initializeApp({ projectId: PROJECT });
 
 export const db = () => getFirestore();
 
-// Fake Vercel response object: records status and JSON body.
+// Fake Vercel response object: records status, JSON body and redirects.
 export function res() {
   const r = { statusCode: 200, body: undefined };
   r.status = (c) => {
@@ -39,6 +39,11 @@ export function res() {
   };
   r.json = (b) => {
     r.body = b;
+    return r;
+  };
+  r.redirect = (code, url) => {
+    r.statusCode = code;
+    r.location = url;
     return r;
   };
   return r;
