@@ -156,7 +156,7 @@ test("weight records: one per day (latest wins), dates, cutoff, metrics", async 
       { tableName: "t1", userIds: [99, 77] }, // the account user is listed: used
       { tableName: "" }, // skipped
       { tableName: "t2", userIds: ["99", "88"] }, // account user not listed: first id used
-      { tableName: "t3" }, // no ids: the account user
+      { tableName: "t3", userIds: "99" }, // ids not a list: the account user
       null,
     ]),
     [BODY]: (req) => ok(tables[req.tableName][req.pageNum - 1] ?? []),
@@ -270,11 +270,13 @@ test("timestamps: seconds below 1e12, milliseconds above", async () => {
     [BODY]: pages([
       { timeStamp: 5e10, weight: 70 }, // seconds, far in the future
       { timeStamp: 1e12 + 86_400_000, weight: 71 }, // milliseconds: 10 Sep 2001
+      { timeStamp: 1e12, weight: 72 }, // 1e12 itself is milliseconds: 9 Sep 2001
+      { timeStamp: 1e20, weight: 73 }, // beyond any date: skipped
     ]),
   });
   assert.deepEqual(
     (await call({})).body.records.map((r) => r.date),
-    ["2001-09-10", "3554-06-09"],
+    ["2001-09-09", "2001-09-10", "3554-06-09"],
   );
 });
 

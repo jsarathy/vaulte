@@ -149,6 +149,10 @@ export const CLEAN_FILES = [
   "src/components/PlanCurveEditor.jsx",
   "src/tabs/WeightTracker.jsx",
   "api/_renpho/client.js",
+  "api/_renpho/days.js",
+  "api/_renpho/weight.js",
+  "api/_renpho/girth.js",
+  "api/renpho-sync.js",
 ];
 
 const unused = [

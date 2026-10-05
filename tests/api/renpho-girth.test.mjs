@@ -41,12 +41,12 @@ test("girth: tape readings by day in the device's time zone", async () => {
         girth("2026-09-01T08:00:00Z", { waistValue: 100 + i / 10 }, { timeZone: "+1:00" }),
       ),
       [
-        girth("2026-09-01T23:30:00Z", all, { timeZone: "+1:00" }), // 00:30 on 2 Sep locally
+        girth("2026-09-01T23:30:00Z", all, { timeZone: " +1:00 " }), // 00:30 on 2 Sep locally
         girth("2026-09-10T03:00:00Z", { hipValue: 102 }, { timeZone: "-5" }), // 9 Sep 22:00 locally
         girth("2026-09-03T20:00:00Z", { neckValue: 39 }, { timeZone: "+5.5" }), // 4 Sep 01:30
         girth("2026-09-05T23:00:00Z", { neckValue: 39.5 }, { timeZone: "+0:45" }), // 5 Sep 23:45
         girth("2026-09-06T22:45:00Z", { neckValue: 39.6 }, { timeZone: "+1:30" }), // 7 Sep 00:15
-        { timeStamp: sec("2026-09-08T10:00:00Z") * 1000, chestValue: 104, timeZone: "UTC" }, // ms; odd zone ignored
+        { timeStamp: sec("2026-09-08T23:30:00Z") * 1000, chestValue: 104, timeZone: "UTC" }, // ms; odd zone: UTC
         girth("2026-09-11T10:00:00Z", {
           chestValue: 0,
           waistValue: -1,
@@ -126,8 +126,13 @@ test("girth: paging limits, empty replies and errors", async () => {
     [GIRTH]: pages([
       girth("2026-09-01T08:00:00Z", { neckValue: 40 }),
       girth("2026-09-01T08:00:00Z", { neckValue: 41 }),
+      girth("2026-09-02T10:00:00Z", { neckValue: 42 }), // later reading listed first
+      girth("2026-09-02T09:00:00Z", { neckValue: 43 }),
     ]),
   });
   out = await call({ kind: "girth" });
-  assert.deepEqual(out.body.records, [{ date: "2026-09-01", values: { neck: 41 } }]);
+  assert.deepEqual(out.body.records, [
+    { date: "2026-09-01", values: { neck: 41 } },
+    { date: "2026-09-02", values: { neck: 42 } },
+  ]);
 });
