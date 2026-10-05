@@ -228,6 +228,14 @@ export const CLEAN_FILES = [
   "src/components/AnatomyFigure.jsx",
   "src/components/MeasurementSites.jsx",
   "src/tabs/BodyTracker.jsx",
+  "src/lib/hourlySteps.js",
+  "src/hooks/useHourlySteps.js",
+  "src/styles/hourlyStepsStyles.js",
+  "src/components/BrowseByDate.jsx",
+  "src/components/HourlyStepsChart.jsx",
+  "src/components/HourlyStepsBody.jsx",
+  "src/components/HourlyStepsFull.jsx",
+  "src/components/HourlyStepsCard.jsx",
 ];
 
 const unused = [
