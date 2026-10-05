@@ -2,12 +2,10 @@
 // Body tab: Renpho Smart Body Tape Measure readings (cm), one row per date in
 // users/{uid}/body_log/{date}. Layout mirrors WeightTracker: log table left,
 // Trajectory chart + anatomy figure right.
-import { useState } from "react";
 import { MEASURE, BODY_MEASURES } from "../lib/bodyMeasures.js";
 import useTrajectoryChart from "../hooks/useTrajectoryChart.js";
 import BodyTrajectory from "../components/BodyTrajectory.jsx";
-import { db } from "../firebase";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import BodyLogPanel from "../components/BodyLogPanel.jsx";
 
 // ── Anatomy figure ───────────────────────────────────────────────────────────
 // Front-view silhouette drawn from a few proportions, so male and female share
@@ -169,29 +167,6 @@ function AnatomyFigure({ sex, active, latest }) {
 export default function BodyTracker({ userId, bodyLog, setBodyLog, sex }) {
   const chart = useTrajectoryChart("waist"); // shared with the anatomy figure
 
-  // Persist one field of one row (date-keyed) and update local state.
-  const saveField = async (i, key, val) => {
-    const row = bodyLog[i];
-    if (!row?.date) return;
-    const updatedRow = { ...row, [key]: val };
-    setBodyLog(bodyLog.map((r, j) => (j === i ? updatedRow : r)));
-    try {
-      await setDoc(doc(db, "users", userId, "body_log", row.date), updatedRow);
-    } catch (e) {
-      console.error("body row save failed", e);
-    }
-  };
-  const deleteRow = async (row) => {
-    if (!row?.date) return;
-    if (!window.confirm(`Delete body measurements for ${row.date}?`)) return;
-    try {
-      await deleteDoc(doc(db, "users", userId, "body_log", row.date));
-    } catch (e) {
-      console.error("body row delete failed", e);
-      return;
-    }
-    setBodyLog((prev) => prev.filter((r) => r.date !== row.date));
-  };
   // Most recent non-empty reading per measurement, for the anatomy label.
   const latest = Object.fromEntries(
     BODY_MEASURES.map(({ key }) => {
@@ -200,55 +175,6 @@ export default function BodyTracker({ userId, bodyLog, setBodyLog, sex }) {
       return [key, null];
     }),
   );
-  // Pull Smart Tape Measure readings from the Renpho cloud. Synced sites overwrite
-  // that day's values; sites the tape didn't send keep any manual entry.
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState(null);
-  const syncBody = async () => {
-    if (syncing || !userId) return;
-    setSyncing(true);
-    setSyncMsg(null);
-    try {
-      const res = await fetch("/api/renpho-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, kind: "girth" }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Sync failed (HTTP ${res.status})`);
-      const recs = data.records || [];
-      if (!recs.length) setSyncMsg({ ok: true, text: "No tape measurements found." });
-      else {
-        const existing = new Map(bodyLog.map((r) => [r.date, r]));
-        const merged = recs.map((rec) => ({
-          ...(existing.get(rec.date) || {}),
-          date: rec.date,
-          ...rec.values,
-        }));
-        await Promise.all(
-          merged.map((row) => setDoc(doc(db, "users", userId, "body_log", row.date), row)),
-        );
-        merged.forEach((row) => existing.set(row.date, row));
-        setBodyLog(
-          [...existing.values()].sort((a, b) => (a.date || "").localeCompare(b.date || "")),
-        );
-        setSyncMsg({
-          ok: true,
-          text: `Synced ${merged.length} day${merged.length !== 1 ? "s" : ""}.`,
-        });
-      }
-    } catch (e) {
-      setSyncMsg({ ok: false, text: e.message });
-    }
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(null), 6000);
-  };
-  const toNum = (v) => {
-    const t = String(v).trim();
-    if (t === "") return null;
-    const n = Number(t);
-    return Number.isFinite(n) ? n : null;
-  };
 
   return (
     <div
@@ -262,153 +188,7 @@ export default function BodyTracker({ userId, bodyLog, setBodyLog, sex }) {
       }}
     >
       {/* ── LEFT: Body Log Table (55%) ── */}
-      <div style={{ flex: "0 0 55%", minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-          <div style={{ fontSize: "15px", fontWeight: "bold", color: "#185FA5" }}>📏 Body Log</div>
-          <button
-            onClick={syncBody}
-            disabled={syncing}
-            style={{
-              background: syncing ? "#9ca3af" : "#378ADD",
-              border: "none",
-              color: "#fff",
-              borderRadius: "4px",
-              padding: "4px 10px",
-              fontSize: "11px",
-              fontWeight: "bold",
-              cursor: syncing ? "default" : "pointer",
-            }}
-          >
-            {syncing ? "Syncing…" : "⟳ Sync Renpho"}
-          </button>
-          {syncMsg ? (
-            <span style={{ fontSize: "11px", color: syncMsg.ok ? "#2E7D32" : "#c62828" }}>
-              {syncMsg.text}
-            </span>
-          ) : (
-            <span style={{ fontSize: "11px", color: "#9ca3af" }}>
-              cm · click a date in the calendar to add a row
-            </span>
-          )}
-        </div>
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "8px",
-            border: "0.5px solid #e5e7eb",
-            overflow: "auto",
-            maxHeight: "calc(100vh - 220px)",
-          }}
-        >
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-            <thead>
-              <tr
-                style={{
-                  background: "#185FA5",
-                  color: "#fff",
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 1,
-                }}
-              >
-                {["Date", ...BODY_MEASURES.map((m) => m.short), ""].map((h, i) => (
-                  <th
-                    key={h || `c${i}`}
-                    style={{
-                      padding: "7px 6px",
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      fontSize: "11px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bodyLog.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={BODY_MEASURES.length + 2}
-                    style={{
-                      padding: "18px",
-                      textAlign: "center",
-                      color: "#9ca3af",
-                      fontSize: "12px",
-                    }}
-                  >
-                    No measurements yet — click a date in the calendar to start a row.
-                  </td>
-                </tr>
-              )}
-              {/* Latest first; i stays the index into bodyLog (used by saveField) */}
-              {bodyLog
-                .map((row, i) => ({ row, i }))
-                .reverse()
-                .map(({ row, i }) => {
-                  const rowBg = i % 2 === 0 ? "#fff" : "#F7FAFD";
-                  const isCurrent = i === bodyLog.length - 1;
-                  return (
-                    <tr key={row.date || i} style={{ background: isCurrent ? "#E3F2FD" : rowBg }}>
-                      <td
-                        style={{
-                          padding: "5px 8px",
-                          color: "#185FA5",
-                          whiteSpace: "nowrap",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {row.date}
-                      </td>
-                      {BODY_MEASURES.map(({ key }) => (
-                        <td key={key} style={{ padding: "5px 3px", textAlign: "right" }}>
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="10"
-                            max="250"
-                            value={row[key] ?? ""}
-                            placeholder="—"
-                            onChange={(e) => saveField(i, key, toNum(e.target.value))}
-                            style={{
-                              width: "50px",
-                              padding: "2px 4px",
-                              border: "0.5px solid #e5e7eb",
-                              borderRadius: "4px",
-                              fontSize: "12px",
-                              textAlign: "right",
-                              background: row[key] != null ? "#FFF3E0" : "#fff",
-                              fontWeight: row[key] != null ? "bold" : "normal",
-                              color: row[key] != null ? "#B26A00" : "#1a2a3a",
-                            }}
-                          />
-                        </td>
-                      ))}
-                      <td style={{ padding: "5px 6px", textAlign: "center" }}>
-                        <button
-                          onClick={() => deleteRow(row)}
-                          title="Delete row"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: "#c62828",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            padding: 0,
-                          }}
-                        >
-                          ×
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <BodyLogPanel userId={userId} bodyLog={bodyLog} setBodyLog={setBodyLog} />
 
       {/* ── RIGHT: Chart + Specs (43%) ── */}
       <div style={{ flex: "0 0 43%", minWidth: 0 }}>

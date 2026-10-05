@@ -172,6 +172,11 @@ export const CLEAN_FILES = [
   "src/lib/bodyMeasures.js",
   "src/components/TrajectoryFrame.jsx",
   "src/components/BodyTrajectory.jsx",
+  "src/lib/bodyLog.js",
+  "src/api/bodyLog.js",
+  "src/hooks/useBodyLog.js",
+  "src/components/BodyLogTable.jsx",
+  "src/components/BodyLogPanel.jsx",
 ];
 
 const unused = [
