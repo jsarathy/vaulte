@@ -246,6 +246,12 @@ export const CLEAN_FILES = [
   "src/utils/imageUtils.js",
   "src/constants/seedDays.js",
   "src/api/firestore.js",
+  "src/lib/appleActivity.js",
+  "src/hooks/useAppleActivity.js",
+  "src/styles/appleActivityStyles.js",
+  "src/components/AppleActivityTable.jsx",
+  "src/components/AppleActivityHeader.jsx",
+  "src/components/AppleActivityCard.jsx",
 ];
 
 const unused = [

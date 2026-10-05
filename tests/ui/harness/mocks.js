@@ -51,10 +51,18 @@ export const collection = (...a) => ({ path: a.slice(1).join("/") });
 export const orderBy = () => ({});
 export const query = () => ({});
 export const where = () => ({});
-// onSnapshot: one reply, from window.__docs like getDoc
-export const onSnapshot = (ref, cb) => {
-  const d = window.__docs?.[ref?.path];
-  cb({ exists: () => d !== undefined, data: () => d ?? null, forEach() {}, docs: [] });
+// onSnapshot: one reply, from window.__docs like getDoc, after any window.__getDocDelays delay;
+// a path in window.__failPaths errors instead
+export const onSnapshot = (ref, cb, onError) => {
+  const reply = () => {
+    if (window.__failPaths?.includes(ref?.path))
+      return onError?.(new Error("Mock onSnapshot failure"));
+    const d = window.__docs?.[ref?.path];
+    cb({ exists: () => d !== undefined, data: () => d ?? null, forEach() {}, docs: [] });
+  };
+  const delay = window.__getDocDelays?.[ref?.path];
+  if (delay) setTimeout(reply, delay);
+  else reply();
   return () => {};
 };
 
