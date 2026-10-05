@@ -134,6 +134,10 @@ export const CLEAN_FILES = [
   "src/components/TrajectoryChart.jsx",
   "src/components/TrajectoryDrawing.jsx",
   "src/components/TrajectoryPanel.jsx",
+  "src/lib/weightLogTable.js",
+  "src/hooks/useWeightLog.js",
+  "src/components/WeightLogPanel.jsx",
+  "src/components/WeightLogTable.jsx",
 ];
 
 const unused = [
