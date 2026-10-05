@@ -236,6 +236,11 @@ export const CLEAN_FILES = [
   "src/components/HourlyStepsBody.jsx",
   "src/components/HourlyStepsFull.jsx",
   "src/components/HourlyStepsCard.jsx",
+  "src/lib/referenceDiet.js",
+  "src/styles/compareStyles.js",
+  "src/components/CompareDays.jsx",
+  "src/components/ReferenceCalculator.jsx",
+  "src/tabs/CompareTab.jsx",
 ];
 
 const unused = [
