@@ -73,7 +73,12 @@ const shape = (p) =>
         .filter((n) => n.nodeType === 3)
         .map((n) => n.nodeValue)
         .join("");
-      const parts = [el.tagName, el.getAttribute("style") ?? ""];
+      // Chromium versions serialise "border: none" differently: normalise it
+      const style = (el.getAttribute("style") ?? "").replace(
+        "border-width: medium; border-style: none; border-color: currentcolor; border-image: none;",
+        "border: none;",
+      );
+      const parts = [el.tagName, style];
       if (own.trim()) parts.push(`"${own}"`);
       if (el.tagName === "INPUT")
         parts.push(
