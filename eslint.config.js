@@ -163,6 +163,12 @@ export const CLEAN_FILES = [
   "src/components/DayHeader.jsx",
   "src/components/CalorieBar.jsx",
   "src/components/DaySummary.jsx",
+  "src/lib/mealCards.js",
+  "src/components/MealCard.jsx",
+  "src/components/MealItemRow.jsx",
+  "src/hooks/useCollapsedMeals.js",
+  "src/hooks/useAppleKcal.js",
+  "src/tabs/LogTab.jsx",
 ];
 
 const unused = [
