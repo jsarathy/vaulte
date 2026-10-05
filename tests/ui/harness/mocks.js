@@ -4,7 +4,8 @@
 
 // ── firebase / firebase/firestore ────────────────────────────────────────────
 export const db = {};
-export const auth = {};
+export const auth = { currentUser: null }; // set by the auth mocks below
+export const storage = {};
 export const doc = (...a) => ({ path: a.slice(1).join("/") });
 // setDoc/getDoc: saves are recorded in window.__setDocs; reads come from window.__docs
 // (keyed by path, e.g. "users/u/monthly_targets/2026-10"), which tests may seed first.
@@ -215,3 +216,102 @@ export const claudeEstimatePortionWeight = async (r) => {
   );
   return { total_g: total, portion_g: total / (Number(r.servings) || 1) + 0.4 };
 };
+
+// ── firebase/auth ────────────────────────────────────────────────────────────
+// Calls recorded in window.__authCalls as { fn, ...args }. window.__authUser is the user
+// already signed in when the page opens (null: nobody); window.__authFail = { fn: code } makes
+// that call throw an error with that code (message "Mock <code>" unless __authFail[fn] is
+// [code, message]). window.__magicLink: the page opened from a sign-in link.
+window.__authCalls = [];
+// window.__authDelays = { fn: ms } slows that call
+const authWait = (fn) => new Promise((res) => setTimeout(res, window.__authDelays?.[fn] || 0));
+const authCall = (fn, args) => {
+  window.__authCalls.push({ fn, ...args });
+  const fail = window.__authFail?.[fn];
+  if (!fail) return;
+  const [code, message] = Array.isArray(fail) ? fail : [fail, `Mock ${fail}`];
+  throw Object.assign(new Error(message), { code });
+};
+const signedIn = (user) => {
+  auth.currentUser = user;
+  return { user };
+};
+const userFor = (uid, email, extra = {}) => ({
+  uid,
+  email,
+  displayName: null,
+  photoURL: null,
+  ...extra,
+});
+export const onAuthStateChanged = (_a, cb) => {
+  setTimeout(() => {
+    auth.currentUser = window.__authUser ?? null;
+    cb(auth.currentUser);
+  }, window.__authDelay || 0);
+  return () => {};
+};
+export const createUserWithEmailAndPassword = async (_a, email, password) => {
+  await authWait("createUser");
+  authCall("createUser", { email, password });
+  return signedIn(userFor("new-u", email));
+};
+export const signInWithEmailAndPassword = async (_a, email, password) => {
+  await authWait("signIn");
+  authCall("signIn", { email, password });
+  return signedIn(userFor(window.__signInUid ?? "u", email));
+};
+export const signOut = async () => {
+  authCall("signOut", {});
+  auth.currentUser = null;
+};
+export const deleteUser = async (user) => {
+  await authWait("deleteUser");
+  authCall("deleteUser", { uid: user?.uid });
+};
+export const updatePassword = async (user, password) => {
+  await authWait("updatePassword");
+  authCall("updatePassword", { uid: user?.uid, password });
+};
+export const sendSignInLinkToEmail = async (_a, email, settings) => {
+  await authWait("sendLink");
+  authCall("sendLink", { email, settings });
+};
+export const isSignInWithEmailLink = (_a, href) => {
+  authCall("isLink", { href });
+  return !!window.__magicLink;
+};
+export const signInWithEmailLink = async (_a, email, href) => {
+  await authWait("signInWithLink");
+  authCall("signInWithLink", { email, href });
+  return signedIn(userFor(window.__signInUid ?? "magic-u", email));
+};
+export class GoogleAuthProvider {}
+export const signInWithPopup = async (_a, provider) => {
+  await authWait("popup");
+  authCall("popup", { provider: provider?.constructor?.name });
+  const g = window.__googleUser ?? {
+    uid: "g-u",
+    email: "gina@example.com",
+    displayName: "Gina Marie Google",
+    photoURL: "https://photos.test/gina.jpg",
+  };
+  return signedIn(userFor(g.uid, g.email, g));
+};
+
+// ── firebase/storage ─────────────────────────────────────────────────────────
+// Calls recorded in window.__storageCalls; window.__failStorage = { fn: message } makes that
+// call throw. getDownloadURL gives https://cdn.test/<path>.
+window.__storageCalls = [];
+const storageCall = (fn, args) => {
+  window.__storageCalls.push({ fn, ...args });
+  const fail = window.__failStorage?.[fn];
+  if (fail) throw new Error(fail);
+};
+export const ref = (_s, path) => ({ path });
+export const uploadBytes = async (r, file) =>
+  storageCall("upload", { path: r.path, name: file?.name, size: file?.size, type: file?.type });
+export const getDownloadURL = async (r) => {
+  storageCall("url", { path: r.path });
+  return `https://cdn.test/${r.path}`;
+};
+export const deleteObject = async (r) => storageCall("delete", { path: r.path });

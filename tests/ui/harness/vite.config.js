@@ -12,6 +12,8 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^firebase\/firestore$/, replacement: mocks },
+      { find: /^firebase\/auth$/, replacement: mocks },
+      { find: /^firebase\/storage$/, replacement: mocks },
       { find: /^(\.\.?\/)+firebase$/, replacement: mocks },
       { find: /^(\.\.?\/)+api\/firestore$/, replacement: mocks },
       { find: /^(\.\.?\/)+api\/claude$/, replacement: mocks },
