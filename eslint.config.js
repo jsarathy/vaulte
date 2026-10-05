@@ -244,6 +244,8 @@ export const CLEAN_FILES = [
   "api/_polar/hrFetch.js",
   "api/polar-fetch-hr.js",
   "src/utils/imageUtils.js",
+  "src/constants/seedDays.js",
+  "src/api/firestore.js",
 ];
 
 const unused = [
