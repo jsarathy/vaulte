@@ -50,8 +50,10 @@ export const collection = (...a) => ({ path: a.slice(1).join("/") });
 export const orderBy = () => ({});
 export const query = () => ({});
 export const where = () => ({});
-export const onSnapshot = (_r, cb) => {
-  cb({ exists: () => false, data: () => null, forEach() {}, docs: [] });
+// onSnapshot: one reply, from window.__docs like getDoc
+export const onSnapshot = (ref, cb) => {
+  const d = window.__docs?.[ref?.path];
+  cb({ exists: () => d !== undefined, data: () => d ?? null, forEach() {}, docs: [] });
   return () => {};
 };
 

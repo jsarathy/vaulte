@@ -1,7 +1,11 @@
 // src/tabs/LogTab.jsx
 import { useState, useEffect } from "react";
-import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
-import { C, FONT, IconX, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
+import { fmt, getDayTotals } from "../constants/helpers";
+import { dayBudget, summaryCards } from "../lib/dayBudget.js";
+import { C, FONT, IconX } from "../constants/design.jsx";
+import DayHeader from "../components/DayHeader.jsx";
+import CalorieBar from "../components/CalorieBar.jsx";
+import DaySummary from "../components/DaySummary.jsx";
 import PolarDetailModal from "../components/PolarDetailModal.jsx";
 import { usePolarDetail } from "../hooks/usePolarDetail.js";
 import AppleActivityCard from "../components/AppleActivityCard.jsx";
@@ -59,30 +63,12 @@ export default function LogTab({
     );
 
   const totals = getDayTotals(currentDayData);
-  const BMR =
-    calcSex === "m"
-      ? 10 * calcWeight + 6.25 * calcHeight - 5 * calcAge + 5
-      : 10 * calcWeight + 6.25 * calcHeight - 5 * calcAge - 161;
-  let activeTierIdx = 0;
-  const exerciseBurned = totals.exerciseBurned + appleKcal; // workouts + Apple Watch daily activity
-  if (exerciseBurned > 300) activeTierIdx = 3;
-  else if (exerciseBurned > 150) activeTierIdx = 2;
-  else if (exerciseBurned > 0) activeTierIdx = 1;
-  const activeTier = ACTIVITY_LEVELS[activeTierIdx];
-  const tdee = Math.round(BMR * activeTier.factor);
-  const macroTgt = calcMacros(tdee, {
-    weight: calcWeight,
-    proteinPerKg: calcProtein,
-    fatPct: calcFatPct / 100,
+  const calc = { sex: calcSex, age: calcAge, height: calcHeight, weight: calcWeight };
+  const budget = dayBudget(totals, appleKcal, {
+    ...calc,
+    protein: calcProtein,
+    fatPct: calcFatPct,
   });
-  const netKcal = totals.foodKcal - exerciseBurned;
-  const netRemaining = tdee - netKcal;
-  const netPct = Math.min(100, Math.round((netKcal / tdee) * 100));
-  const macros = [
-    ["P", totals.protein, macroTgt.protein_g, "blue"],
-    ["F", totals.fat, macroTgt.fat_g, "amber"],
-    ["C", totals.carbs, macroTgt.carbs_g, "amber"],
-  ];
 
   // Cards are collapsed by default; only an explicit `false` (user expanded it) shows them open
   const isClosed = (id) => collapsed[id] ?? true;
@@ -97,291 +83,9 @@ export default function LogTab({
   return (
     <>
       <PolarDetailModal detail={polar} userId={userId} />
-      {/* Day header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "12px",
-        }}
-      >
-        <div style={{ fontSize: "14px", fontWeight: "500", color: C.text }}>
-          {formatDate(currentDate)}
-        </div>
-        <div style={{ display: "flex", gap: "4px" }}>
-          <button
-            onClick={() => {
-              const idx = allDays.findIndex((d) => d.date === currentDate);
-              if (idx < allDays.length - 1) switchDay(allDays[idx + 1].date);
-            }}
-            style={{
-              width: "26px",
-              height: "26px",
-              border: `0.5px solid ${C.borderMid}`,
-              borderRadius: "5px",
-              background: "#fff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: C.muted,
-            }}
-          >
-            <IconChevronLeft size={12} />
-          </button>
-          <button
-            onClick={() => {
-              const idx = allDays.findIndex((d) => d.date === currentDate);
-              if (idx > 0) switchDay(allDays[idx - 1].date);
-            }}
-            style={{
-              width: "26px",
-              height: "26px",
-              border: `0.5px solid ${C.borderMid}`,
-              borderRadius: "5px",
-              background: "#fff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: C.muted,
-            }}
-          >
-            <IconChevronRight size={12} />
-          </button>
-        </div>
-      </div>
-
-      {/* Calorie bar */}
-      <div
-        style={{
-          background: "#fff",
-          border: `0.5px solid ${C.border}`,
-          borderRadius: "8px",
-          padding: "12px 14px",
-          marginBottom: "10px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "8px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-            <span
-              style={{
-                fontFamily: FONT.mono,
-                fontSize: "20px",
-                fontWeight: "500",
-                color: C.text,
-                letterSpacing: "-0.5px",
-              }}
-            >
-              {Math.round(netKcal).toLocaleString()}
-            </span>
-            <span style={{ fontSize: "11px", color: C.muted }}>
-              net kcal of {tdee.toLocaleString()} · {activeTier.label}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {macros.map(([k, v, t, c]) => {
-              const over = v > t;
-              const bg = over
-                ? C.dangerBg
-                : c === "blue"
-                  ? C.blueBg
-                  : c === "amber"
-                    ? C.amberBg
-                    : C.greenBg;
-              const col = over
-                ? C.danger
-                : c === "blue"
-                  ? C.blueText
-                  : c === "amber"
-                    ? C.amberText
-                    : C.greenText;
-              const border = over
-                ? `1px solid ${C.danger}`
-                : c === "blue"
-                  ? `1px solid ${C.blueMid}`
-                  : `1px solid ${C.amberBg}`;
-              return (
-                <div
-                  key={k}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    background: bg,
-                    border: border,
-                    borderRadius: "8px",
-                    padding: "5px 10px",
-                    minWidth: "52px",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "9px",
-                      fontWeight: "500",
-                      color: col,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      opacity: 0.8,
-                    }}
-                  >
-                    {k === "P" ? "Protein" : k === "F" ? "Fat" : "Carbs"}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: FONT.mono,
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      color: col,
-                      letterSpacing: "-0.3px",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {fmt(v)}g
-                  </span>
-                </div>
-              );
-            })}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                background: netRemaining < 0 ? C.dangerBg : C.greenBg,
-                border: netRemaining < 0 ? `1px solid ${C.danger}` : `1px solid ${C.greenBg}`,
-                borderRadius: "8px",
-                padding: "5px 10px",
-                minWidth: "52px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "9px",
-                  fontWeight: "500",
-                  color: netRemaining < 0 ? C.danger : C.greenText,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  opacity: 0.8,
-                }}
-              >
-                Left
-              </span>
-              <span
-                style={{
-                  fontFamily: FONT.mono,
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: netRemaining < 0 ? C.danger : C.greenText,
-                  letterSpacing: "-0.3px",
-                  lineHeight: 1.2,
-                }}
-              >
-                {netRemaining >= 0 ? "-" : "+"}‎
-                {Math.abs(Math.round(netRemaining)).toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div style={{ height: "4px", background: C.bg, borderRadius: "2px", overflow: "hidden" }}>
-          <div
-            style={{
-              height: "100%",
-              width: `${netPct}%`,
-              background: netPct > 100 ? C.danger : C.blue,
-              borderRadius: "2px",
-              transition: "width 0.3s",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Summary metric row */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-          gap: "7px",
-          marginBottom: "12px",
-        }}
-      >
-        {[
-          [
-            "Consumed",
-            Math.round(totals.foodKcal).toLocaleString(),
-            `${Math.round(exerciseBurned)} kcal burned${appleKcal ? ` (incl. ${Math.round(appleKcal)} Apple)` : ""}`,
-            "",
-          ],
-          ["Protein", `${fmt(totals.protein)}g`, `target ${macroTgt.protein_g}g`, ""],
-          [
-            "Net carbs",
-            `${fmt(totals.net_carbs)}g`,
-            totals.net_carbs > macroTgt.carbs_g
-              ? `+${fmt(totals.net_carbs - macroTgt.carbs_g)}g over`
-              : `${fmt(macroTgt.carbs_g - totals.net_carbs)}g left`,
-            "warn",
-          ],
-          [
-            "Fat burned",
-            `${fmt(totals.fatBurnedG || 0)}g`,
-            totals.exerciseBurned
-              ? `${Math.round(totals.exerciseBurned)} kcal exercise`
-              : "no exercise logged",
-            "",
-          ],
-        ].map(([lbl, val, sub, variant]) => (
-          <div
-            key={lbl}
-            style={{
-              background: "#fff",
-              border: `0.5px solid ${C.border}`,
-              borderRadius: "8px",
-              padding: "10px 12px",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "10px",
-                fontWeight: "500",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-                color: C.hint,
-                marginBottom: "4px",
-              }}
-            >
-              {lbl}
-            </div>
-            <div
-              style={{
-                fontFamily: FONT.mono,
-                fontSize: "18px",
-                fontWeight: "500",
-                color: C.text,
-                letterSpacing: "-0.5px",
-              }}
-            >
-              {val}
-            </div>
-            <div
-              style={{
-                fontSize: "10px",
-                color: variant === "warn" && sub.includes("over") ? C.amberText : C.hint,
-                marginTop: "2px",
-                fontFamily: FONT.mono,
-              }}
-            >
-              {sub}
-            </div>
-          </div>
-        ))}
-      </div>
+      <DayHeader date={currentDate} allDays={allDays} switchDay={switchDay} />
+      <CalorieBar budget={budget} totals={totals} />
+      <DaySummary cards={summaryCards(totals, budget, appleKcal)} />
 
       {/* Meal cards */}
       {currentDayData.meals?.map((meal) => {
