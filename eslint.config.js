@@ -243,6 +243,7 @@ export const CLEAN_FILES = [
   "src/tabs/CompareTab.jsx",
   "api/_polar/hrFetch.js",
   "api/polar-fetch-hr.js",
+  "src/utils/imageUtils.js",
 ];
 
 const unused = [
