@@ -138,6 +138,10 @@ export const CLEAN_FILES = [
   "src/hooks/useWeightLog.js",
   "src/components/WeightLogPanel.jsx",
   "src/components/WeightLogTable.jsx",
+  "src/lib/planSummary.js",
+  "src/hooks/usePlanEditing.js",
+  "src/components/PlanSpecsCard.jsx",
+  "src/components/MilestoneRoadmap.jsx",
 ];
 
 const unused = [
