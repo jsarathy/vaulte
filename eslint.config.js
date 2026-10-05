@@ -142,6 +142,12 @@ export const CLEAN_FILES = [
   "src/hooks/usePlanEditing.js",
   "src/components/PlanSpecsCard.jsx",
   "src/components/MilestoneRoadmap.jsx",
+  "src/lib/planEdits.js",
+  "src/hooks/usePlanForm.js",
+  "src/components/planFormStyles.js",
+  "src/components/PlanStatsEditor.jsx",
+  "src/components/PlanCurveEditor.jsx",
+  "src/tabs/WeightTracker.jsx",
 ];
 
 const unused = [
