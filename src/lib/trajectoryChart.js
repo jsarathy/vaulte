@@ -1,5 +1,5 @@
-// src/lib/trajectoryChart.js — what the Weight tab's Trajectory chart draws: the chosen metric's
-// readings (for weight, also the plan curve and the 2-wk average), and the drawing's scales,
+// src/lib/trajectoryChart.js — what the Weight and Body tabs' Trajectory charts draw: the chosen
+// metric's readings (for weight, also the plan curve and the 2-wk average), and the drawing's scales,
 // gridlines, date labels, paths and hover label. Compact: a fixed 380 × 230 drawing scaled to the
 // panel. Expanded: real pixels, at least MIN_DAY_PX per day, scrolling sideways, so daily
 // readings always get room to separate.
@@ -13,10 +13,9 @@ const COMPACT = { W: 380, H: 230 };
 const Y_STEPS = [1, 2, 2.5, 5, 10];
 const X_STEP_DAYS = [1, 2, 3, 7, 14, 30, 61, 91, 182, 365];
 
-/** Readings of a metric, oldest first: { t, v, date }. */
-function readingsOf(weightLog, metric) {
-  const valOf = (row) => (metric === "weight" ? row.actual : row.renpho?.[metric]);
-  return weightLog
+/** Readings, oldest first: { t, v, date } for each dated row valOf finds a value in. */
+function readingsOf(rows, valOf) {
+  return rows
     .filter((row) => valOf(row) != null && Number.isFinite(Date.parse(row.date)))
     .map((row) => ({ t: Date.parse(row.date), v: Number(valOf(row)), date: row.date }))
     .sort((a, b) => a.t - b.t);
@@ -30,7 +29,9 @@ const planPoints = (cfg) =>
 
 /** Everything plotted for a metric. Only weight has a plan curve and a 2-wk average. */
 export function chartSeries(weightLog, metric, cfg) {
-  const acts = readingsOf(weightLog, metric);
+  const acts = readingsOf(weightLog, (row) =>
+    metric === "weight" ? row.actual : row.renpho?.[metric],
+  );
   if (metric !== "weight")
     return { isPlan: false, unit: metricUnit(metric), acts, avgPts: [], projPts: [] };
   const readings = weightReadings(weightLog);
@@ -39,6 +40,16 @@ export function chartSeries(weightLog, metric, cfg) {
     .filter((p) => p.v != null);
   return { isPlan: true, unit: "kg", acts, avgPts, projPts: planPoints(cfg) };
 }
+
+/** A Body tab site's tape readings (cm). Its scale keeps at least 0.5 cm above and below. */
+export const bodySeries = (bodyLog, site) => ({
+  isPlan: false,
+  unit: "cm",
+  acts: readingsOf(bodyLog, (row) => row[site]),
+  avgPts: [],
+  projPts: [],
+  minPad: 0.5,
+});
 
 /** Drawable once there are two points of either the plan curve or the readings. */
 export const hasEnough = ({ projPts, acts }) => projPts.length >= 2 || acts.length >= 2;
@@ -63,18 +74,20 @@ function canvas(full, days, box) {
   return { k: 1.6, PAD, W, H: Math.max(300, vh - 22) }; // 22px leaves room for the scrollbar
 }
 
-/** Room above and below the values: 1 kg for weight, else 15% of the range (at least 1%). */
-function valuePad(isPlan, vals) {
+/** Room above and below the values: 1 kg for weight, else 15% of the range, at least minPad
+ * (default 1% of the top value, at least 0.1). */
+function valuePad({ isPlan, minPad }, vals) {
   if (isPlan) return 1;
   const hi = Math.max(...vals);
   const lo = Math.min(...vals);
-  return Math.max((hi - lo) * 0.15, Math.abs(hi) * 0.01, 0.1);
+  return Math.max((hi - lo) * 0.15, minPad ?? Math.max(Math.abs(hi) * 0.01, 0.1));
 }
 
 /** Value scale; for weight, low enough to show the target zone's bottom too. */
-function valueRange({ isPlan, projPts, acts }, cfg) {
+function valueRange(series, cfg) {
+  const { isPlan, projPts, acts } = series;
   const vals = [...projPts.map((p) => p.v), ...acts.map((a) => a.v)];
-  const vPad = valuePad(isPlan, vals);
+  const vPad = valuePad(series, vals);
   const maxW = Math.max(...vals) + vPad;
   const minW = Math.min(...vals) - vPad;
   if (!isPlan || !Number.isFinite(cfg.targetWeightMinKg)) return { minW, maxW };

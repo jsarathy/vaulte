@@ -56,9 +56,10 @@ function useHover(full, metric) {
   return { hoverMetric, setHoverMetric, hoverPt, setHoverPt };
 }
 
-export default function useTrajectoryChart() {
+/** first: the metric shown at first ("weight" on the Weight tab, "waist" on the Body tab). */
+export default function useTrajectoryChart(first = "weight") {
   const [full, setFull] = useState(false);
-  const [metric, setMetric] = useState("weight"); // "weight" | a Renpho metric key
+  const [metric, setMetric] = useState(first); // weight / Renpho metric, or a Body tab site
   useEscapeToCollapse(full, setFull);
   const refs = useScrollToLatest(full, metric);
   const box = useBoxSize(full, refs.scrollRef);

@@ -169,6 +169,9 @@ export const CLEAN_FILES = [
   "src/hooks/useCollapsedMeals.js",
   "src/hooks/useAppleKcal.js",
   "src/tabs/LogTab.jsx",
+  "src/lib/bodyMeasures.js",
+  "src/components/TrajectoryFrame.jsx",
+  "src/components/BodyTrajectory.jsx",
 ];
 
 const unused = [
