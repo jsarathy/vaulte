@@ -106,9 +106,10 @@ const describe = (root) =>
       .filter((n) => n.nodeType === 3)
       .map((n) => n.nodeValue)
       .join("");
+    // CI's Chromium writes "border(-bottom): none" as longhands
     const style = (el.getAttribute("style") ?? "").replace(
-      "border-width: medium; border-style: none; border-color: currentcolor; border-image: none;",
-      "border: none;",
+      /border(-bottom)?-width: medium; border\1-style: none; border\1-color: currentcolor;( border-image: none;)?/g,
+      "border$1: none;",
     );
     const attrs = ["width", "height", "viewBox", "d", "cx", "cy", "r", "stroke", "fill"]
       .concat(["stroke-width", "stroke-linecap", "colspan"])
