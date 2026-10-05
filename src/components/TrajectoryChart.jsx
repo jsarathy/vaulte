@@ -1,6 +1,6 @@
-// src/components/TrajectoryChart.jsx — the Trajectory chart for the chosen metric: legend and
-// drawing, or a hint when there's too little to draw. Render only; figures from
-// lib/trajectoryChart, chart = useTrajectoryChart().
+// src/components/TrajectoryChart.jsx — the Weight tab's Trajectory chart for the chosen metric:
+// legend and drawing, or a hint when there's too little to draw; its parts are shared with the
+// Body tab's chart. Render only; figures from lib/trajectoryChart, chart = useTrajectoryChart().
 import { chartLayout, chartSeries, hasEnough, latestX } from "../lib/trajectoryChart.js";
 import TrajectoryDrawing from "./TrajectoryDrawing.jsx";
 
@@ -32,33 +32,31 @@ const S = {
   scroll: { overflowX: "auto", overflowY: "hidden", flex: 1, minHeight: 0 },
 };
 
-function ChartEmpty({ full, isPlan }) {
-  return (
-    <div style={S.empty(full)}>
-      {isPlan
-        ? "Set a start date, start weight and curve anchors to see the projection"
-        : "Needs at least two readings — sync Renpho to fill this in"}
-    </div>
-  );
+/** The hint shown instead of a chart. */
+export function ChartEmpty({ full, children }) {
+  return <div style={S.empty(full)}>{children}</div>;
 }
 
-function ChartLegend({ full, showAvg }) {
+/** projected: list the plan curve (Weight tab); showAvg: list the 2-wk average. */
+export function ChartLegend({ full, projected = true, showAvg }) {
   return (
     <div style={S.legend(full)}>
-      <span style={S.item}>
-        <svg width="16" height="4">
-          <line
-            x1="0"
-            y1="2"
-            x2="16"
-            y2="2"
-            stroke="#90CAF9"
-            strokeWidth="1.5"
-            strokeDasharray="4,3"
-          />
-        </svg>
-        Projected
-      </span>
+      {projected && (
+        <span style={S.item}>
+          <svg width="16" height="4">
+            <line
+              x1="0"
+              y1="2"
+              x2="16"
+              y2="2"
+              stroke="#90CAF9"
+              strokeWidth="1.5"
+              strokeDasharray="4,3"
+            />
+          </svg>
+          Projected
+        </span>
+      )}
       <span style={S.item}>
         <svg width="16" height="6">
           <line x1="0" y1="3" x2="16" y2="3" stroke="#378ADD" strokeWidth="2" />
@@ -78,14 +76,13 @@ function ChartLegend({ full, showAvg }) {
   );
 }
 
-export default function TrajectoryChart({ weightLog, cfg, chart }) {
-  const series = chartSeries(weightLog, chart.metric, cfg);
-  if (!hasEnough(series)) return <ChartEmpty full={chart.full} isPlan={series.isPlan} />;
+/** Legend, then the drawing in its scroller (expanded: scrolls sideways to the latest reading). */
+export function ChartBody({ series, cfg, chart, legend }) {
   const L = chartLayout(series, cfg, { full: chart.full, box: chart.box });
   chart.latestXRef.current = latestX(series, L);
   return (
     <>
-      <ChartLegend full={chart.full} showAvg={series.isPlan && series.avgPts.length > 1} />
+      {legend}
       <style>{SCROLLBAR_CSS}</style>
       <div
         ref={chart.scrollRef}
@@ -96,4 +93,19 @@ export default function TrajectoryChart({ weightLog, cfg, chart }) {
       </div>
     </>
   );
+}
+
+export default function TrajectoryChart({ weightLog, cfg, chart }) {
+  const series = chartSeries(weightLog, chart.metric, cfg);
+  if (!hasEnough(series))
+    return (
+      <ChartEmpty full={chart.full}>
+        {series.isPlan
+          ? "Set a start date, start weight and curve anchors to see the projection"
+          : "Needs at least two readings — sync Renpho to fill this in"}
+      </ChartEmpty>
+    );
+  const showAvg = series.isPlan && series.avgPts.length > 1;
+  const legend = <ChartLegend full={chart.full} showAvg={showAvg} />;
+  return <ChartBody series={series} cfg={cfg} chart={chart} legend={legend} />;
 }

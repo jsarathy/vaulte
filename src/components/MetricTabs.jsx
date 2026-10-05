@@ -1,6 +1,7 @@
-// src/components/MetricTabs.jsx — the Trajectory chart's metric tabs (Weight + Renpho metrics)
-// and the note shown while one is hovered or focused. Render only; chart = useTrajectoryChart().
-import { metricHeading, metricInfo, metricTabs } from "../lib/weightMetrics.js";
+// src/components/MetricTabs.jsx — a Trajectory chart's metric tabs (Weight + Renpho metrics, or
+// the Body tab's sites) and the note shown while one is hovered or focused. Render only;
+// chart = useTrajectoryChart(), tabs = [[metric, label]], noteOf(metric) → { title, info } (no
+// note while noteOf is null).
 
 const S = {
   row: { display: "flex", flexWrap: "wrap", gap: "4px" },
@@ -37,16 +38,16 @@ const S = {
   noteTitle: { fontWeight: "bold", marginBottom: "3px" },
 };
 
-function MetricNote({ metric }) {
+function MetricNote({ title, info }) {
   return (
     <div style={S.note}>
-      <div style={S.noteTitle}>{metricHeading(metric)}</div>
-      {metricInfo(metric)}
+      <div style={S.noteTitle}>{title}</div>
+      {info}
     </div>
   );
 }
 
-function MetricTab({ metric, label, chart }) {
+function MetricTab({ metric, label, chart, noteOf }) {
   const choose = (e) => {
     e.stopPropagation(); // not a double-click on the chart
     chart.setMetric(metric);
@@ -65,17 +66,17 @@ function MetricTab({ metric, label, chart }) {
       >
         {label}
       </button>
-      {chart.hoverMetric === metric && <MetricNote metric={metric} />}
+      {noteOf && chart.hoverMetric === metric && <MetricNote {...noteOf(metric)} />}
     </span>
   );
 }
 
-export default function MetricTabs({ weightLog, chart }) {
+export default function MetricTabs({ tabs, chart, noteOf }) {
   return (
     <div onDoubleClick={(e) => e.stopPropagation()} style={{ position: "relative" }}>
       <div style={S.row}>
-        {metricTabs(weightLog).map(([metric, label]) => (
-          <MetricTab key={metric} metric={metric} label={label} chart={chart} />
+        {tabs.map(([metric, label]) => (
+          <MetricTab key={metric} metric={metric} label={label} chart={chart} noteOf={noteOf} />
         ))}
       </div>
     </div>
