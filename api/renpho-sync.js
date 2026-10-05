@@ -12,45 +12,15 @@
 //   RENPHO_EMAIL
 //   RENPHO_PASSWORD
 
-import crypto from "crypto";
-
-const API_BASE = "https://cloud.renpho.com";
-const ENC_KEY = "ed*wijdi$h6fe3ew"; // 16-byte AES-128 key used by the app
-const APP_VERSION = "6.6.0";
-const PLATFORM = "android";
-const SUCCESS_CODES = new Set([0, "0", 101, "101", 200, "200", 20000, "20000"]);
-
-// Device type codes for body-weight scales (ES-20M is in this family).
-const BODY_WEIGHT_SCALES = [
-  "01",
-  "02",
-  "03",
-  "04",
-  "05",
-  "06",
-  "07",
-  "08",
-  "09",
-  "0A",
-  "0B",
-  "0C",
-  "0D",
-  "0E",
-  "0F",
-  "10",
-  "11",
-  "12",
-  "13",
-  "14",
-];
-
-const ENDPOINTS = {
-  login: "renpho-aggregation/user/login",
-  deviceInfo: "renpho-aggregation/device/count",
-  measurements: "RenphoHealth/scale/queryAllMeasureDataList",
-  bodyComposition: "RenphoHealth/scale/queryBodyCompositionMeasureData",
-  girth: "RenphoHealth/renpho/girth/queryAllGirthsDataList",
-};
+import {
+  ENDPOINTS,
+  checkResponse,
+  decryptResponse,
+  encryptRequest,
+  fetchPages,
+  login,
+  post,
+} from "./_renpho/client.js";
 
 // Smart Tape Measure: Renpho field -> Body tab key (all cm). The overall
 // arm/thigh/calf fields and the custom slots are not used.
@@ -69,100 +39,14 @@ const GIRTH_FIELDS = {
   rightCalfValue: "calfR",
 };
 
-// ── AES-128-ECB envelope ─────────────────────────────────────────────────────
-function aesEncrypt(plaintext) {
-  const c = crypto.createCipheriv("aes-128-ecb", Buffer.from(ENC_KEY, "utf8"), null);
-  c.setAutoPadding(true); // PKCS7
-  return Buffer.concat([c.update(plaintext, "utf8"), c.final()]).toString("base64");
-}
-function aesDecrypt(b64) {
-  const d = crypto.createDecipheriv("aes-128-ecb", Buffer.from(ENC_KEY, "utf8"), null);
-  d.setAutoPadding(true);
-  return Buffer.concat([d.update(Buffer.from(b64, "base64")), d.final()]).toString("utf8");
-}
-const encryptRequest = (obj) => ({ encryptData: aesEncrypt(JSON.stringify(obj)) });
-const decryptResponse = (data) => JSON.parse(aesDecrypt(data));
-
-// ── Token cache (survives warm lambda invocations) ───────────────────────────
-let cached = { token: null, userId: null, at: 0 };
-const TOKEN_TTL_MS = 50 * 60 * 1000;
-
-function checkResponse(result, context) {
-  const code = result?.code;
-  const msg = String(result?.msg ?? "");
-  if (msg.toLowerCase() === "success" || SUCCESS_CODES.has(code)) return;
-  throw new Error(`${context} failed: code=${code}, msg=${msg}`);
-}
-
-async function post(endpoint, body, { token, userId } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (token) {
-    headers.token = token;
-    headers.userId = String(userId);
-    headers.appVersion = APP_VERSION;
-    headers.platform = PLATFORM;
-  }
-  const res = await fetch(`${API_BASE}/${endpoint}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
+const fetchPaged = (endpoint, tableName, uid, auth) =>
+  fetchPages({
+    endpoint,
+    body: { userIds: [String(uid)], tableName },
+    auth,
+    pageSize: 50,
+    label: endpoint,
   });
-  if (!res.ok) throw new Error(`${endpoint} HTTP ${res.status}`);
-  return res.json();
-}
-
-async function login(email, password) {
-  if (cached.token && Date.now() - cached.at < TOKEN_TTL_MS) return cached;
-  const payload = {
-    questionnaire: {},
-    login: {
-      password,
-      areaCode: "US",
-      appRevision: APP_VERSION,
-      cellphoneType: "VaulteSync",
-      systemType: "11",
-      email,
-      platform: PLATFORM,
-    },
-    bindingList: { deviceTypes: BODY_WEIGHT_SCALES },
-  };
-  const result = await post(ENDPOINTS.login, encryptRequest(payload));
-  checkResponse(result, "Login");
-  const data = decryptResponse(result.data);
-  const info = data?.login || {};
-  if (!info.token) throw new Error("Login returned no token");
-  cached = { token: info.token, userId: info.id, at: Date.now() };
-  return cached;
-}
-
-function extractRecords(pageData) {
-  if (Array.isArray(pageData)) return pageData.length ? pageData : null;
-  if (pageData && typeof pageData === "object") {
-    for (const k of ["list", "data", "records", "measurements"]) {
-      if (Array.isArray(pageData[k])) return pageData[k].length ? pageData[k] : null;
-    }
-    if ("weight" in pageData) return [pageData];
-  }
-  return null;
-}
-
-async function fetchPaged(endpoint, tableName, uid, auth, pageSize = 50) {
-  const out = [];
-  for (let page = 1; page <= 40; page++) {
-    const result = await post(
-      endpoint,
-      encryptRequest({ pageNum: page, pageSize, userIds: [String(uid)], tableName }),
-      auth,
-    );
-    checkResponse(result, `${endpoint} page ${page}`);
-    if (!result.data) break;
-    const recs = extractRecords(decryptResponse(result.data));
-    if (!recs) break;
-    out.push(...recs);
-    if (recs.length < pageSize) break;
-  }
-  return out;
-}
 
 // Fields that describe the record rather than the body — never surfaced as metrics.
 const NON_METRIC =
@@ -204,19 +88,8 @@ function girthDate(m) {
 }
 
 // The girth endpoint identifies the user from the headers: no table or user id.
-async function fetchGirths(auth, pageSize = 100) {
-  const out = [];
-  for (let page = 1; page <= 40; page++) {
-    const result = await post(ENDPOINTS.girth, encryptRequest({ pageNum: page, pageSize }), auth);
-    checkResponse(result, `Girth page ${page}`);
-    if (!result.data) break;
-    const recs = extractRecords(decryptResponse(result.data));
-    if (!recs) break;
-    out.push(...recs);
-    if (recs.length < pageSize) break;
-  }
-  return out;
-}
+const fetchGirths = (auth) =>
+  fetchPages({ endpoint: ENDPOINTS.girth, body: {}, auth, pageSize: 100, label: "Girth" });
 
 async function girthHandler(req, res, auth) {
   const raw = await fetchGirths(auth);
