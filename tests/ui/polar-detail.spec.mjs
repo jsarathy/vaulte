@@ -92,7 +92,11 @@ const describe = (root) =>
     const own = [...el.childNodes]
       .filter((n) => n.nodeType === 3)
       .map((n) => n.nodeValue)
-      .join("");
+      .join("")
+      .replace(
+        /^((?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day|Mon|Tue|Wed|Thu|Fri|Sat|Sun), /,
+        "$1 ",
+      ); // CI's ICU adds a comma
     const style = (el.getAttribute("style") ?? "").replace(
       "border-width: medium; border-style: none; border-color: currentcolor; border-image: none;",
       "border: none;",
@@ -117,7 +121,7 @@ test("opening a session: loading mark, header, stats, closing", async ({ page: p
   await expect(box(p)).toBeVisible();
   await expect(link(p, "Indoor Cycling (46 min) · Polar")).toBeVisible();
   await expect(box(p).locator("div").nth(1)).toHaveText(
-    "Indoor CyclingSunday 4 October 2026 · 07:30×",
+    /^Indoor CyclingSunday,? 4 October 2026 · 07:30×$/,
   );
   const stats = await box(p)
     .locator('div[style*="grid-template-columns: 1fr 1fr"] > div')
