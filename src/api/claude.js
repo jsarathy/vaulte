@@ -1,192 +1,41 @@
-// src/api/claude.js — All Claude API helpers
+// src/api/claude.js — the Claude calls the app makes: parsing food, creating / recalculating /
+// scaling / regenerating recipes, estimating a portion weight, and the chat. Each sends a system
+// prompt (claudePrompts.js) and the user's content, and gets a reply constrained to a schema
+// (claudeSchemas.js) via claudeClient.js.
+import { requestStructured, requestText } from "./claudeClient.js";
+import * as prompt from "./claudePrompts.js";
+import {
+  FOOD_ITEMS_SCHEMA,
+  NUTRITION_SCHEMA,
+  PORTION_SCHEMA,
+  RECIPE_SCHEMA,
+} from "./claudeSchemas.js";
 
-// Grabs the model's final text block — needed because when web_search is used,
-// content[0] may be a tool-use/tool-result block rather than text.
-function extractFinalText(data) {
-  const textBlocks = (data.content || []).filter((b) => b.type === "text");
-  return textBlocks.length ? textBlocks[textBlocks.length - 1].text : "";
-}
+const user = (content) => [
+  { role: "user", content: typeof content === "string" ? content : JSON.stringify(content) },
+];
+const WEB_SEARCH = [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }];
 
-// res.json() throws a cryptic "Unexpected token" error if the body isn't JSON —
-// which happens when the platform itself fails (timeout, crash) before our
-// serverless function code runs, returning an HTML/plain-text error page instead
-// of a JSON body. This reads the body as text first so we can say what actually happened.
-async function safeJson(res) {
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(
-      res.status === 504 || /timed?\s?out/i.test(text)
-        ? "The request timed out — this can happen with web search on a longer lookup. Try a more specific description, or increase maxDuration in vercel.json."
-        : `Server returned a non-JSON response (status ${res.status}): ${text.slice(0, 150) || "empty body"}`,
-    );
-  }
-}
-
-// Throws with the real API error message instead of silently returning empty content.
-function assertOk(res, data) {
-  if (!res.ok || data.error) {
-    const msg = data.error?.message || data.error?.type || `API request failed (${res.status})`;
-    throw new Error(msg);
-  }
-}
-
-// Sends a request with output_config.format set, so the API guarantees the
-// response text matches the given JSON schema via constrained decoding
-// (Structured Outputs) — no reliance on Claude following "return only JSON"
-// instructions, no prefill needed, and it still works fine alongside tools
-// like web_search since the grammar only constrains Claude's final text output.
-async function requestStructured(body, schema) {
-  const res = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...body,
-      output_config: { format: { type: "json_schema", schema } },
-    }),
-  });
-  const data = await safeJson(res);
-  assertOk(res, data);
-  if (data.stop_reason === "refusal") {
-    throw new Error("Claude declined to generate this — try rephrasing your request.");
-  }
-  if (data.stop_reason === "max_tokens") {
-    throw new Error("Response was cut off before completing — try a shorter/simpler request.");
-  }
-  const raw = extractFinalText(data).trim();
-  if (!raw) throw new Error("Claude returned no text content.");
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(`Response wasn't valid JSON: ${raw.slice(0, 200)}`);
-  }
-}
-
-const NUTRITION_SCHEMA = {
-  type: "object",
-  properties: {
-    kcal: { type: "number" },
-    fat: { type: "number" },
-    sat_fat: { type: "number" },
-    carbs: { type: "number" },
-    sugar: { type: "number" },
-    fibre: { type: "number" },
-    net_carbs: { type: "number" },
-    protein: { type: "number" },
-  },
-  required: ["kcal", "fat", "sat_fat", "carbs", "sugar", "fibre", "net_carbs", "protein"],
-  additionalProperties: false,
-};
-
-const PORTION_SCHEMA = {
-  type: "object",
-  properties: { total_g: { type: "number" }, portion_g: { type: "number" } },
-  required: ["total_g", "portion_g"],
-  additionalProperties: false,
-};
-
-const RECIPE_SCHEMA = {
-  type: "object",
-  properties: {
-    name: { type: "string" },
-    description: { type: "string" },
-    source: { type: "string" },
-    servings: { type: "number" },
-    prep_time: { type: "string" },
-    cook_time: { type: "string" },
-    ingredients: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: { amount: { type: "string" }, item: { type: "string" } },
-        required: ["amount", "item"],
-        additionalProperties: false,
-      },
-    },
-    steps: { type: "array", items: { type: "string" } },
-    notes: { type: "string" },
-    portion_g: { type: "number" },
-    nutrition: NUTRITION_SCHEMA,
-  },
-  required: [
-    "name",
-    "description",
-    "source",
-    "servings",
-    "prep_time",
-    "cook_time",
-    "ingredients",
-    "steps",
-    "notes",
-    "portion_g",
-    "nutrition",
-  ],
-  additionalProperties: false,
-};
-
+/** The food items (name + nutrition) in a description of what was eaten. */
 export async function claudeParseFood(text) {
-  const result = await requestStructured(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: `You are a precise nutrition analysis assistant. The user will describe food they ate. For each distinct food item, estimate nutrition using accurate nutritional database values, rounded to 1 decimal place. Name should be descriptive and include quantity/weight, e.g. "Walnuts (30g)".`,
-      messages: [{ role: "user", content: text }],
-    },
-    {
-      type: "object",
-      properties: {
-        items: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: { name: { type: "string" }, ...NUTRITION_SCHEMA.properties },
-            required: ["name", ...NUTRITION_SCHEMA.required],
-            additionalProperties: false,
-          },
-        },
-      },
-      required: ["items"],
-      additionalProperties: false,
-    },
-  );
+  const body = { max_tokens: 1000, system: prompt.PARSE_FOOD, messages: user(text) };
+  const result = await requestStructured(body, FOOD_ITEMS_SCHEMA);
   return result.items;
 }
 
+/** A full recipe from a description (web search allowed); saved recipes may be ingredients. */
 export async function claudeCreateRecipe(description, savedRecipeNames = []) {
-  const saved = savedRecipeNames.length
-    ? `\nThe user has these saved recipes: ${JSON.stringify(savedRecipeNames)}. If the description uses one of them as an ingredient, list it as ONE ingredient whose "item" is exactly that saved name (don't expand it into its own ingredients and don't look it up), with "amount" in grams like "250g" or in portions like "1 portion". Its nutrition and weight are filled in from the saved recipe afterwards.`
-    : "";
-  return requestStructured(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 2000,
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
-      system: `You are a recipe and nutrition expert. The user will describe a recipe or dish they want.
-If their description is vague or missing ingredient quantities, use web search to find a real, reputable recipe (e.g. a well-known recipe site) that matches what they asked for, and base your answer on it — don't ask the user for more detail, look it up instead.
-"source" should be "Home recipe" or the site/publication name if looked up online. nutrition is PER SERVING, using accurate nutritional database values. portion_g is the estimated weight of one serving in grams: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.${saved}`,
-      messages: [{ role: "user", content: description }],
-    },
-    RECIPE_SCHEMA,
-  );
+  const system = prompt.createRecipe(savedRecipeNames);
+  const body = { max_tokens: 2000, tools: WEB_SEARCH, system, messages: user(description) };
+  return requestStructured(body, RECIPE_SCHEMA);
 }
 
+/** Nutrition per serving recalculated from the recipe's ingredients and servings. */
 export async function claudeRecalculateNutrition(recipe) {
+  const { servings, ingredients } = recipe;
+  const body = { max_tokens: 600, system: prompt.RECALCULATE_NUTRITION };
   return requestStructured(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 600,
-      system: `You are a precise nutrition analysis assistant. The user will give you a recipe's ingredients and serving count, possibly hand-edited. Recalculate the nutrition PER SERVING from scratch based on exactly what's given — don't reuse any nutrition values you might infer were there before. Use accurate nutritional database values.`,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({
-            servings: recipe.servings,
-            ingredients: recipe.ingredients,
-          }),
-        },
-      ],
-    },
+    { ...body, messages: user({ servings, ingredients }) },
     NUTRITION_SCHEMA,
   );
 }
@@ -195,107 +44,48 @@ export async function claudeRecalculateNutrition(recipe) {
 // recipe has no Wt/portion (or for ml); with a Wt/portion, g and oz are
 // scaled locally instead.
 export async function claudeScaleRecipeNutrition(recipe, qty, unit) {
-  return requestStructured(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 600,
-      system: `You are a precise nutrition analysis assistant. You are given a cooked recipe: its servings, ingredients, nutrition per serving and, if known, portion_g (the cooked weight of one serving in grams). Return the nutrition for the requested amount of the cooked dish, scaled from the per-serving nutrition given. If portion_g is null, first estimate it as the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.`,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({
-            name: recipe.name,
-            servings: recipe.servings,
-            ingredients: recipe.ingredients,
-            nutrition_per_serving: recipe.nutrition,
-            portion_g: recipe.portion_g ?? null,
-            amount: qty,
-            unit,
-          }),
-        },
-      ],
-    },
-    NUTRITION_SCHEMA,
-  );
+  const content = {
+    name: recipe.name,
+    servings: recipe.servings,
+    ingredients: recipe.ingredients,
+    nutrition_per_serving: recipe.nutrition,
+    portion_g: recipe.portion_g ?? null,
+    amount: qty,
+    unit,
+  };
+  const body = { max_tokens: 600, system: prompt.SCALE_RECIPE, messages: user(content) };
+  return requestStructured(body, NUTRITION_SCHEMA);
 }
 
 // Estimated Wt/portion: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.
 export async function claudeEstimatePortionWeight(recipe) {
+  const { name, servings, ingredients } = recipe;
+  const body = { max_tokens: 600, system: prompt.ESTIMATE_PORTION };
   return requestStructured(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 600,
-      system: `You estimate recipe weights. Given a recipe's ingredients and servings, total_g is the total weight in grams of all the ingredients as listed (convert volumes and counts to grams using typical weights, e.g. 1 medium onion, 1 tbsp oil, 1 litre milk; include liquids; ignore "to taste" items with no amount). portion_g = total_g ÷ servings. Do not adjust for water lost or absorbed in cooking.`,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({
-            name: recipe.name,
-            servings: recipe.servings,
-            ingredients: recipe.ingredients,
-          }),
-        },
-      ],
-    },
+    { ...body, messages: user({ name, servings, ingredients }) },
     PORTION_SCHEMA,
   );
 }
 
+/** The hand-edited draft refined: steps matched to the ingredients, nutrition recalculated. */
 export async function claudeRegenerateRecipe(recipe) {
-  return requestStructured(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 2000,
-      system: `You are a recipe and nutrition expert. The user has a recipe draft they've hand-edited — treat their name, servings, ingredients, steps, and notes as the source of truth, not something to second-guess.
-Refine it: rewrite the method steps if needed so they match the current ingredient list (e.g. if an ingredient was added, removed, or its amount changed, update the steps accordingly), and recalculate the nutrition per serving from scratch based on the current ingredients and servings — don't reuse any nutrition values that might already be present. portion_g is the weight of one serving in grams: keep the user's value if given, otherwise estimate it as the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.`,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({
-            name: recipe.name,
-            description: recipe.description,
-            source: recipe.source,
-            servings: recipe.servings,
-            prep_time: recipe.prep_time,
-            cook_time: recipe.cook_time,
-            ingredients: recipe.ingredients,
-            steps: recipe.steps,
-            notes: recipe.notes,
-            portion_g: recipe.portion_g ?? null,
-          }),
-        },
-      ],
-    },
-    RECIPE_SCHEMA,
-  );
+  const content = {
+    name: recipe.name,
+    description: recipe.description,
+    source: recipe.source,
+    servings: recipe.servings,
+    prep_time: recipe.prep_time,
+    cook_time: recipe.cook_time,
+    ingredients: recipe.ingredients,
+    steps: recipe.steps,
+    notes: recipe.notes,
+    portion_g: recipe.portion_g ?? null,
+  };
+  const body = { max_tokens: 2000, system: prompt.REGENERATE_RECIPE, messages: user(content) };
+  return requestStructured(body, RECIPE_SCHEMA);
 }
 
+/** The chat reply as text; the user's saved recipes are in the assistant's context. */
 export async function claudeChat(messages, userRecipes = []) {
-  const recipesContext =
-    userRecipes.length > 0
-      ? `\n\nThe user has the following saved recipes available. Use this list to answer any questions about their recipes (ingredients, nutrition, steps, etc.) instead of saying you don't have access to them:\n${JSON.stringify(
-          userRecipes.map((r) => ({
-            name: r.name,
-            description: r.description,
-            servings: r.servings,
-            ingredients: r.ingredients,
-            steps: r.steps,
-            nutrition: r.nutrition,
-          })),
-        )}`
-      : "";
-
-  const res = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: `You are a helpful nutrition and health assistant. Answer naturally and conversationally.${recipesContext}`,
-      messages,
-    }),
-  });
-  const data = await safeJson(res);
-  assertOk(res, data);
-  return extractFinalText(data);
+  return requestText({ max_tokens: 1000, system: prompt.chat(userRecipes), messages });
 }
