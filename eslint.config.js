@@ -252,6 +252,9 @@ export const CLEAN_FILES = [
   "src/components/AppleActivityTable.jsx",
   "src/components/AppleActivityHeader.jsx",
   "src/components/AppleActivityCard.jsx",
+  "src/styles/recipeModalStyles.js",
+  "src/components/RecipeModalSections.jsx",
+  "src/components/RecipeModal.jsx",
 ];
 
 const unused = [
