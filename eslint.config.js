@@ -241,6 +241,8 @@ export const CLEAN_FILES = [
   "src/components/CompareDays.jsx",
   "src/components/ReferenceCalculator.jsx",
   "src/tabs/CompareTab.jsx",
+  "api/_polar/hrFetch.js",
+  "api/polar-fetch-hr.js",
 ];
 
 const unused = [
