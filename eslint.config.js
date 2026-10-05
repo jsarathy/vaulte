@@ -153,6 +153,12 @@ export const CLEAN_FILES = [
   "api/_renpho/weight.js",
   "api/_renpho/girth.js",
   "api/renpho-sync.js",
+  "src/lib/polarDetail.js",
+  "src/api/polarDetail.js",
+  "src/hooks/usePolarDetail.js",
+  "src/lib/hrChart.js",
+  "src/components/HRChart.jsx",
+  "src/components/PolarDetailModal.jsx",
 ];
 
 const unused = [

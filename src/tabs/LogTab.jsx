@@ -1,17 +1,9 @@
 // src/tabs/LogTab.jsx
 import { useState, useEffect } from "react";
-import { getDoc, doc } from "firebase/firestore";
-import { db } from "../firebase";
-import {
-  fmt,
-  formatDate,
-  ACTIVITY_LEVELS,
-  calcMacros,
-  getDayTotals,
-  calcFatBurned,
-} from "../constants/helpers";
-import { C, FONT, border, IconX, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
-import HRChart from "../components/HRChart.jsx";
+import { fmt, formatDate, ACTIVITY_LEVELS, calcMacros, getDayTotals } from "../constants/helpers";
+import { C, FONT, IconX, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
+import PolarDetailModal from "../components/PolarDetailModal.jsx";
+import { usePolarDetail } from "../hooks/usePolarDetail.js";
 import AppleActivityCard from "../components/AppleActivityCard.jsx";
 
 const LS_KEY = "vaulte_collapsed_meals";
@@ -31,225 +23,6 @@ function saveCollapsed(state) {
   }
 }
 
-// ── Polar Detail Modal ────────────────────────────────────────────────────────
-function PolarDetailModal({ session, onClose, userId, onHRLoaded }) {
-  const [fetchingHR, setFetchingHR] = useState(false);
-  const [hrError, setHrError] = useState("");
-
-  if (!session) return null;
-  const s = session;
-  const sport = s.sport
-    ? s.sport
-        .replace(/_/g, " ")
-        .toLowerCase()
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-    : "Exercise";
-  const d = s.start_time ? new Date(s.start_time) : null;
-  const dateStr = d
-    ? d.toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : "";
-  const timeStr = d ? d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
-
-  // Compute fat burned from session data
-  const fatBurned = calcFatBurned(s.calories, s.fat_pct);
-  const fatBurnedKcal = fatBurned?.fatKcal ?? null;
-  const fatBurnedG = fatBurned?.fatGrams ?? null;
-
-  const stats = [
-    ["Duration", `${Math.round(s.duration_min || 0)} min`],
-    ["Calories", `${s.calories} kcal`],
-    s.hr_avg ? ["Avg HR", `${s.hr_avg} bpm`] : null,
-    s.hr_max ? ["Max HR", `${s.hr_max} bpm`] : null,
-    s.fat_pct != null ? ["Fat burn %", `${s.fat_pct}%`] : null,
-    fatBurnedKcal != null ? ["Fat burned", `${fatBurnedG}g · ${fatBurnedKcal} kcal`] : null,
-    s.device ? ["Device", s.device] : null,
-  ].filter(Boolean);
-
-  const fetchHR = async () => {
-    setFetchingHR(true);
-    setHrError("");
-    try {
-      const res = await fetch("/api/polar-fetch-hr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, sessionId: s.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setHrError(data.message || data.error || "Failed to fetch HR data.");
-      } else {
-        onHRLoaded({ ...s, hr_samples: data.hr_samples, recording_rate_s: data.recording_rate_s });
-      }
-    } catch (e) {
-      setHrError("Network error — try again.");
-    } finally {
-      setFetchingHR(false);
-    }
-  };
-
-  return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.4)",
-        zIndex: 3000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: "10px",
-          width: "520px",
-          maxWidth: "100%",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          border: `0.5px solid ${C.border}`,
-          fontFamily: FONT.sans,
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "14px 18px",
-            borderBottom: border,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            position: "sticky",
-            top: 0,
-            background: "#fff",
-            zIndex: 1,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: "14px", fontWeight: "500", color: C.text }}>{sport}</div>
-            <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>
-              {dateStr}
-              {timeStr ? ` · ${timeStr}` : ""}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: C.muted,
-              fontSize: "18px",
-              lineHeight: 1,
-              marginLeft: "12px",
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <div style={{ padding: "16px 18px" }}>
-          {/* Stats grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "7px",
-              marginBottom: "16px",
-            }}
-          >
-            {stats.map(([lbl, val]) => (
-              <div
-                key={lbl}
-                style={{
-                  background: C.bg,
-                  borderRadius: "6px",
-                  padding: "9px 11px",
-                  border: `0.5px solid ${C.border}`,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: C.hint,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.4px",
-                    marginBottom: "3px",
-                  }}
-                >
-                  {lbl}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONT.mono,
-                    fontWeight: "500",
-                    fontSize: "14px",
-                    color: C.text,
-                  }}
-                >
-                  {val}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* HR chart or fetch button */}
-          {s.hr_samples?.length > 1 ? (
-            <HRChart session={s} />
-          ) : (
-            <div
-              style={{
-                background: C.bg,
-                borderRadius: "6px",
-                border: `0.5px solid ${C.border}`,
-                padding: "16px",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "12px", color: C.muted, marginBottom: "12px" }}>
-                Heart rate data wasn't captured at sync time.
-              </div>
-              {(s.exercise_url || s.polar_user_id) && (
-                <>
-                  <button
-                    onClick={fetchHR}
-                    disabled={fetchingHR}
-                    style={{
-                      background: fetchingHR ? C.hint : C.blue,
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "8px 18px",
-                      cursor: fetchingHR ? "not-allowed" : "pointer",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      fontFamily: FONT.sans,
-                    }}
-                  >
-                    {fetchingHR ? "Fetching…" : "Fetch HR data"}
-                  </button>
-                  {hrError && (
-                    <div style={{ fontSize: "11px", color: C.danger, marginTop: "8px" }}>
-                      {hrError}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LogTab({
   userId,
   currentDate,
@@ -267,8 +40,7 @@ export default function LogTab({
   calcFatPct,
 }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed);
-  const [polarDetail, setPolarDetail] = useState(null); // loaded session object
-  const [polarLoading, setPolarLoading] = useState(null); // item id being loaded
+  const polar = usePolarDetail(userId);
 
   const [appleKcal, setAppleKcal] = useState(0); // reported by AppleActivityCard
 
@@ -278,19 +50,6 @@ export default function LogTab({
   useEffect(() => {
     setAppleKcal(0);
   }, [currentDate]);
-
-  const openPolarDetail = async (item) => {
-    if (!item.polar_session_id || !userId) return;
-    setPolarLoading(item.id);
-    try {
-      const snap = await getDoc(doc(db, "users", userId, "polar_sessions", item.polar_session_id));
-      if (snap.exists()) setPolarDetail(snap.data());
-    } catch (e) {
-      console.error("Failed to load polar session:", e);
-    } finally {
-      setPolarLoading(null);
-    }
-  };
 
   if (!currentDayData)
     return (
@@ -337,12 +96,7 @@ export default function LogTab({
 
   return (
     <>
-      <PolarDetailModal
-        session={polarDetail}
-        onClose={() => setPolarDetail(null)}
-        userId={userId}
-        onHRLoaded={(updated) => setPolarDetail(updated)}
-      />
+      <PolarDetailModal detail={polar} userId={userId} />
       {/* Day header */}
       <div
         style={{
@@ -821,7 +575,7 @@ export default function LogTab({
                           >
                             {item.is_exercise && item.polar_session_id ? (
                               <span
-                                onClick={() => openPolarDetail(item)}
+                                onClick={() => polar.open(item)}
                                 style={{
                                   cursor: "pointer",
                                   borderBottom: `1px dashed ${C.blueMid}`,
@@ -830,7 +584,7 @@ export default function LogTab({
                                   gap: "4px",
                                 }}
                               >
-                                {polarLoading === item.id ? "…" : item.name}
+                                {polar.loadingId === item.id ? "…" : item.name}
                                 <svg
                                   width="10"
                                   height="10"
