@@ -126,6 +126,14 @@ export const CLEAN_FILES = [
   "src/components/TrackerTabs.jsx",
   "src/components/TrackerFrame.jsx",
   "src/NutritionTracker.jsx",
+  "src/lib/weightMetrics.js",
+  "src/lib/twoWeekWeight.js",
+  "src/lib/trajectoryChart.js",
+  "src/hooks/useTrajectoryChart.js",
+  "src/components/MetricTabs.jsx",
+  "src/components/TrajectoryChart.jsx",
+  "src/components/TrajectoryDrawing.jsx",
+  "src/components/TrajectoryPanel.jsx",
 ];
 
 const unused = [
