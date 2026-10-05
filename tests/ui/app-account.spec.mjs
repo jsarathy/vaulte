@@ -61,6 +61,9 @@ test("top bar, sidebar navigation and the Home panel", async ({ page }) => {
   expect(await style("My Account")).toBe("rgb(255, 207, 63)");
   await expect(page.locator("h2")).toHaveText("My Account");
   await expect(page.locator("text=Good to have you back.")).toBeHidden();
+  await expect(page.locator(".app-main")).toHaveCSS("padding", "48px"); // Home has none
+  await nav(page, "Home").click();
+  await expect(page.locator(".app-main")).toHaveCSS("padding", "0px");
   await nav(page, "Nutrition").click();
   await expect(page.locator("text=Daily log")).toBeVisible({ timeout: 10000 });
   await nav(page, "Home").click();
@@ -116,6 +119,9 @@ test("My Account: missing details show 'Not provided'; the address joins what is
 test("photo upload: stored, saved to the profile, shown; removal clears it", async ({ page }) => {
   await start(page, signedIn());
   await nav(page, "My Account").click();
+  await page.setInputFiles("#photo-upload", []); // a cancelled chooser: nothing happens
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__storageCalls)).toEqual([]);
   await page.setInputFiles("#photo-upload", {
     name: "me.png",
     mimeType: "image/png",
