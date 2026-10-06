@@ -65,8 +65,8 @@ test("polar log box: header, stats, chart and zones", async ({ page: p }) => {
   p.on("pageerror", (e) => errs.push(e.message));
   await start(p, [RIDE, WALK, PLAIN, NODATE, EDGES]);
   await row(p, "Indoor Cycling").click();
-  // (sic) every letter capitalised in this box — kept; a separate fix
-  await expect(box(p).getByText("INDOOR CYCLING", { exact: true })).toBeVisible();
+  // each word's first letter capitalised, as in the Polar Sessions list (Fix 29)
+  await expect(box(p).getByText("Indoor Cycling", { exact: true })).toBeVisible();
   await expect(box(p).getByText(/^Saturday,? 3 October · 08:00$/)).toBeVisible();
   expect(await stats(p)).toEqual([
     ["Duration", "46 min"],
@@ -150,10 +150,10 @@ test("polar log box: header, stats, chart and zones", async ({ page: p }) => {
 
   // No date at all: no date line; a single sample → no chart
   await row(p, "Running").click();
-  await expect(box(p).getByText("RUNNING", { exact: true })).toBeVisible();
+  await expect(box(p).getByText("Running", { exact: true })).toBeVisible();
   expect(
     await box(p)
-      .locator("div", { hasText: /^RUNNING$/ })
+      .locator("div", { hasText: /^Running$/ })
       .locator("xpath=following-sibling::div[1]")
       .textContent(),
   ).toBe("");
@@ -215,7 +215,7 @@ test("polar log box: meal slot and logging", async ({ page: p }) => {
   const item = meal.items[0];
   expect(item).toEqual({
     id: item.id,
-    name: "INDOOR CYCLING (46 min) · Polar",
+    name: "Indoor Cycling (46 min) · Polar",
     kcal: -400,
     fat: 0,
     sat_fat: 0,
@@ -236,11 +236,23 @@ test("polar log box: meal slot and logging", async ({ page: p }) => {
   expect(marked).toEqual([{ ...RIDE, logged: true }]);
   await expect(p.getByText("2 unlogged sessions")).toBeVisible();
 
-  // (sic) the box keeps "Logging…" for the next session until the page reloads — kept; a
-  // separate fix
+  // The next session opens fresh: Log session enabled, no slot chosen (Fix 29)
   await row(p, "Exercise").click();
-  await expect(logBtn).toHaveText("Logging…");
-  await expect(logBtn).toBeDisabled();
+  await expect(logBtn).toHaveText("Log session");
+  await expect(logBtn).toBeEnabled();
+  await expect(slot(p)).toHaveValue("");
+  await expect(box(p).getByText("Please select a meal slot")).toHaveCount(0);
+
+  // Closing the box drops its slot and message too
+  await logBtn.click();
+  await expect(box(p).getByText("Please select a meal slot")).toBeVisible();
+  await slot(p).selectOption("__slot__🌙 Dinner");
+  await box(p).getByRole("button", { name: "Cancel" }).click();
+  await expect(box(p)).toHaveCount(0);
+  await row(p, "Exercise").click();
+  await expect(slot(p)).toHaveValue("");
+  await expect(box(p).getByText("Please select a meal slot")).toHaveCount(0);
+  await expect(logBtn).toBeEnabled();
   expect(errs).toEqual([]);
 });
 
@@ -279,7 +291,7 @@ test("polar log box: a day not stored yet, and no date", async ({ page: p }) => 
   const walked = await ev(() => window.__savedDays.at(-1));
   expect(walked.date).toBe("2026-10-04");
   const items = walked.meals.find((m) => m.name === "Breakfast").items;
-  expect(items.map((i) => i.name)).toEqual(["Cycling (30 min)", "WALKING (20 min) · Polar"]);
+  expect(items.map((i) => i.name)).toEqual(["Cycling (30 min)", "Walking (20 min) · Polar"]);
   expect(items[1]).toMatchObject({ fat_burned_g: 4, fat_burned_kcal: 33 });
 
   // No date: today (UTC)

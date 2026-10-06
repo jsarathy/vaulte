@@ -23,9 +23,10 @@ const RIDE = {
   fat_pct: 40,
 };
 
-test("sport name (sic: all capitals), else Exercise", () => {
-  assert.equal(sportName("INDOOR_CYCLING"), "INDOOR CYCLING");
-  assert.equal(sportName("road_running"), "ROAD RUNNING");
+test("sport name: each word's first letter capitalised, else Exercise", () => {
+  assert.equal(sportName("INDOOR_CYCLING"), "Indoor Cycling");
+  assert.equal(sportName("road_running"), "Road Running");
+  assert.equal(sportName("Golf"), "Golf");
   assert.equal(sportName(undefined), "Exercise");
   assert.equal(sportName(""), "Exercise");
 });
@@ -73,7 +74,7 @@ test("fat burned, duration, stats", () => {
 test("logged exercise entry", () => {
   assert.deepEqual(polarExerciseItem(RIDE, "i"), {
     id: "i",
-    name: "INDOOR CYCLING (46 min) · Polar",
+    name: "Indoor Cycling (46 min) · Polar",
     kcal: -400,
     fat: 0,
     sat_fat: 0,
