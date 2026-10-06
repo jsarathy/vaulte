@@ -1,12 +1,18 @@
 // src/hooks/useChat.js — the Claude chat's actions: ask a question, or (with a meal chosen)
 // turn a description into food entries to log; clear the conversation.
 // ctx = tracker state (chat, days, recipes) + userId + persistDay
-import { genId, makeMeals } from "../constants/helpers";
+import { ensureMealSlots, genId, makeMeals } from "../constants/helpers";
 import { loadDay } from "../api/firestore";
 import { claudeChat, claudeParseFood } from "../api/claude";
 import { writeChatHistory } from "../api/chatHistory";
 import { withItemsInMeal } from "../lib/dayMeals.js";
-import { chatMealName, lastMessages, withMessage } from "../lib/chatLog.js";
+import {
+  chatMealIn,
+  chatMealName,
+  lastMessages,
+  mealNotFound,
+  withMessage,
+} from "../lib/chatLog.js";
 
 async function saveHistory(userId, history) {
   if (!userId) return;
@@ -63,9 +69,14 @@ async function chatDay(ctx) {
 async function confirmLog(ctx, msgId) {
   const msg = ctx.chatMessages.find((m) => m.id === msgId);
   if (!msg) return;
-  const day = await chatDay(ctx);
+  const day = ensureMealSlots(await chatDay(ctx));
+  const mealId = chatMealIn(day, msg.mealId);
+  if (!mealId) {
+    const text = mealNotFound(day.date);
+    return ctx.setChatMessages((prev) => withMessage(prev, msgId, { type: "error", text }));
+  }
   const items = msg.items.map((i) => ({ ...i, id: genId() }));
-  await ctx.persistDay(withItemsInMeal(day, msg.mealId, items));
+  await ctx.persistDay(withItemsInMeal(day, mealId, items));
   ctx.setChatMessages((prev) => withMessage(prev, msgId, { confirmed: true }));
 }
 
