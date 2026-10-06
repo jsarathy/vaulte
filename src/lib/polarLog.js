@@ -1,13 +1,13 @@
 // src/lib/polarLog.js — the "log a Polar session" box: what it shows about a session (name,
 // time, stats, heart-rate line and zones) and the exercise entry it logs.
 
-/** (sic) Every letter ends up capitalised ("INDOOR CYCLING"); kept as is — a separate fix. */
+/** "INDOOR_CYCLING" → "Indoor Cycling" (as the Polar Sessions list shows it); no sport → "Exercise". */
 export const sportName = (sport) =>
   sport
     ? sport
         .replace(/_/g, " ")
         .toLowerCase()
-        .replace(/\w/g, (c) => c.toUpperCase())
+        .replace(/\b\w/g, (c) => c.toUpperCase())
     : "Exercise";
 
 /** "Saturday 3 October" and "08:00" from start_time; the stored date (no time) otherwise. */

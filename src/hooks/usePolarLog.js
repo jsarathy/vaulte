@@ -1,8 +1,8 @@
 // src/hooks/usePolarLog.js — the "log a Polar session" box: meal slot, logging, errors.
 // ctx = { session, userId, allDays, persistDay, setCurrentDayData, currentDate,
 //         setPolarSessions, onClose }
-// (sic) The state outlives the box, so after logging a session the next one opens still
-// "Logging…" until the page reloads — kept as is; a separate fix.
+// PolarLogModal mounts the box only while a session is open, so this state (slot, message,
+// "Logging…") never carries over to the next session.
 import { useState } from "react";
 import { genId, ensureMealSlots, DEFAULT_MEAL_SLOTS } from "../constants/helpers";
 import { dayForEdit } from "../api/dayForEdit";

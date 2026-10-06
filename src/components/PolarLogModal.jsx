@@ -139,12 +139,9 @@ function MealSlot({ log }) {
   );
 }
 
-/** Props: session (null = closed), userId, allDays, persistDay, setCurrentDayData,
- *  currentDate, setPolarSessions, onClose. */
-export default function PolarLogModal(props) {
+function LogBox(props) {
   const log = usePolarLog(props);
   const { session, onClose } = props;
-  if (!session) return null;
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()} style={S.backdrop}>
       <div style={S.box}>
@@ -165,4 +162,13 @@ export default function PolarLogModal(props) {
       </div>
     </div>
   );
+}
+
+/** Props: session (null = closed), userId, allDays, persistDay, setCurrentDayData,
+ *  currentDate, setPolarSessions, onClose. The box (and its state: slot, message, "Logging…")
+ *  is mounted only while a session is open, so the next session starts fresh. */
+export default function PolarLogModal(props) {
+  const { session } = props;
+  if (!session) return null;
+  return <LogBox {...props} />;
 }
