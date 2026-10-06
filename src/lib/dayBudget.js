@@ -29,7 +29,7 @@ export function dayBudget(totals, appleKcal, calc) {
     fatPct: calc.fatPct / 100,
   });
   const net = totals.foodKcal - burned;
-  const pct = Math.min(100, Math.round((net / tdee) * 100)); // may be negative
+  const pct = Math.max(0, Math.min(100, Math.round((net / tdee) * 100))); // bar width, 0–100
   return { burned, tier, tdee, target, net, left: tdee - net, pct };
 }
 

@@ -213,7 +213,7 @@ test("tier boundaries, a woman's target, eating past the target", async ({ page:
   await start(p, { __days: edge(150) });
   await expect.poll(() => caption(p)).toBe("net kcal of 2,167 · Lightly Active");
   expect(await figure(p)).toBe("-150");
-  expect(await progress(p)).toBe(""); // (sic) "-7%" isn't a width: the bar keeps none
+  expect(await progress(p)).toBe("0%"); // a negative net kcal: an empty bar (Fix 34)
   expect((await pills(p)).at(-1)).toEqual(["Left", "-‎2,317"]);
 
   // a fraction of a kcal burned already counts; "Left" exactly 0 is still under

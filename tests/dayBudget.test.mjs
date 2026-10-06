@@ -58,7 +58,8 @@ test("the day's budget", () => {
   assert.equal(b.pct, 97);
   assert.equal(dayBudget(totals({ foodKcal: 1892 }), 0, CALC).tdee, 1892); // 1,891.5 rounds up
   assert.equal(dayBudget(totals({ foodKcal: 4000 }), 0, CALC).pct, 100);
-  assert.equal(dayBudget(totals({ exerciseBurned: 150 }), 0, CALC).pct, -7);
+  assert.equal(dayBudget(totals({ exerciseBurned: 150 }), 0, CALC).pct, 0); // net -150 (Fix 34)
+  assert.equal(dayBudget(totals({ foodKcal: 0.4 }), 0, CALC).pct, 0);
   assert.equal(dayBudget(totals(), 0, { ...CALC, fatPct: 45 }).target.fat_g, 95);
   assert.equal(dayBudget(totals(), 0, { ...CALC, protein: 2 }).target.protein_g, 168);
   assert.equal(dayBudget(totals(), 0, { ...CALC, weight: 70 }).target.protein_g, 98);
