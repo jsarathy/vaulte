@@ -39,8 +39,8 @@ export function sessionStats(s) {
   ].filter(Boolean);
 }
 
-/** Two or more samples: the chart is shown (it draws nothing with fewer than two real ones). */
-export const hasHeartRate = (s) => s.hr_samples?.length > 1;
+/** Two or more real readings (gaps are null): the chart can be drawn. */
+export const hasHeartRate = (s) => (s.hr_samples || []).filter((v) => v != null).length > 1;
 
 /** Heart rate can be fetched from Polar for a session it knows about. */
 export const canFetchHeartRate = (s) => Boolean(s.exercise_url || s.polar_user_id);

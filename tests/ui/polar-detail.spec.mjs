@@ -213,7 +213,7 @@ test("heart-rate chart: zones, average, gaps and defaults", async ({ page: p }) 
     await expect(box(p).locator("svg")).toHaveCount(1);
     matchGolden(`chart-${name}`, await shape(p));
   }
-  // two or more readings but under two real ones: no chart and no note either (sic)
+  // two or more samples but under two real readings: the note and the fetch button (Fix 32)
   for (const list of [
     [120, null],
     [null, null, null],
@@ -222,9 +222,14 @@ test("heart-rate chart: zones, average, gaps and defaults", async ({ page: p }) 
     await link(p, "Run · Polar").click();
     await expect(box(p).getByText("Duration")).toBeVisible();
     await expect(box(p).locator("svg")).toHaveCount(0);
-    await expect(box(p).getByRole("button", { name: "Fetch HR data" })).toHaveCount(0);
-    await expect(box(p).getByText("Heart rate data wasn't captured at sync time.")).toHaveCount(0);
+    await expect(box(p).getByText("Heart rate data wasn't captured at sync time.")).toBeVisible();
+    await expect(box(p).getByRole("button", { name: "Fetch HR data" })).toBeVisible();
   }
+  // two real readings with a gap between: the chart
+  await start(p, { __docs: { [P("polar_sessions/s2")]: hr([120, null, 130]) } });
+  await link(p, "Run · Polar").click();
+  await expect(box(p).locator("svg")).toHaveCount(1);
+  await expect(box(p).getByText("120–130 bpm")).toBeVisible();
   // one reading: the note and the fetch button
   await start(p, { __docs: { [P("polar_sessions/s2")]: hr([120], { exercise_url: "x" }) } });
   await link(p, "Run · Polar").click();

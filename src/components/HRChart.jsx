@@ -46,7 +46,7 @@ const S = {
   minutes: { fontFamily: FONT.mono, color: C.text, fontWeight: "500" },
 };
 
-// The top and bottom labels read 5 bpm in from the scale's edges (sic: the top shows max + 10)
+// Labels: the scale's top (max + 5) and the lowest reading (5 bpm in from the scale's bottom)
 function Line({ chart, avg }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={S.svg}>
@@ -70,7 +70,7 @@ function Line({ chart, avg }) {
         strokeLinecap="round"
       />
       <text x={PAD + 2} y={PAD + 9} {...LABEL}>
-        {Math.round(chart.scale.max + 5)} bpm
+        {Math.round(chart.scale.max)} bpm
       </text>
       <text x={PAD + 2} y={H - PAD - 2} {...LABEL}>
         {Math.round(chart.scale.min + 5)} bpm
