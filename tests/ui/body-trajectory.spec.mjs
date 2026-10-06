@@ -233,13 +233,10 @@ test("expand, scroll to the latest reading, hover, collapse", async ({ page: p }
   await chartSvg(p).locator('circle[fill="transparent"]').nth(10).dispatchEvent("mouseout");
   await expect(chartSvg(p).locator("g[style] rect")).toHaveCount(0);
   await hoverReading(p, 4);
-  // switching site re-scrolls; (sic) the hovered waist reading stays labelled on the hip chart
+  // switching site re-scrolls and drops the hovered waist reading's label (Fix 36)
   await chartSvg(p).evaluate((svg) => (svg.parentElement.scrollLeft = 0));
   await pill(p, "Hip").click();
-  await expect(chartSvg(p).locator("g[style] > text")).toHaveText(
-    `${ROWS[4].id.split("-").reverse().join("/")} · ${ROWS[4].waist.toFixed(1)} cm`,
-  );
-  await chartSvg(p).locator('circle[fill="transparent"]').nth(0).dispatchEvent("mouseout");
+  await expect(chartSvg(p).locator("g[style] > text")).toHaveCount(0);
   await expect(chartSvg(p).locator("g[style] rect")).toHaveCount(0);
   await expect.poll(async () => (await scroll()).left).toBeGreaterThan(0);
   matchGolden("hip-expanded", await shape(p));
