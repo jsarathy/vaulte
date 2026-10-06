@@ -210,7 +210,7 @@
     "INPUT | width: 60px; padding: 2px 4px; border: 0.5px solid rgb(229, 231, 235); border-radius: 4px; font-size: 12px; text-align: right; background: rgb(232, 245, 233); font-weight: bold; color: rgb(46, 125, 50); | type=number | step=0.1 | min=30 | max=200 | placeholder=— | value=80",
     "TD | padding: 5px 8px; text-align: right; font-weight: bold; color: rgb(198, 40, 40); | \"+1.9\"",
     "TD | padding: 5px 8px; text-align: right; color: rgb(55, 138, 221); font-weight: bold; | \"-5.5 kg\"",
-    "TD | padding: 5px 8px; text-align: right; font-weight: bold; color: rgb(107, 114, 128); | \"-0.0 kg\"",
+    "TD | padding: 5px 8px; text-align: right; font-weight: bold; color: rgb(107, 114, 128); | \"0.0 kg\"",
     "TR | background: rgb(255, 255, 255);",
     "TD | padding: 5px 8px; text-align: right;",
     "INPUT | width: 38px; padding: 2px 4px; border: 0.5px solid rgb(229, 231, 235); border-radius: 4px; font-size: 11px; text-align: right; background: rgb(255, 255, 255); color: rgb(107, 114, 128); | type=number | step=null | min=null | max=null | placeholder=— | value=",
