@@ -97,6 +97,7 @@ test("getDayTotals: every macro summed; exercise burn is positive", () => {
     protein: 7,
     foodKcal: 150,
     exerciseBurned: 200,
+    fatBurnedG: 0,
   });
   assert.equal(getDayTotals({}).kcal, 0);
 });

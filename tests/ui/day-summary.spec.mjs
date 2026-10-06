@@ -152,7 +152,7 @@ test("calorie bar and summary row, per activity tier", async ({ page: p }) => {
     ["Consumed", "3,000", "400 kcal burned"],
     ["Protein", "140.3g", "target 118g"],
     ["Net carbs", "380g", "+23g over"], // carbs target (2,719 − 118×4 − 91×9) / 4 = 357
-    ["Fat burned", "0g", "400 kcal exercise"], // (sic) fat burned is never filled in: always 0g
+    ["Fat burned", "0g", "400 kcal exercise"], // the walk has no fat burned recorded
   ]);
 
   // 3 Oct: 200 burned → Moderately Active ×1.55 = 2,443; 700 net, 1,743 left
@@ -180,6 +180,19 @@ test("calorie bar and summary row, per activity tier", async ({ page: p }) => {
     ["Net carbs", "0g", "213g left"],
     ["Fat burned", "0g", "no exercise logged"],
   ]);
+  expect(w.errs).toEqual([]);
+});
+
+test("fat burned: the day's exercise entries added up (Fix 33)", async ({ page: p }) => {
+  const w = watch(p);
+  const ride = { id: "r", name: "Ride", kcal: -300, is_exercise: 1, fat_burned_g: 12 };
+  const walk = { id: "w", name: "Walk", kcal: -100, is_exercise: 1, fat_burned_g: 6.44 };
+  const d = day("2026-10-04", [food("a", 1000)]);
+  d.meals[1].items = [ride, walk];
+  await start(p, { __days: [d] });
+  await expect
+    .poll(() => summary(p).then((s) => s.at(-1)))
+    .toEqual(["Fat burned", "18.4g", "400 kcal exercise"]);
   expect(w.errs).toEqual([]);
 });
 

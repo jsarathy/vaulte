@@ -55,12 +55,15 @@ const zeroTotals = () => ({
   ...Object.fromEntries(DAY_MACROS.map((k) => [k, 0])),
   foodKcal: 0,
   exerciseBurned: 0,
+  fatBurnedG: 0,
 });
 
 // Exercise entries are logged as negative kcal; their burn is counted as positive.
+// Fat burned comes from any entry that recorded it (Polar / manual exercise), in any meal.
 function addMeal(totals, meal) {
   for (const item of meal.items || []) {
     for (const k of DAY_MACROS) totals[k] += item[k] || 0;
+    totals.fatBurnedG += item.fat_burned_g || 0;
     const kcal = item.kcal || 0;
     if (meal.is_exercise) totals.exerciseBurned += Math.abs(kcal);
     else totals.foodKcal += kcal;
