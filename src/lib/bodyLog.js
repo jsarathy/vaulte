@@ -33,8 +33,8 @@ export function mergeTapeRecords(bodyLog, records) {
   const existing = new Map(bodyLog.map((r) => [r.date, r]));
   const merged = records.map((rec) => ({
     ...(existing.get(rec.date) || {}),
-    date: rec.date,
     ...rec.values,
+    date: rec.date, // after the values: a "date" among them can't move the reading
   }));
   merged.forEach((row) => existing.set(row.date, row));
   const rows = [...existing.values()].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
