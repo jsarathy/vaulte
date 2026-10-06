@@ -198,19 +198,41 @@ test("chat: log food to a meal", async ({ page: p }) => {
   expect(other.date).toBe("2026-10-03");
   expect(other.notes).toBe("Rest day");
   expect(other.meals.find((m) => m.id === "m2026-10-03").items.map((i) => i.name)).toEqual(["Egg"]);
-
-  // (sic) a day never stored: a new day with the default meals is saved, but the chosen meal
-  // (from the open day) isn't in it, so the food is lost — kept as is; Fix 30
-  await p.locator('input[type="date"]').last().fill("2026-10-09");
-  await mode(p).selectOption({ label: "Breakfast" });
+  // a default slot that stored day doesn't have yet: added by name, the stored meals kept (Fix 30)
+  await mode(p).selectOption({ label: "🌙 Dinner" });
   await ask(p, "egg");
-  await p.getByRole("button", { name: "Log to Breakfast" }).click();
+  await p.getByRole("button", { name: "Log to 🌙 Dinner" }).click();
   await expect(p.getByText("Logged 1 item")).toHaveCount(3);
-  const lost = await ev(p, () => window.__savedDays.at(-1));
-  expect(lost.date).toBe("2026-10-09");
-  expect(lost.notes).toBe("");
-  expect(lost.meals.length).toBeGreaterThan(5);
-  expect(lost.meals.every((m) => m.items.length === 0)).toBe(true);
+  const slotted = await ev(p, () => window.__savedDays.at(-1));
+  expect(slotted.date).toBe("2026-10-03");
+  expect(slotted.meals.find((m) => m.name === "🌙 Dinner").items.map((i) => i.name)).toEqual([
+    "Egg",
+  ]);
+  expect(slotted.meals.some((m) => m.id === "m2026-10-03")).toBe(true);
+
+  // a day never stored: its default meals are offered, and the food lands in the chosen one
+  // (Fix 30)
+  await p.locator('input[type="date"]').last().fill("2026-10-09");
+  const newOpts = await mode(p)
+    .locator("option")
+    .evaluateAll((os) => os.map((o) => o.text));
+  expect(newOpts).toEqual([
+    "Chat mode",
+    "☕ Breakfast",
+    "🥤 Post-Workout",
+    "🥗 Lunch",
+    "🍎 Snack",
+    "🌙 Dinner",
+  ]);
+  await mode(p).selectOption({ label: "🌙 Dinner" });
+  await ask(p, "egg");
+  await p.getByRole("button", { name: "Log to 🌙 Dinner" }).click();
+  await expect(p.getByText("Logged 1 item")).toHaveCount(4);
+  const added = await ev(p, () => window.__savedDays.at(-1));
+  expect(added.date).toBe("2026-10-09");
+  expect(added.notes).toBe("");
+  expect(added.meals.find((m) => m.name === "🌙 Dinner").items.map((i) => i.name)).toEqual(["Egg"]);
+  expect(added.meals.filter((m) => m.items.length).length).toBe(1);
 
   // a parse failure shows the reason
   await ev(p, () => (window.__failParse = true));
@@ -233,6 +255,13 @@ test("chat: meal name falls back to 'Meal'; switching day resets the mode", asyn
   await ev(p, (e) => (window.__parseReply = [e]), EGG);
   await ask(p, "egg");
   await expect(p.getByRole("button", { name: "Log to Meal" })).toBeVisible();
+  // logging it: an error, nothing saved (Fix 30)
+  const saved = await ev(p, () => window.__savedDays?.length || 0);
+  await p.getByRole("button", { name: "Log to Meal" }).click();
+  await expect(
+    p.getByText("Couldn't find that meal on 2026-10-02 — nothing was logged.", { exact: true }),
+  ).toBeVisible();
+  expect(await ev(p, () => window.__savedDays?.length || 0)).toBe(saved);
   // opening a day on the calendar: chat mode and that day again
   await p.getByTitle("Nutrition assistant").click();
   await p.evaluate(() =>

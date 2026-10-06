@@ -114,22 +114,33 @@ test("HANDLES: four edges and four corners with their cursors", () => {
   );
 });
 
-test("mealsForDate: the stored day's meals, else the open day's; exercise slots left out", () => {
+test("mealsForDate: the chat day's own meals, default slots it lacks by name (Fix 30)", () => {
+  const slot = (name) => ({ id: "__slot__" + name, name });
+  const SLOTS = ["☕ Breakfast", "🥤 Post-Workout", "🥗 Lunch", "🍎 Snack", "🌙 Dinner"].map(slot);
   const days = [
     {
       date: "2026-10-01",
       meals: [
         { id: "a", name: "A" },
+        { id: "b", name: "☕ Breakfast" },
         { id: "x", name: "Run", is_exercise: 1 },
       ],
     },
     { date: "2026-10-02" },
   ];
-  const current = { meals: [{ id: "c", name: "C" }] };
-  assert.deepEqual(mealsForDate(days, "2026-10-01", current), [{ id: "a", name: "A" }]);
-  assert.deepEqual(mealsForDate(days, "2026-10-02", current), []); // stored, no meals
-  assert.deepEqual(mealsForDate(days, "2026-09-30", current), [{ id: "c", name: "C" }]);
-  assert.deepEqual(mealsForDate(days, "2026-09-30", null), []);
+  const names = (list) => list.map((m) => [m.id, m.name]);
+  // stored: its meals keep their ids, missing slots by name, custom meals last, no exercise
+  assert.deepEqual(names(mealsForDate(days, "2026-10-01", null)), [
+    ["b", "☕ Breakfast"],
+    ...names(SLOTS.slice(1)),
+    ["a", "A"],
+  ]);
+  assert.deepEqual(mealsForDate(days, "2026-10-02", null), SLOTS); // stored, no meals
+  // not stored: the open day when it is that day, else the default slots
+  const open = { date: "2026-09-30", meals: [{ id: "c", name: "C" }] };
+  assert.deepEqual(names(mealsForDate(days, "2026-09-30", open)), [...names(SLOTS), ["c", "C"]]);
+  assert.deepEqual(mealsForDate(days, "2026-09-29", open), SLOTS);
+  assert.deepEqual(mealsForDate(days, "2026-09-29", null), SLOTS);
 });
 
 test("labels: history count, placeholder, logged items, html line breaks", () => {

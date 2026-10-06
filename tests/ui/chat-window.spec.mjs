@@ -269,6 +269,6 @@ test("the context bar: the date is editable; the meal list follows the chosen da
   await date.fill("2026-10-04"); // a stored day: its meal, then the slots
   await expect(date).toHaveValue("2026-10-04");
   await expect(meals.locator("option")).toHaveText(["Chat mode", ...SLOTS, "Breakfast"]);
-  await date.fill("2026-09-15"); // no stored day: the open day's meals again
-  await expect(meals.locator("option")).toHaveText(["Chat mode", ...SLOTS, "Breakfast"]);
+  await date.fill("2026-09-15"); // no stored day: the default slots (Fix 30)
+  await expect(meals.locator("option")).toHaveText(["Chat mode", ...SLOTS]);
 });
