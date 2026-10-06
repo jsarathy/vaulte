@@ -9,7 +9,9 @@ export const COLUMN_HEADS = ["Item", "kcal", "Fat", "Carbs", "Sugar", "Fibre", "
 /** The stored open / closed state ({ [mealId]: closed }); {} when unreadable. */
 export function parseCollapsed(text) {
   try {
-    return JSON.parse(text || "{}");
+    const parsed = JSON.parse(text || "{}");
+    const isMap = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
+    return isMap ? parsed : {}; // "null", a list or a plain value: start afresh
   } catch {
     return {};
   }
