@@ -56,13 +56,13 @@ test("merging tape records", () => {
   ]);
   assert.deepEqual(merged, [
     { date: "2026-09-27", waist: 99.5, chest: 109, hip: 107 },
-    { date: "x", neck: 41 }, // (sic) a "date" among the values wins
+    { date: "2026-09-24", neck: 41 }, // a "date" among the values doesn't override (Fix 37)
   ]);
   assert.deepEqual(
     rows.map((r) => r.date),
-    ["2026-09-20", "2026-09-27", "x"],
+    ["2026-09-20", "2026-09-24", "2026-09-27"],
   );
-  assert.deepEqual(rows[1], merged[0]);
+  assert.deepEqual(rows[2], merged[0]);
   // rows without a date sort first
   const odd = mergeTapeRecords([{ waist: 1 }], [{ date: "2026-01-01", values: {} }]).rows;
   assert.deepEqual(odd, [{ waist: 1 }, { date: "2026-01-01" }]);
