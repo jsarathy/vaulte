@@ -5,10 +5,13 @@ import { twoWeekLossAt, weightReadings } from "./twoWeekWeight.js";
 
 const DEFAULT_CUM_LOSS_BASELINE_KG = 86.45;
 
-/** Cum Loss is measured from this weight (the all-time high), or 86.45 kg when unset/unreadable. */
+/**
+ * Cum Loss is measured from this weight (the all-time high), or 86.45 kg when blank, cleared,
+ * unreadable or not above 0.
+ */
 export function cumLossBaseline(cfg) {
-  const kg = Number(cfg.cumLossBaselineKg);
-  return Number.isFinite(kg) ? kg : DEFAULT_CUM_LOSS_BASELINE_KG;
+  const kg = Number(cfg.cumLossBaselineKg); // blank / cleared → 0, unreadable → NaN
+  return kg > 0 ? kg : DEFAULT_CUM_LOSS_BASELINE_KG;
 }
 
 /** Sync cutoff: measurements before it are rejected by the sync and can be purged. */
@@ -38,16 +41,23 @@ export function vsProjFigure(diff) {
   return { text: `${x > 0 ? "+" : ""}${diff}`, tone: toneOf(x) };
 }
 
+/** A loss (kg, to 1 dp) as shown: "-0.8 kg", a gain "+0.5 kg", none "0.0 kg". */
+function lossText(loss) {
+  const x = Number(loss.toFixed(1));
+  if (x === 0) return "0.0 kg";
+  return `${x > 0 ? "-" : "+"}${Math.abs(x).toFixed(1)} kg`;
+}
+
 /** 2-wk Loss as shown: a loss as "-0.8 kg" (tone up), a gain as "+0.5 kg" (tone down). */
 export function twoWeekFigure(loss) {
   if (loss == null) return { text: "—", tone: null };
   const x = parseFloat(loss);
-  return { text: x >= 0 ? `-${loss} kg` : `+${Math.abs(x).toFixed(1)} kg`, tone: toneOf(x) };
+  return { text: lossText(x), tone: toneOf(x) };
 }
 
-/** Cum Loss as shown ("-2.3 kg"); null without a reading. */
+/** Cum Loss as shown ("-2.3 kg", a gain "+1.0 kg"); null without a reading. */
 export const cumLossFigure = (row, baseline) =>
-  row.actual != null ? `-${(baseline - row.actual).toFixed(1)} kg` : null;
+  row.actual != null ? lossText(baseline - row.actual) : null;
 
 /** Dated today or earlier (a missing or unreadable date never is). */
 const isPast = (date, now) => new Date(date) <= now;

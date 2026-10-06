@@ -149,15 +149,18 @@ test("Cum Loss baseline; flat 2-wk Loss; latest reading last", async ({ page: p 
   ];
   await start(p, withLog(rows, { cumLossBaselineKg: "85.5" }));
   expect(await cells(p)).toEqual([
-    ["", "2026-09-15", "", "80", "+1.9", "-5.5 kg", "-0.0 kg"],
+    ["", "2026-09-15", "", "80", "+1.9", "-5.5 kg", "0.0 kg"],
     ["", "2026-09-01", "", "80", "-0.7", "-5.5 kg", "—"],
   ]);
   matchGolden("flat", await shape(p));
   await start(p, withLog(rows, { cumLossBaselineKg: "lots" })); // falls back to 86.45
   await expect(column(p).locator("tbody tr").first().locator("td").nth(5)).toHaveText("-6.5 kg");
-  // a cleared baseline counts as 0 (sic: shows a double minus) → Fix 31
+  // a cleared baseline falls back to 86.45 too (Fix 31)
   await start(p, withLog(rows, { cumLossBaselineKg: null }));
-  await expect(column(p).locator("tbody tr").first().locator("td").nth(5)).toHaveText("--80.0 kg");
+  await expect(column(p).locator("tbody tr").first().locator("td").nth(5)).toHaveText("-6.5 kg");
+  // above the baseline: a gain
+  await start(p, withLog(rows, { cumLossBaselineKg: "79" }));
+  await expect(column(p).locator("tbody tr").first().locator("td").nth(5)).toHaveText("+1.0 kg");
   expect(w.errs).toEqual([]);
 });
 

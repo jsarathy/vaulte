@@ -19,7 +19,9 @@ test("baseline, sync cutoff and purge wording", () => {
   assert.equal(cumLossBaseline({ cumLossBaselineKg: "85.5" }), 85.5);
   assert.equal(cumLossBaseline({ cumLossBaselineKg: "lots" }), 86.45);
   assert.equal(cumLossBaseline({}), 86.45);
-  assert.equal(cumLossBaseline({ cumLossBaselineKg: null }), 0); // Number(null): see Fix 31
+  // blank, cleared or not above 0: the default (Fix 31)
+  for (const kg of [null, "", " ", 0, "0", -5])
+    assert.equal(cumLossBaseline({ cumLossBaselineKg: kg }), 86.45, String(kg));
   assert.equal(syncFromOf({ syncFromDate: "2026-09-01", startDate: "2026-08-16" }), "2026-09-01");
   assert.equal(syncFromOf({ syncFromDate: "", startDate: "2026-08-16" }), "2026-08-16");
   assert.equal(syncFromOf({}), null);
@@ -46,11 +48,17 @@ test("figures as shown", () => {
   assert.deepEqual(twoWeekFigure("0.8"), { text: "-0.8 kg", tone: "up" });
   assert.deepEqual(twoWeekFigure("-0.5"), { text: "+0.5 kg", tone: "down" });
   assert.deepEqual(twoWeekFigure("-1.0"), { text: "+1.0 kg", tone: "down" });
-  assert.deepEqual(twoWeekFigure("0.0"), { text: "-0.0 kg", tone: "flat" });
-  assert.deepEqual(twoWeekFigure("-0.0"), { text: "--0.0 kg", tone: "flat" }); // sic: Fix 31
+  // no change either way shows unsigned (Fix 31)
+  assert.deepEqual(twoWeekFigure("0.0"), { text: "0.0 kg", tone: "flat" });
+  assert.deepEqual(twoWeekFigure("-0.0"), { text: "0.0 kg", tone: "flat" });
   assert.deepEqual(twoWeekFigure(null), { text: "—", tone: null });
   assert.equal(cumLossFigure({ actual: 84.25 }, 86.45), "-2.2 kg");
   assert.equal(cumLossFigure({ actual: 0 }, 86.45), "-86.5 kg");
+  // at or above the baseline: a gain as "+x kg", none as "0.0 kg" (Fix 31)
+  assert.equal(cumLossFigure({ actual: 87.45 }, 86.45), "+1.0 kg");
+  assert.equal(cumLossFigure({ actual: 86.45 }, 86.45), "0.0 kg");
+  assert.equal(cumLossFigure({ actual: 86.44 }, 86.45), "0.0 kg");
+  assert.equal(cumLossFigure({ actual: 86.5 }, 86.45), "0.0 kg");
   assert.equal(cumLossFigure({ actual: null }, 86.45), null);
   assert.equal(cumLossFigure({}, 86.45), null);
 });
