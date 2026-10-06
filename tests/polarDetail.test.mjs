@@ -60,7 +60,10 @@ test("title, start and stats", () => {
 
 test("heart rate: shown, fetchable, errors", () => {
   assert.equal(hasHeartRate({ hr_samples: [1, 2] }), true);
+  assert.equal(hasHeartRate({ hr_samples: [1, null, 2] }), true);
   assert.equal(hasHeartRate({ hr_samples: [1] }), false);
+  assert.equal(hasHeartRate({ hr_samples: [1, null] }), false);
+  assert.equal(hasHeartRate({ hr_samples: [null, null, null] }), false);
   assert.equal(hasHeartRate({}), false);
   assert.equal(canFetchHeartRate({ exercise_url: "u" }), true);
   assert.equal(canFetchHeartRate({ polar_user_id: 3 }), true);
