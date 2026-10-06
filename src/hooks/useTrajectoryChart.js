@@ -50,9 +50,8 @@ function useBoxSize(full, scrollRef) {
 function useHover(full, metric) {
   const [hoverMetric, setHoverMetric] = useState(null); // metric tab being hovered
   const [hoverPt, setHoverPt] = useState(null); // expanded view only: { t, v }
-  useEffect(() => {
-    if (!full) setHoverPt(null);
-  }, [full, metric]);
+  // a hovered reading belongs to one metric and one view: drop it when either changes
+  useEffect(() => setHoverPt(null), [full, metric]);
   return { hoverMetric, setHoverMetric, hoverPt, setHoverPt };
 }
 
