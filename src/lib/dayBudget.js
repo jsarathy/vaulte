@@ -76,7 +76,7 @@ export function summaryCards(totals, budget, appleKcal) {
     carbsCard(totals.net_carbs, target.carbs_g),
     card(
       "Fat burned",
-      `${fmt(totals.fatBurnedG || 0)}g`, // (sic) getDayTotals never fills this in: always 0g
+      `${fmt(totals.fatBurnedG)}g`,
       exercise ? `${Math.round(exercise)} kcal exercise` : "no exercise logged",
     ),
   ];

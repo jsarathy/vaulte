@@ -148,6 +148,31 @@ describe("getDayTotals", () => {
   });
 });
 
+test("getDayTotals — fat burned: every entry's fat_burned_g, wherever it is logged (Fix 33)", () => {
+  assert.equal(getDayTotals(null).fatBurnedG, 0);
+  const day = makeDay([
+    { id: "a", name: "Breakfast", is_exercise: 0, items: [makeItem({ kcal: 500 })] },
+    {
+      id: "b",
+      name: "Morning Exercise",
+      is_exercise: 1,
+      items: [
+        makeItem({ kcal: -300, is_exercise: 1, fat_burned_g: 12 }),
+        makeItem({ kcal: -100, is_exercise: 1, fat_burned_g: 6.4 }),
+        makeItem({ kcal: -50, is_exercise: 1 }),
+      ],
+    },
+    // a Polar session logged into a food slot keeps its fat burned
+    {
+      id: "c",
+      name: "Dinner",
+      is_exercise: 0,
+      items: [makeItem({ kcal: -200, is_exercise: 1, fat_burned_g: 2 })],
+    },
+  ]);
+  assert.equal(getDayTotals(day).fatBurnedG, 20.4);
+});
+
 // ── calcMacros ───────────────────────────────────────────────────────────────
 
 describe("calcMacros", () => {

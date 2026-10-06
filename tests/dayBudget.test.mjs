@@ -15,6 +15,7 @@ const CALC = { sex: "m", age: 60, height: 165, weight: 84, protein: 1.4, fatPct:
 const totals = (t = {}) => ({
   foodKcal: 0,
   exerciseBurned: 0,
+  fatBurnedG: 0,
   protein: 0,
   fat: 0,
   carbs: 0,
