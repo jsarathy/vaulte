@@ -18,6 +18,9 @@ test("open / closed state", () => {
   assert.deepEqual(parseCollapsed(null), {});
   assert.deepEqual(parseCollapsed(""), {});
   assert.deepEqual(parseCollapsed("{oops"), {});
+  // valid JSON that isn't an object of card states (Fix 35)
+  for (const text of ["null", "[]", "[1]", "5", '"x"', "true"])
+    assert.deepEqual(parseCollapsed(text), {}, text);
   const c = { a: false, b: true };
   assert.equal(isClosed(c, "a"), false);
   assert.equal(isClosed(c, "b"), true);

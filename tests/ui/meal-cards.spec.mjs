@@ -203,6 +203,18 @@ test("unreadable stored state: everything collapsed, replaced", async ({ page: p
   expect(w.errs).toEqual([]);
 });
 
+test('stored state of "null": the Daily log still loads, everything collapsed (Fix 35)', async ({
+  page: p,
+}) => {
+  const w = watch(p);
+  await start(p, { __collapsed: "null" });
+  expect(await rows(p, "Breakfast")).toHaveLength(1);
+  expect(await stored(p)).toEqual({});
+  await head(p, "Breakfast").click();
+  expect(await stored(p)).toEqual({ mB: false });
+  expect(w.errs).toEqual([]);
+});
+
 test("a saved recipe opens from its entry, without toggling the card", async ({ page: p }) => {
   const w = watch(p);
   await start(p, { __collapsed: JSON.stringify({ mB: false }) });
