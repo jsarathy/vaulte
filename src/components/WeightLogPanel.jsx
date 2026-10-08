@@ -2,9 +2,9 @@
 // Purge and the sync message, then the log table. Render only; log = useWeightLog().
 import useWeightLog from "../hooks/useWeightLog.js";
 import WeightLogTable from "./WeightLogTable.jsx";
+import { columnStyle } from "../lib/phoneLayout.js";
 
 const S = {
-  column: { flex: "0 0 55%", minWidth: 0 },
   heading: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" },
   title: { fontSize: "15px", fontWeight: "bold", color: "#185FA5" },
   sync: (busy) => ({
@@ -33,13 +33,14 @@ const S = {
     borderRadius: "8px",
     border: "0.5px solid #e5e7eb",
     overflow: "auto",
-    maxHeight: "calc(100vh - 220px)",
+    maxHeight: "calc(100dvh - 220px)",
   },
 };
 
-function Heading({ log, renpho }) {
+function Heading({ log, renpho, phone }) {
+  const wrap = phone ? { flexWrap: "wrap", gap: "8px 10px" } : null;
   return (
-    <div style={S.heading}>
+    <div style={{ ...S.heading, ...wrap }}>
       <div style={S.title}>⚖️ Weight Log</div>
       <button onClick={renpho.sync} disabled={renpho.syncing} style={S.sync(renpho.syncing)}>
         {renpho.syncing ? "Syncing…" : "⟳ Sync Renpho"}
@@ -62,11 +63,12 @@ export default function WeightLogPanel({
   cfg,
   purgeBefore,
   renpho,
+  phone,
 }) {
   const log = useWeightLog({ userId, weightLog, setWeightLog, cfg, purgeBefore });
   return (
-    <div style={S.column}>
-      <Heading log={log} renpho={renpho} />
+    <div style={columnStyle(phone, 55)}>
+      <Heading log={log} renpho={renpho} phone={phone} />
       <div style={S.frame}>
         <WeightLogTable rows={log.rows} saveField={log.saveField} />
       </div>

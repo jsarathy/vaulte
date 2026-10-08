@@ -9,7 +9,7 @@ const S = {
     borderRadius: "8px",
     border: "0.5px solid #e5e7eb",
     overflow: "auto",
-    maxHeight: "calc(100vh - 220px)",
+    maxHeight: "calc(100dvh - 220px)",
   },
   headRow: { background: "#185FA5", color: "#fff", position: "sticky", top: 0, zIndex: 1 },
   head: {
