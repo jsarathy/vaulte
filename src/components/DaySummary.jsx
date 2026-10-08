@@ -1,5 +1,6 @@
 // src/components/DaySummary.jsx — the Daily log's row of four summary cards.
 import { C, FONT } from "../constants/design.jsx";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 const GRID = {
   display: "grid",
@@ -31,8 +32,9 @@ const VALUE = {
 
 /** cards: [{ label, value, note, warn }] from summaryCards. */
 export default function DaySummary({ cards }) {
+  const grid = useIsPhone() ? { ...GRID, gridTemplateColumns: "repeat(2,minmax(0,1fr))" } : GRID;
   return (
-    <div style={GRID}>
+    <div style={grid}>
       {cards.map(({ label, value, note, warn }) => (
         <div key={label} style={CARD}>
           <div style={LABEL}>{label}</div>

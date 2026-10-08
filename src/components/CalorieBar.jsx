@@ -2,6 +2,7 @@
 // the macro pills, what's left, and a progress bar.
 import { C, FONT } from "../constants/design.jsx";
 import { macroPills, leftParts } from "../lib/dayBudget.js";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 const BOX = {
   background: "#fff",
@@ -85,9 +86,10 @@ function Progress({ pct }) {
 export default function CalorieBar({ budget, totals }) {
   const { net, tdee, tier, left, target, pct } = budget;
   const [sign, amount] = leftParts(left);
+  const wrap = useIsPhone() ? { flexWrap: "wrap", gap: "8px" } : null; // pills drop under the figure
   return (
     <div style={BOX}>
-      <div style={TOP}>
+      <div style={{ ...TOP, ...wrap }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
           <span style={FIGURE}>{Math.round(net).toLocaleString()}</span>
           <span style={{ fontSize: "11px", color: C.muted }}>

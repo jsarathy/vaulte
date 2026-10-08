@@ -3,6 +3,9 @@
 import { C, FONT } from "../constants/design.jsx";
 import { COLUMN_HEADS, mealSummary, subtotalText } from "../lib/mealCards.js";
 import MealItemRow from "./MealItemRow.jsx";
+import { MealIcon, Chevron } from "./MealCardIcons.jsx";
+import MealCardPhone from "./MealCardPhone.jsx";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 // Column widths — shared between the header row and the entry rows
 const COL_ITEM = "auto";
@@ -51,55 +54,6 @@ function Columns() {
         ))}
       <col style={{ width: COL_DEL }} />
     </colgroup>
-  );
-}
-
-function MealIcon({ isExercise }) {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke={isExercise ? C.blue : C.hint}
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      style={{ flexShrink: 0 }}
-    >
-      {isExercise ? (
-        <>
-          <path d="M3 8h10M8 3l3 5-3 5" />
-        </>
-      ) : (
-        <>
-          <circle cx="8" cy="8" r="5" />
-          <path d="M5 8h6" />
-          <path d="M8 5v6" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-function Chevron({ closed }) {
-  const turn = {
-    flexShrink: 0,
-    transition: "transform 0.18s",
-    transform: closed ? "rotate(-90deg)" : "rotate(0deg)",
-  };
-  return (
-    <svg
-      width="10"
-      height="10"
-      viewBox="0 0 10 10"
-      fill="none"
-      stroke={C.hint}
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      style={turn}
-    >
-      <path d="M2 3.5l3 3 3-3" />
-    </svg>
   );
 }
 
@@ -168,7 +122,18 @@ function NothingLogged() {
 
 /** entry: { polar, userRecipes, setRecipeModal, deleteItem } for the entry rows. */
 export default function MealCard({ meal, closed, onToggle, entry }) {
+  const phone = useIsPhone();
   const summary = mealSummary(meal);
+  if (phone)
+    return (
+      <MealCardPhone
+        meal={meal}
+        summary={summary}
+        closed={closed}
+        onToggle={onToggle}
+        entry={entry}
+      />
+    );
   const open = !closed;
   return (
     <div style={S.card}>
