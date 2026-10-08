@@ -1,5 +1,6 @@
 // src/components/RecipeModalSections.jsx — the recipe card's parts: tag row, nutrition per
 // serving, ingredients, the numbered method, notes
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import {
   tagRowStyle,
   tagStyle,
@@ -57,11 +58,15 @@ export function Tags({ recipe }) {
 }
 
 export function Nutrition({ nutrition }) {
+  const phone = useIsPhone();
   if (!nutrition) return null;
+  const grid = phone
+    ? { ...nutritionGridStyle, gridTemplateColumns: "repeat(3,minmax(0,1fr))" }
+    : nutritionGridStyle;
   return (
     <>
       <Sect>Nutrition per serving</Sect>
-      <div style={nutritionGridStyle}>
+      <div style={grid}>
         {NUTRITION.map(([k, l]) => (
           <div key={k} style={nutritionCellStyle}>
             <div style={nutritionValueStyle}>{nutrition[k] || 0}</div>

@@ -19,7 +19,7 @@ const S = {
     borderRadius: "12px",
     width: "560px",
     maxWidth: "95vw",
-    maxHeight: "90vh",
+    maxHeight: "90dvh",
     overflowY: "auto",
     boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
   },

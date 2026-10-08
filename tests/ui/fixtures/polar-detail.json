@@ -1,7 +1,7 @@
 {
   "no-hr": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Indoor Cycling\"",
@@ -36,7 +36,7 @@
   ],
   "with-hr": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Running\"",
@@ -85,7 +85,7 @@
   ],
   "bare": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Exercise\"",
@@ -104,7 +104,7 @@
   ],
   "chart-zones": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Running\"",
@@ -165,7 +165,7 @@
   ],
   "chart-defaults": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Running\"",
@@ -202,7 +202,7 @@
   ],
   "chart-flat": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Running\"",
@@ -239,7 +239,7 @@
   ],
   "fetching": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Indoor Cycling\"",
@@ -274,7 +274,7 @@
   ],
   "fetch-error": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Indoor Cycling\"",
@@ -310,7 +310,7 @@
   ],
   "fetched": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",
-    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
+    "DIV | background: rgb(255, 255, 255); border-radius: 10px; width: 520px; max-width: 100%; max-height: 90dvh; overflow-y: auto; border: 0.5px solid rgb(229, 231, 235); font-family: \"DM Sans\", system-ui, sans-serif;",
     "DIV | padding: 14px 18px; border-bottom: 0.5px solid rgb(229, 231, 235); display: flex; justify-content: space-between; align-items: flex-start; position: sticky; top: 0px; background: rgb(255, 255, 255); z-index: 1;",
     "DIV | ",
     "DIV | font-size: 14px; font-weight: 500; color: rgb(17, 24, 39); | \"Indoor Cycling\"",

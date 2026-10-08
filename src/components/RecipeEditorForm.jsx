@@ -1,6 +1,7 @@
 // src/components/RecipeEditorForm.jsx — the recipe builder's editable recipe: name, details,
 // nutrition (+ Recalculate), ingredients, method, notes. Render only; edits come from
 // lib/recipeEdits and go through builder.setPreview.
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import { isEstimatedWeight } from "../api/recipeWeights";
 import { withField, withServings, withWeighedPortion, withMacro } from "../lib/recipeEdits.js";
 import { IngredientsEditor, StepsEditor, SectionHeading } from "./RecipeListEditors";
@@ -177,8 +178,9 @@ function Details({ recipe, edit }) {
 
 function Nutrition({ recipe, edit }) {
   const values = recipe.nutrition || {};
+  const grid = useIsPhone() ? { ...S.macros, gridTemplateColumns: "repeat(4,1fr)" } : S.macros;
   return (
-    <div style={S.macros}>
+    <div style={grid}>
       {MACRO_FIELDS.map(([k, label]) => (
         <div key={k} style={S.macro}>
           <input

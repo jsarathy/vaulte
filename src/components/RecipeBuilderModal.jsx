@@ -18,7 +18,7 @@ const S = {
     borderRadius: "10px",
     width: "640px",
     maxWidth: "95vw",
-    maxHeight: "88vh",
+    maxHeight: "88dvh",
     overflowY: "auto",
     boxShadow: "0 8px 40px rgba(0,0,0,0.3)",
   },

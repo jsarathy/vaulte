@@ -16,7 +16,7 @@ export const cardStyle = {
   borderRadius: "10px",
   width: "580px",
   maxWidth: "95vw",
-  maxHeight: "88vh",
+  maxHeight: "88dvh",
   overflowY: "auto",
   border: `0.5px solid ${C.border}`,
 };
