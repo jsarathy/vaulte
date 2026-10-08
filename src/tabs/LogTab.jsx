@@ -1,11 +1,10 @@
-// src/tabs/LogTab.jsx — the Daily log: the open day's header, calorie bar, summary row, meal
+// src/tabs/LogTab.jsx — the Daily log: the open day's header, calorie bar, meal
 // cards and Apple Watch card, plus the Polar session box. Render only.
 import { getDayTotals } from "../constants/helpers";
-import { dayBudget, summaryCards } from "../lib/dayBudget.js";
+import { dayBudget } from "../lib/dayBudget.js";
 import { C } from "../constants/design.jsx";
 import DayHeader from "../components/DayHeader.jsx";
 import CalorieBar from "../components/CalorieBar.jsx";
-import DaySummary from "../components/DaySummary.jsx";
 import MealCard from "../components/MealCard.jsx";
 import PolarDetailModal from "../components/PolarDetailModal.jsx";
 import AppleActivityCard from "../components/AppleActivityCard.jsx";
@@ -27,7 +26,6 @@ function DayLog({ p, polar, cards, appleKcal, setAppleKcal }) {
     <>
       <DayHeader date={p.currentDate} allDays={p.allDays} switchDay={p.switchDay} />
       <CalorieBar budget={budget} totals={totals} />
-      <DaySummary cards={summaryCards(totals, budget, appleKcal)} />
       {day.meals?.map((meal) => (
         <MealCard
           key={meal.id}

@@ -1,5 +1,5 @@
 // tests/ui/phone-log.spec.mjs — the Daily log on a phone (Fix 43.5), at 390 x 844: nothing past
-// the right edge, the calorie bar's pills under the figure, two summary columns, thumb-sized
+// the right edge, the calorie bar's pills under the figure, thumb-sized
 // arrows, and meal cards as header + stacked entries (name over labelled figures, remove).
 import { test, expect } from "@playwright/test";
 
@@ -66,18 +66,15 @@ test("nothing sticks out past the right edge except the sideways-scrolling tabs"
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
-test("header arrows are thumb-sized; summary is two columns; pills drop under the figure", async ({
+test("header arrows are thumb-sized; no summary cards; pills drop under the figure", async ({
   page: p,
 }) => {
   await start(p);
   const first = await box(p.getByText("Sun, 4 Oct 2026").locator("..").locator("button").first());
   expect(first.width).toBeGreaterThanOrEqual(44);
   expect(first.height).toBeGreaterThanOrEqual(44);
-  const grid = p.getByText("Consumed", { exact: true }).locator("../..");
-  const cols = await grid.evaluate(
-    (e) => getComputedStyle(e).gridTemplateColumns.split(" ").length,
-  );
-  expect(cols).toBe(2);
+  await expect(p.getByText("Consumed", { exact: true })).toHaveCount(0); // no summary cards
+  await expect(p.getByText("Fat burned", { exact: true })).toBeVisible(); // it is a pill now
   const figure = await box(p.getByText("net kcal of"));
   const pill = await box(p.getByText("Protein", { exact: true }).first());
   expect(pill.top).toBeGreaterThan(figure.bottom - 1); // below, not beside

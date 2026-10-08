@@ -1,5 +1,5 @@
 // src/lib/dayBudget.js — the Daily log's energy budget for one day: activity tier, energy
-// target (TDEE), macro targets, net kcal, what's left, and the figures the summary row shows.
+// target (TDEE), macro targets, net kcal and what's left.
 import { ACTIVITY_LEVELS, calcMacros, fmt } from "../constants/helpers.js";
 
 /** Resting energy (Mifflin–St Jeor) for the reference calculator's sex, weight, height, age. */
@@ -51,36 +51,6 @@ export const leftParts = (left) => [
   left >= 0 ? "-" : "+",
   Math.abs(Math.round(left)).toLocaleString(),
 ];
-
-const card = (label, value, note) => ({ label, value, note, warn: false });
-
-/** "+23g over" / "241g left" against the carbs target. */
-function carbsCard(eaten, goal) {
-  const over = eaten > goal;
-  const note = over ? `+${fmt(eaten - goal)}g over` : `${fmt(goal - eaten)}g left`;
-  return { ...card("Net carbs", `${fmt(eaten)}g`, note), warn: over };
-}
-
-/** The summary row's four cards: label, figure, note, and whether the note is a warning. */
-export function summaryCards(totals, budget, appleKcal) {
-  const { burned, target } = budget;
-  const apple = appleKcal ? ` (incl. ${Math.round(appleKcal)} Apple)` : "";
-  const exercise = totals.exerciseBurned;
-  return [
-    card(
-      "Consumed",
-      Math.round(totals.foodKcal).toLocaleString(),
-      `${Math.round(burned)} kcal burned${apple}`,
-    ),
-    card("Protein", `${fmt(totals.protein)}g`, `target ${target.protein_g}g`),
-    carbsCard(totals.net_carbs, target.carbs_g),
-    card(
-      "Fat burned",
-      `${fmt(totals.fatBurnedG)}g`,
-      exercise ? `${Math.round(exercise)} kcal exercise` : "no exercise logged",
-    ),
-  ];
-}
 
 /** The date of the day `step` places along the loaded list (1: older, -1: newer), or null. */
 export function adjacentDay(allDays, date, step) {
