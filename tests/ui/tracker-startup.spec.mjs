@@ -275,17 +275,18 @@ test("start-up: a required part fails → logged, page shown without data", asyn
   expect(await calculator(p)).toEqual(["f", "40", "165", "70", "1.6", "25"]); // loaded before
 });
 
-test("start-up: recipes failing stops the load", async ({ page: p }) => {
+test("start-up: recipes failing → logged, no day opened; the other parts still load", async ({
+  page: p,
+}) => {
   const w = watch(p);
   await start(p, { ...FULL, __failRecipes: true });
   await p.getByText("October 2026").waitFor();
   expect(w.logged.some((l) => l.startsWith("Init error:"))).toBe(true);
+  expect(await openDay(p)).toBe(null); // days are set last, after every part has loaded
   await tab(p, "Compare");
-  expect(await calculator(p)).toEqual(["m", "60", "165", "84", "1.4", "30"]);
-  await p.waitForTimeout(800);
+  expect(await calculator(p)).toEqual(["f", "40", "165", "70", "1.6", "25"]); // loaded in parallel
   await p.getByText("Age", { exact: true }).locator("..").locator("input").fill("59");
-  await p.waitForTimeout(800);
-  expect(await calcSaves(p)).toEqual([]); // never loaded, so never saved
+  await expect.poll(() => calcSaves(p)).toHaveLength(1); // so saving works
 });
 
 test("start-up: not signed in", async ({ page: p }) => {
