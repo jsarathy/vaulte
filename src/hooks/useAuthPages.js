@@ -1,6 +1,6 @@
 // src/hooks/useAuthPages.js — the state behind the sign-in pages: which page is open, the
 // signed-in profile, the toast, and the Create Account / Sign In / Magic Link / Google flows.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   completeMagicLink,
   createAccount,
@@ -25,10 +25,13 @@ const TOAST_MS = 3000;
 
 export function useToast() {
   const [toast, setToast] = useState("");
+  const timer = useRef(null);
   const showToast = (msg) => {
+    clearTimeout(timer.current); // an older toast's timer must not clear this one early
     setToast(msg);
-    setTimeout(() => setToast(""), TOAST_MS);
+    timer.current = setTimeout(() => setToast(""), TOAST_MS);
   };
+  useEffect(() => () => clearTimeout(timer.current), []);
   return { toast, showToast };
 }
 

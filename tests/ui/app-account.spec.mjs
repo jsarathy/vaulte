@@ -154,6 +154,27 @@ test("photo upload: stored, saved to the profile, shown; removal clears it", asy
   await expect(button(page, "Remove Photo")).toBeHidden();
 });
 
+test("toasts: a newer toast is not cleared early by an older toast's timer", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await start(page, {
+    ...signedIn({ ...PROFILE, photoURL: "https://cdn.test/old.jpg" }),
+    __failStorage: { upload: "Bucket closed" },
+  });
+  await nav(page, "My Account").click();
+  await page.setInputFiles("#photo-upload", {
+    name: "me.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("x"),
+  });
+  await expect(page.locator("text=UPLOADING...")).toBeVisible();
+  await page.waitForTimeout(2000); // 2 s into UPLOADING...'s 3 s
+  await button(page, "Remove Photo").click();
+  await expect(page.locator("text=PHOTO REMOVED")).toBeVisible();
+  await page.waitForTimeout(1500); // 3.5 s: past the first toast's timer, inside the second's
+  await expect(page.locator("text=PHOTO REMOVED")).toBeVisible();
+  await expect(page.locator("text=PHOTO REMOVED")).toBeHidden({ timeout: 4000 });
+});
+
 test("photo upload: a failed upload alerts and changes nothing; a failed delete still removes", async ({
   page,
 }) => {
