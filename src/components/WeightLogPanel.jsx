@@ -33,7 +33,7 @@ const S = {
     borderRadius: "8px",
     border: "0.5px solid #e5e7eb",
     overflow: "auto",
-    maxHeight: "calc(100dvh - 220px)",
+    maxHeight: "calc(100vh - 220px)",
   },
 };
 
@@ -69,7 +69,7 @@ export default function WeightLogPanel({
   return (
     <div style={columnStyle(phone, 55)}>
       <Heading log={log} renpho={renpho} phone={phone} />
-      <div style={S.frame}>
+      <div className="table-frame" style={S.frame}>
         <WeightLogTable rows={log.rows} saveField={log.saveField} />
       </div>
     </div>

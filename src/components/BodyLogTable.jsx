@@ -9,7 +9,7 @@ const S = {
     borderRadius: "8px",
     border: "0.5px solid #e5e7eb",
     overflow: "auto",
-    maxHeight: "calc(100dvh - 220px)",
+    maxHeight: "calc(100vh - 220px)",
   },
   headRow: { background: "#185FA5", color: "#fff", position: "sticky", top: 0, zIndex: 1 },
   head: {
@@ -103,7 +103,7 @@ function LogRow({ row, i, count, edits }) {
 /** edits: { saveField(i, key, value), deleteRow(row) } from useBodyLogEdits. */
 export default function BodyLogTable({ bodyLog, edits }) {
   return (
-    <div style={S.box}>
+    <div className="table-frame" style={S.box}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
         <Heads />
         <tbody>

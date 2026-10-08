@@ -61,7 +61,7 @@ test("Weight: log, chart and plan stacked; the table scrolls inside its frame", 
   const frame = p.locator("table").first().locator("..");
   expect(await frame.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true); // sideways inside
   expect((await box(frame)).right).toBeLessThanOrEqual(390);
-  expect(await frame.evaluate((e) => e.style.maxHeight)).toContain("dvh");
+  expect(await frame.evaluate((e) => getComputedStyle(e).maxHeight)).toBe("624px"); // 844 - 220
 });
 
 test("Body: log, chart and measurement sites stacked; nothing past the edge", async ({
@@ -76,6 +76,6 @@ test("Body: log, chart and measurement sites stacked; nothing past the edge", as
   expect([log.left, chart.left, sites.left].every((x) => x < 40)).toBe(true);
   expect(await strays(p)).toEqual([]);
   const frame = p.locator("table").first().locator("..");
-  expect(await frame.evaluate((e) => e.style.maxHeight)).toContain("dvh");
+  expect(await frame.evaluate((e) => getComputedStyle(e).maxHeight)).toBe("624px"); // 844 - 220
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });

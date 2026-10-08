@@ -7,7 +7,7 @@
       "SPAN | font-size: 11px; color: rgb(156, 163, 175); | \"cm · click a date in the calendar to add a row\""
     ],
     "table": [
-      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100dvh);",
+      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100vh);",
       "TABLE | width: 100%; border-collapse: collapse; font-size: 12px;",
       "THEAD | ",
       "TR | background: rgb(24, 95, 165); color: rgb(255, 255, 255); position: sticky; top: 0px; z-index: 1;",
@@ -120,7 +120,7 @@
       "SPAN | font-size: 11px; color: rgb(156, 163, 175); | \"cm · click a date in the calendar to add a row\""
     ],
     "table": [
-      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100dvh);",
+      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100vh);",
       "TABLE | width: 100%; border-collapse: collapse; font-size: 12px;",
       "THEAD | ",
       "TR | background: rgb(24, 95, 165); color: rgb(255, 255, 255); position: sticky; top: 0px; z-index: 1;",
@@ -177,7 +177,7 @@
       "SPAN | font-size: 11px; color: rgb(156, 163, 175); | \"cm · click a date in the calendar to add a row\""
     ],
     "table": [
-      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100dvh);",
+      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100vh);",
       "TABLE | width: 100%; border-collapse: collapse; font-size: 12px;",
       "THEAD | ",
       "TR | background: rgb(24, 95, 165); color: rgb(255, 255, 255); position: sticky; top: 0px; z-index: 1;",
@@ -238,7 +238,7 @@
       "SPAN | font-size: 11px; color: rgb(156, 163, 175); | \"cm · click a date in the calendar to add a row\""
     ],
     "table": [
-      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100dvh);",
+      "DIV | background: rgb(255, 255, 255); border-radius: 8px; border: 0.5px solid rgb(229, 231, 235); overflow: auto; max-height: calc(-220px + 100vh);",
       "TABLE | width: 100%; border-collapse: collapse; font-size: 12px;",
       "THEAD | ",
       "TR | background: rgb(24, 95, 165); color: rgb(255, 255, 255); position: sticky; top: 0px; z-index: 1;",
