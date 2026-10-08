@@ -1,0 +1,40 @@
+# Fix 38 follow-up — early warning for GitHub's move of `ubuntu-latest` from Ubuntu 24.04 to
+# 26.04 (rolling out 2026-10-19 to 2026-11-19). Runs the Playwright UI suite and the API tests
+# on `ubuntu-26.04` every day, separately from the required checks. A red run (GitHub emails
+# the person who last edited this file) means the move would break CI: fix it, or pin
+# `ubuntu-24.04` in ci.yml. Delete this file once ci.yml has run green on 26.04 for a week.
+name: ubuntu-26-canary
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui:
+    name: UI tests on Ubuntu 26.04
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+  api:
+    name: API tests on Ubuntu 26.04
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run test:api
