@@ -1,5 +1,6 @@
 // src/components/TrackerTabs.jsx — NutritionTracker's tab content. Render only; t = useTracker().
 import { C } from "../constants/design.jsx";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import LogTab from "../tabs/LogTab";
 import CompareTab from "../tabs/CompareTab";
 import AddEntry from "../tabs/AddEntry";
@@ -16,8 +17,9 @@ const calc = (t) => ({
 });
 
 function DailyLog({ t }) {
+  const padding = useIsPhone() ? "10px" : "14px 16px";
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px", background: C.bg }}>
+    <div style={{ flex: 1, overflowY: "auto", padding, background: C.bg }}>
       <LogTab
         userId={t.userId}
         currentDate={t.currentDate}

@@ -1,6 +1,7 @@
 // src/components/AppleActivityHeader.jsx — the Apple Watch card's title bar: chevron, title,
 // loading / synced status and (collapsed) the steps · kcal summary
 import { C } from "../constants/design.jsx";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import { statusText, summaryText } from "../lib/appleActivity";
 import {
   headStyle,
@@ -28,8 +29,9 @@ const Chevron = ({ collapsed }) => (
 );
 
 export default function AppleActivityHeader({ collapsed, onToggle, s }) {
+  const wrap = useIsPhone() ? { flexWrap: "wrap", gap: "4px 10px", minHeight: "44px" } : null;
   return (
-    <div onClick={onToggle} style={headStyle(collapsed, onToggle)}>
+    <div onClick={onToggle} style={{ ...headStyle(collapsed, onToggle), ...wrap }}>
       <div style={titleRowStyle}>
         <Chevron collapsed={collapsed} />
         <span style={titleStyle}>⌚ Apple Watch Activity</span>

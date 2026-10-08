@@ -2,6 +2,7 @@
 import { formatDate } from "../constants/helpers";
 import { C, IconChevronLeft, IconChevronRight } from "../constants/design.jsx";
 import { adjacentDay } from "../lib/dayBudget.js";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 const ARROW = {
   width: "26px",
@@ -23,6 +24,7 @@ const ROW = {
 };
 
 export default function DayHeader({ date, allDays, switchDay }) {
+  const arrow = useIsPhone() ? { ...ARROW, width: "44px", height: "44px" } : ARROW;
   const go = (step) => {
     const next = adjacentDay(allDays, date, step);
     if (next) switchDay(next);
@@ -31,10 +33,10 @@ export default function DayHeader({ date, allDays, switchDay }) {
     <div style={ROW}>
       <div style={{ fontSize: "14px", fontWeight: "500", color: C.text }}>{formatDate(date)}</div>
       <div style={{ display: "flex", gap: "4px" }}>
-        <button onClick={() => go(1)} style={ARROW}>
+        <button onClick={() => go(1)} style={arrow}>
           <IconChevronLeft size={12} />
         </button>
-        <button onClick={() => go(-1)} style={ARROW}>
+        <button onClick={() => go(-1)} style={arrow}>
           <IconChevronRight size={12} />
         </button>
       </div>

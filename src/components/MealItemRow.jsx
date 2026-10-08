@@ -45,8 +45,19 @@ function PolarLink({ item, polar }) {
   );
 }
 
-function ItemName({ item, polar, userRecipes, setRecipeModal }) {
+export function ItemLabel({ item, polar, userRecipes, setRecipeModal }) {
   const link = itemLink(item, userRecipes);
+  if (link?.polar) return <PolarLink item={item} polar={polar} />;
+  if (!link?.recipe) return item.name;
+  return (
+    <span onClick={() => setRecipeModal(link.recipe)} style={S.recipe}>
+      {item.name}
+    </span>
+  );
+}
+
+function ItemName(props) {
+  const { item } = props;
   const cell = {
     padding: "7px 8px",
     fontSize: "12px",
@@ -54,15 +65,7 @@ function ItemName({ item, polar, userRecipes, setRecipeModal }) {
   };
   return (
     <td style={cell}>
-      {link?.polar ? (
-        <PolarLink item={item} polar={polar} />
-      ) : link?.recipe ? (
-        <span onClick={() => setRecipeModal(link.recipe)} style={S.recipe}>
-          {item.name}
-        </span>
-      ) : (
-        item.name
-      )}
+      <ItemLabel {...props} />
     </td>
   );
 }
