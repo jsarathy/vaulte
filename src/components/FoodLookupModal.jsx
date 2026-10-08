@@ -2,6 +2,7 @@
 // looks it up. Render only; state and actions in useFoodLookup.
 import { C, FONT } from "../constants/design.jsx";
 import { LOOKUP_UNITS } from "../lib/foodLookup.js";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 const S = {
   backdrop: {
@@ -22,6 +23,8 @@ const S = {
     border: `0.5px solid ${C.border}`,
     fontFamily: FONT.sans,
   },
+  // phone: narrower padding, never taller than the visible screen
+  boxPhone: { padding: "16px", maxHeight: "94dvh", overflowY: "auto" },
   label: {
     fontSize: "10px",
     fontWeight: "500",
@@ -88,7 +91,7 @@ const S = {
 function AmountInputs({ lookup }) {
   return (
     <div style={{ display: "flex", gap: "8px", marginBottom: "16px", alignItems: "flex-end" }}>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={S.label}>Quantity</div>
         <input
           ref={lookup.inputRef}
@@ -101,7 +104,7 @@ function AmountInputs({ lookup }) {
           style={S.qty}
         />
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={S.label}>Unit</div>
         <select value={lookup.unit} onChange={(e) => lookup.setUnit(e.target.value)} style={S.unit}>
           {LOOKUP_UNITS.map(([value, label]) => (
@@ -135,9 +138,10 @@ function Actions({ lookup }) {
 
 /** lookup: useFoodLookup() while open. */
 export default function FoodLookupModal({ lookup }) {
+  const phone = useIsPhone();
   return (
     <div onClick={(e) => e.target === e.currentTarget && lookup.close()} style={S.backdrop}>
-      <div style={S.box}>
+      <div style={phone ? { ...S.box, ...S.boxPhone } : S.box}>
         <div style={{ fontSize: "14px", fontWeight: "500", color: C.text, marginBottom: "4px" }}>
           {lookup.box.name}
         </div>

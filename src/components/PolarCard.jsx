@@ -2,6 +2,8 @@
 // Reconnect, the last sync message, and the sessions list.
 import PolarSessionsPanel from "./PolarSessionsPanel";
 import { reconnectPolar } from "../api/polarReconnect";
+import { usePhoneFold } from "../hooks/usePhoneFold.js";
+import FoldTitle from "./FoldTitle.jsx";
 
 const S = {
   card: {
@@ -90,20 +92,25 @@ function ConnectedControls({ userId, polar }) {
   );
 }
 
-/** polar: { connected, sessions, lastSync, syncing, syncMsg, sync }. */
+/** polar: { connected, sessions, lastSync, syncing, syncMsg, sync }. Folded shut on a phone. */
 export default function PolarCard({ userId, polar, browse, onLog }) {
+  const fold = usePhoneFold();
   return (
     <div style={S.card}>
       <div style={S.header}>
-        <div style={S.title}>
+        <FoldTitle fold={fold} style={S.title}>
           <span style={{ fontSize: "16px" }}>📡</span> Polar Sessions
+        </FoldTitle>
+        {polar.connected && fold.open && <ConnectedControls userId={userId} polar={polar} />}
+      </div>
+      {fold.open && polar.syncMsg && (
+        <div style={S.msg(polar.syncMsg.ok)}>{polar.syncMsg.text}</div>
+      )}
+      {fold.open && (
+        <div style={{ padding: "12px" }}>
+          <PolarSessionsPanel userId={userId} polar={polar} browse={browse} onLog={onLog} />
         </div>
-        {polar.connected && <ConnectedControls userId={userId} polar={polar} />}
-      </div>
-      {polar.syncMsg && <div style={S.msg(polar.syncMsg.ok)}>{polar.syncMsg.text}</div>}
-      <div style={{ padding: "12px" }}>
-        <PolarSessionsPanel userId={userId} polar={polar} browse={browse} onLog={onLog} />
-      </div>
+      )}
     </div>
   );
 }
