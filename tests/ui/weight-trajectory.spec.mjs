@@ -355,10 +355,14 @@ test("expand, scroll to the latest reading, collapse; hover label", async ({ pag
   await p.keyboard.press("Escape");
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   expect((await shape(p)).svg.viewBox).toBe("0 0 380 230");
-  const radii = await chartSvg(p)
-    .locator('circle[fill="#378ADD"]')
-    .evaluateAll((cs) => [...new Set(cs.map((c) => c.getAttribute("r")))]);
-  expect(radii).toHaveLength(1);
+  // the hover is cleared one render after the view changes, so wait for a single radius
+  await expect
+    .poll(() =>
+      chartSvg(p)
+        .locator('circle[fill="#378ADD"]')
+        .evaluateAll((cs) => new Set(cs.map((c) => c.getAttribute("r"))).size),
+    )
+    .toBe(1);
   await frame(p).dblclick({ position: { x: 200, y: 120 } });
   await expect(chartSvg(p).locator("g[style] rect")).toHaveCount(0);
   // double-click collapses too; Esc when collapsed does nothing
