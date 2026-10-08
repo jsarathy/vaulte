@@ -18,7 +18,7 @@ const S = {
     borderRadius: "12px",
     width: "520px",
     maxWidth: "95vw",
-    maxHeight: "88vh",
+    maxHeight: "88dvh",
     display: "flex",
     flexDirection: "column",
     boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
@@ -76,6 +76,35 @@ const stop = (fn) => (e) => {
   fn();
 };
 
+function RowActions({ recipe, saved, on }) {
+  return (
+    <>
+      <button
+        className="tap-target"
+        onClick={stop(() => on.edit(recipe))}
+        title="Edit recipe"
+        style={S.icon("#378ADD")}
+      >
+        ✏️
+      </button>
+      <button
+        className="tap-target"
+        onClick={stop(() => on.view(recipe))}
+        style={S.icon("#378ADD")}
+      >
+        👁
+      </button>
+      <button
+        className="tap-target"
+        onClick={stop(() => saved.remove(recipe))}
+        style={{ ...S.icon("#c62828"), opacity: 0.5 }}
+      >
+        ✕
+      </button>
+    </>
+  );
+}
+
 function RecipeRow({ recipe, saved, on }) {
   const weight = weightLabel(recipe, isEstimatedWeight(recipe));
   return (
@@ -95,18 +124,7 @@ function RecipeRow({ recipe, saved, on }) {
           </div>
           {weight && <div style={{ fontSize: "11px", color: "#6b7280" }}>{weight}</div>}
         </div>
-        <button onClick={stop(() => on.edit(recipe))} title="Edit recipe" style={S.icon("#378ADD")}>
-          ✏️
-        </button>
-        <button onClick={stop(() => on.view(recipe))} style={S.icon("#378ADD")}>
-          👁
-        </button>
-        <button
-          onClick={stop(() => saved.remove(recipe))}
-          style={{ ...S.icon("#c62828"), opacity: 0.5 }}
-        >
-          ✕
-        </button>
+        <RowActions recipe={recipe} saved={saved} on={on} />
       </div>
     </div>
   );

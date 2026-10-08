@@ -28,7 +28,7 @@ const S = {
     borderRadius: "10px",
     width: "520px",
     maxWidth: "100%",
-    maxHeight: "90vh",
+    maxHeight: "90dvh",
     overflowY: "auto",
     border: `0.5px solid ${C.border}`,
     fontFamily: FONT.sans,

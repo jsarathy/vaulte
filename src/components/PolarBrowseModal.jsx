@@ -27,7 +27,7 @@ const S = {
     borderRadius: "10px",
     width: "580px",
     maxWidth: "100%",
-    maxHeight: "88vh",
+    maxHeight: "88dvh",
     display: "flex",
     flexDirection: "column",
     border: line,

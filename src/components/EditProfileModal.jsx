@@ -92,7 +92,7 @@ export default function EditProfileModal({ editData, setEditData, error, savingE
       }}
     >
       <div
-        style={{ ...cardStyle, maxWidth: "520px", maxHeight: "90vh", overflowY: "auto" }}
+        style={{ ...cardStyle, maxWidth: "520px", maxHeight: "90dvh", overflowY: "auto" }}
         className="modal-in"
       >
         <DecorLines />

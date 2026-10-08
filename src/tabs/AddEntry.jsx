@@ -13,6 +13,7 @@ import PhotoLogCard from "../components/PhotoLogCard";
 import ExerciseLogModal from "../components/ExerciseLogModal";
 import { mealSlotOptions } from "../lib/exerciseLog.js";
 import { useAddEntry } from "../hooks/useAddEntry";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 const BIG_BUTTON = {
   color: "#fff",
@@ -42,9 +43,12 @@ const S = {
   exerciseButton: { ...BIG_BUTTON, width: "100%", background: "#378ADD", marginBottom: "14px" },
 };
 
-function FoodColumn({ h }) {
+// Two columns on a desktop, stacked on a phone
+const column = (phone, share) => ({ flex: phone ? "none" : `0 0 ${share}%`, minWidth: 0 });
+
+function FoodColumn({ h, phone }) {
   return (
-    <div style={{ flex: "0 0 65%", minWidth: 0 }}>
+    <div style={column(phone, 65)}>
       <div style={S.heading}>🥗 Add Food Entry</div>
       <AddFoodCard food={h.food} />
       <PhotoLogCard photo={h.photo} />
@@ -69,9 +73,9 @@ const polarOf = (p) => ({
   sync: p.syncPolar,
 });
 
-function ExerciseColumn({ p, h }) {
+function ExerciseColumn({ p, h, phone }) {
   return (
-    <div style={{ flex: "0 0 35%", minWidth: 0 }}>
+    <div style={column(phone, 35)}>
       <div style={S.heading}>🏋️ Exercise</div>
       <button onClick={h.exercise.show} style={S.exerciseButton}>
         🏋️ Log Manual Exercise
@@ -115,10 +119,14 @@ function Boxes({ p, h }) {
  */
 export default function AddEntry(props) {
   const h = useAddEntry(props);
+  const phone = useIsPhone();
+  const page = phone
+    ? { ...S.page, flexDirection: "column", alignItems: "stretch", padding: "10px" }
+    : S.page;
   return (
-    <div style={S.page}>
-      <FoodColumn h={h} />
-      <ExerciseColumn p={props} h={h} />
+    <div style={page}>
+      <FoodColumn h={h} phone={phone} />
+      <ExerciseColumn p={props} h={h} phone={phone} />
       <Boxes p={props} h={h} />
     </div>
   );
