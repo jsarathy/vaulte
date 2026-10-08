@@ -10,7 +10,6 @@ import HomePanel from "./HomePanel.jsx";
 import AccountPanel from "./AccountPanel.jsx";
 
 const pageStyle = {
-  height: "100vh",
   background: "radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)",
   display: "flex",
   flexDirection: "column",
@@ -28,7 +27,7 @@ function Panel({ activePanel, profile, userId, account }) {
   if (activePanel === "home") return <HomePanel profile={profile} />;
   if (activePanel === "nutrition")
     return (
-      <div className="fade-up" style={{ margin: "-24px" }}>
+      <div className="fade-up nt-wrap" style={{ margin: "-24px" }}>
         <NutritionTracker userId={userId} />
       </div>
     );
@@ -37,7 +36,7 @@ function Panel({ activePanel, profile, userId, account }) {
 
 export default function AccountPage({ profile, toast, userId, page, nav, edit }) {
   return (
-    <div style={pageStyle}>
+    <div className="app-page" style={pageStyle}>
       <style>{globalStyle}</style>
       <Toast msg={toast} />
       {edit.editing && <EditProfileModal {...edit} />}
@@ -47,7 +46,10 @@ export default function AccountPage({ profile, toast, userId, page, nav, edit })
         style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}
       >
         <AccountSidebar {...nav} handleDeleteAccount={page.handleDeleteAccount} />
-        <div className="app-main" style={mainStyle(nav.activePanel)}>
+        <div
+          className={`app-main${nav.activePanel === "nutrition" ? " app-main-nutrition" : ""}`}
+          style={mainStyle(nav.activePanel)}
+        >
           <Panel
             activePanel={nav.activePanel}
             profile={profile}

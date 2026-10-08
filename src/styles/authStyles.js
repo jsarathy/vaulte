@@ -35,7 +35,11 @@ export const globalStyle = `
   ::-webkit-scrollbar { width:4px; }
   ::-webkit-scrollbar-track { background:transparent; }
   ::-webkit-scrollbar-thumb { background:rgba(212,175,55,0.3); border-radius:2px; }
+  .app-page { height:100vh; height:100dvh; }
   @media (max-width: 768px) {
+    .app-main-nutrition { padding:6px !important; display:flex !important; flex-direction:column; overflow:hidden !important; }
+    .app-main-nutrition .nt-wrap { margin:0 !important; flex:1; min-height:0; display:flex; flex-direction:column; }
+    .app-main-nutrition .nt-root { height:auto !important; flex:1; min-height:0; }
     .app-sidebar { width:100% !important; height:56px !important; flex-direction:row !important; padding:0 !important; border-right:none !important; border-top:1px solid rgba(212,175,55,0.15) !important; order:2; gap:0 !important; }
     .app-sidebar .sidebar-label { display:none; }
     .app-sidebar .sidebar-nav-section { display:none; }
