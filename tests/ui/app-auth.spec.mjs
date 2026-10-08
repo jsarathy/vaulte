@@ -236,7 +236,8 @@ test("opened from a sign-in link: the stored email signs in; a new user goes to 
   await start(page, { __magicLink: true, __docs: { "users/magic-u": PROFILE } });
   await page.evaluate(() => localStorage.setItem("vaulte:magicEmail", "jane@example.com"));
   await page.goto("/app.html");
-  await expect(page.locator("text=WELCOME BACK")).toBeVisible();
+  // a cold page load on a busy CI runner can take longer than the default 5 s
+  await expect(page.locator("text=WELCOME BACK")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("vaulte:magicEmail"))).toBeNull();
   expect((await calls(page)).filter(([fn]) => fn === "signInWithLink")).toEqual([

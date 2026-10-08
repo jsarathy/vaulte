@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: "tests/ui",
   testMatch: "**/*.spec.mjs",
   fullyParallel: false, // each file is one ordered flow
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? "100%" : undefined, // one worker per core in CI (Fix 38)
   timeout: 120_000,
   reporter: process.env.CI ? [["list"], ["github"]] : "list",
   use: {
