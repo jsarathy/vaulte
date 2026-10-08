@@ -1,4 +1,5 @@
 // src/components/AccountSidebar.jsx — the signed-in page's navigation and Delete Account.
+import { HomeIcon, PersonIcon, PlateIcon } from "./NavIcons.jsx";
 
 const sidebarStyle = {
   width: "300px",
@@ -43,7 +44,7 @@ const navStyle = (active) => ({
 function NavItem({ id, label, icon, activePanel, setActivePanel }) {
   return (
     <button onClick={() => setActivePanel(id)} style={navStyle(activePanel === id)}>
-      <span style={{ fontSize: "26px" }}>{icon}</span>
+      <span style={{ fontSize: "26px", display: "flex" }}>{icon}</span>
       <span className="sidebar-label">{label}</span>
     </button>
   );
@@ -56,9 +57,9 @@ export default function AccountSidebar({ activePanel, setActivePanel, handleDele
       <div className="sidebar-nav-section" style={sectionStyle}>
         NAVIGATION
       </div>
-      <NavItem id="home" label="Home" icon="~" {...nav} />
-      <NavItem id="account" label="My Account" icon="*" {...nav} />
-      <NavItem id="nutrition" label="Nutrition" icon="N" {...nav} />
+      <NavItem id="home" label="Home" icon={<HomeIcon />} {...nav} />
+      <NavItem id="account" label="My Account" icon={<PersonIcon />} {...nav} />
+      <NavItem id="nutrition" label="Nutrition" icon={<PlateIcon />} {...nav} />
       <div className="sidebar-delete" style={deleteStyle}>
         <button
           className="btn-danger"
