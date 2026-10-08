@@ -1,6 +1,8 @@
 // src/components/AccountPanel.jsx — the My Account panel: header with Edit Profile, the
 // profile card, the contact cards and the accounts Vaulte depends on.
+import { useState } from "react";
 import { hdg } from "../styles/authStyles.js";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import ProfileCard from "./ProfileCard.jsx";
 
 const headerStyle = {
@@ -89,11 +91,42 @@ function ContactCards({ profile }) {
   );
 }
 
-/** Accounts the Vaulte app depends on. */
-function LinkedAccounts() {
+const sectionButtonStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  width: "100%",
+  minHeight: "48px",
+  padding: "0 4px",
+  background: "none",
+  border: "none",
+  borderBottom: "1px solid rgba(212,175,55,0.2)",
+  cursor: "pointer",
+  color: "rgba(212,175,55,0.8)",
+  fontSize: "11px",
+  letterSpacing: "2px",
+  fontFamily: "'Cinzel',serif",
+};
+
+/** Phone: a heading that opens and closes its content (closed to start with). */
+function Collapsible({ title, children }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div style={{ marginTop: "28px" }} className="fade-up-3">
-      <div style={linkedTitleStyle}>ACCOUNTS USED BY VAULTE</div>
+    <div style={{ marginTop: "12px" }}>
+      <button aria-expanded={open} onClick={() => setOpen(!open)} style={sectionButtonStyle}>
+        <span>{title}</span>
+        <span>{open ? "−" : "+"}</span>
+      </button>
+      {open && <div style={{ paddingTop: "14px" }}>{children}</div>}
+    </div>
+  );
+}
+
+/** Accounts the Vaulte app depends on. */
+function LinkedAccounts({ phone }) {
+  return (
+    <div style={{ marginTop: phone ? 0 : "28px" }} className="fade-up-3">
+      {!phone && <div style={linkedTitleStyle}>ACCOUNTS USED BY VAULTE</div>}
       <div style={linkedGridStyle}>
         {LINKED_ACCOUNTS.map(({ name, url }) => (
           <div key={name} className="info-card" style={linkedCardStyle}>
@@ -111,6 +144,7 @@ function LinkedAccounts() {
 }
 
 export default function AccountPanel({ profile, photo, openEdit }) {
+  const phone = useIsPhone();
   return (
     <div>
       <div style={headerStyle} className="fade-up">
@@ -123,8 +157,21 @@ export default function AccountPanel({ profile, photo, openEdit }) {
         </button>
       </div>
       <ProfileCard profile={profile} photo={photo} />
-      <ContactCards profile={profile} />
-      <LinkedAccounts />
+      {phone ? (
+        <>
+          <Collapsible title="DETAILS">
+            <ContactCards profile={profile} />
+          </Collapsible>
+          <Collapsible title="CONNECTED SERVICES">
+            <LinkedAccounts phone />
+          </Collapsible>
+        </>
+      ) : (
+        <>
+          <ContactCards profile={profile} />
+          <LinkedAccounts />
+        </>
+      )}
     </div>
   );
 }

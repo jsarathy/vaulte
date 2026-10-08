@@ -46,10 +46,7 @@ export default function AccountPage({ profile, toast, userId, page, nav, edit })
         style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}
       >
         <AccountSidebar {...nav} handleDeleteAccount={page.handleDeleteAccount} />
-        <div
-          className={`app-main${nav.activePanel === "nutrition" ? " app-main-nutrition" : ""}`}
-          style={mainStyle(nav.activePanel)}
-        >
+        <div className={`app-main app-main-${nav.activePanel}`} style={mainStyle(nav.activePanel)}>
           <Panel
             activePanel={nav.activePanel}
             profile={profile}
