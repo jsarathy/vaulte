@@ -7,7 +7,6 @@ import {
   dayBudget,
   macroPills,
   leftParts,
-  summaryCards,
   adjacentDay,
 } from "../src/lib/dayBudget.js";
 
@@ -76,28 +75,6 @@ test("macro pills, what's left", () => {
   assert.deepEqual(leftParts(0), ["-", "0"]);
   assert.deepEqual(leftParts(-14), ["+", "14"]);
   assert.deepEqual(leftParts(-0.4), ["+", "0"]);
-});
-
-test("summary cards", () => {
-  const b = { burned: 457.4, target: { protein_g: 118, carbs_g: 357 } };
-  const t = totals({ foodKcal: 3000.4, exerciseBurned: 100.4, protein: 140.26, net_carbs: 380 });
-  assert.deepEqual(summaryCards(t, b, 357.3), [
-    { label: "Consumed", value: "3,000", note: "457 kcal burned (incl. 357 Apple)", warn: false },
-    { label: "Protein", value: "140.3g", note: "target 118g", warn: false },
-    { label: "Net carbs", value: "380g", note: "+23g over", warn: true },
-    { label: "Fat burned", value: "0g", note: "100 kcal exercise", warn: false },
-  ]);
-  const cards = summaryCards(totals({ net_carbs: 357, fatBurnedG: 12.34 }), { ...b, burned: 0 }, 0);
-  assert.equal(cards[0].note, "0 kcal burned");
-  assert.deepEqual(cards[2], { label: "Net carbs", value: "357g", note: "0g left", warn: false });
-  assert.deepEqual(cards[3], {
-    label: "Fat burned",
-    value: "12.3g",
-    note: "no exercise logged",
-    warn: false,
-  });
-  assert.equal(summaryCards(totals({ net_carbs: 300.04 }), b, 0)[2].note, "57g left");
-  assert.equal(summaryCards(totals({ net_carbs: 357.26 }), b, 0)[2].note, "+0.3g over");
 });
 
 test("the day before / after", () => {

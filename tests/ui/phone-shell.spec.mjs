@@ -54,6 +54,25 @@ test.describe("phone", () => {
     await expect(p.getByText(/net kcal of/)).toBeVisible();
   });
 
+  test("the open tab is a darker grey pill, like Days when open", async ({ page: p }) => {
+    await start(p);
+    const bg = (n) =>
+      p
+        .locator(".nt-root nav")
+        .getByRole("button", { name: n, exact: true })
+        .evaluate((e) => getComputedStyle(e).backgroundColor);
+    const grey = await days(p).evaluate((e) => getComputedStyle(e).backgroundColor);
+    await expect(days(p)).toHaveAttribute("aria-expanded", "false");
+    expect(await bg("Daily log")).not.toBe(grey); // Days is closed: its own colour differs
+    await days(p).click();
+    const open = await days(p).evaluate((e) => getComputedStyle(e).backgroundColor);
+    await expect.poll(() => bg("Daily log")).toBe(open); // same dark grey as the open Days pill
+    expect(await bg("Compare")).not.toBe(open);
+    await p.locator(".nt-root nav").getByRole("button", { name: "Compare", exact: true }).click();
+    await expect.poll(() => bg("Compare")).toBe(open); // after the 0.15 s colour fade
+    await expect.poll(() => bg("Daily log")).not.toBe(open);
+  });
+
   test("Days button opens the calendar sidebar; Targets and Meds fold; Days turns grey", async ({
     page: p,
   }) => {

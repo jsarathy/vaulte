@@ -56,7 +56,13 @@ const S = {
   }),
   phoneHeader: { padding: "0 8px", gap: "8px" },
   phoneNav: { display: "flex", gap: "2px", overflowX: "auto", flex: 1, minWidth: 0 },
-  phoneTab: { padding: "12px 12px", fontSize: "15px", whiteSpace: "nowrap", flexShrink: 0 },
+  phoneTab: (on) => ({
+    padding: "12px 12px",
+    fontSize: "15px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    ...(on ? S.pillOn : { border: "0.5px solid transparent" }),
+  }),
   daysButton: {
     background: C.bg,
     border: `0.5px solid ${C.border}`,
@@ -68,7 +74,7 @@ const S = {
     cursor: "pointer",
     flexShrink: 0,
   },
-  daysButtonOn: { background: "#d1d5db", border: "0.5px solid #9ca3af" },
+  pillOn: { background: "#d1d5db", border: "0.5px solid #9ca3af" },
   fold: {
     display: "flex",
     justifyContent: "space-between",
@@ -128,7 +134,10 @@ function Tabs({ t, phone, onTab }) {
             onTab?.();
             t.setActiveTab(id);
           }}
-          style={{ ...S.tab(t.activeTab === id), ...(phone ? S.phoneTab : null) }}
+          style={{
+            ...S.tab(t.activeTab === id),
+            ...(phone ? S.phoneTab(t.activeTab === id) : null),
+          }}
         >
           {label}
         </button>
@@ -145,7 +154,7 @@ function Header({ t, phone, daysOpen, onDays, onTab }) {
         <button
           onClick={onDays}
           aria-expanded={daysOpen}
-          style={{ ...S.daysButton, ...(daysOpen ? S.daysButtonOn : null) }}
+          style={{ ...S.daysButton, ...(daysOpen ? S.pillOn : null) }}
         >
           ☰ Days
         </button>

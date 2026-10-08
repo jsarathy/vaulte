@@ -1,7 +1,7 @@
 // tests/ui/apple-activity-card.spec.mjs — the Daily log's Apple Watch Activity card (Fix 26
 // PR 44): loading / empty / synced states, the collapsed summary, the table (steps, active
 // minutes, flights with kcal at the calculator's weight), Polar-session exclusions from 5-min
-// slots and from daily totals ("estimated"), the kcal reported up to the day's summary, and a
+// slots and from daily totals ("estimated"), the kcal reported up to the day's net kcal, and a
 // listener failure.
 import { test, expect } from "@playwright/test";
 
@@ -59,12 +59,12 @@ const rows = (p) =>
   card(p)
     .locator("tr")
     .evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
-// the day summary's note: "N kcal burned (incl. M Apple)" → M, or 0 when nothing reported
-const burned = (p) =>
-  p
-    .locator("body")
-    .innerText()
-    .then((t) => t.match(/kcal burned \(incl\. (\d+) Apple\)/)?.[1] ?? "0");
+// Apple's kcal as the calorie bar shows it: the net kcal falls by the burn, so burn = -net minus
+// the logged exercise (these days log no food); "0" when nothing is reported
+const burned = async (p, exercise = 0) => {
+  const net = await p.getByText("net kcal of").locator("xpath=preceding-sibling::span").innerText();
+  return String(-Number(net.replace(/,/g, "")) - exercise || 0);
+};
 
 test("empty: no data note, blank summary when collapsed; the header's look", async ({
   page: p,
@@ -128,7 +128,7 @@ test("synced slots: table, kcal at the calculator's weight, synced time, summary
     "rgb(24, 95, 165)",
   );
   await expect(card(p)).not.toContainText("Excludes");
-  expect(await burned(p)).toBe("61"); // reported up to the day's summary
+  expect(await burned(p)).toBe("61"); // reported up to the day's net kcal
   await title(p).click();
   await expect(head(p).locator("span").last()).toHaveText("1,000 steps · 61 kcal");
   expect(await style(head(p).locator("span").last(), "fontWeight")).toBe("500");
@@ -200,7 +200,7 @@ test("daily totals: estimated exclusions by sport cadence; none without sessions
     ["Flights climbed", "3", "6"],
     ["Total", "", "95"],
   ]);
-  expect(await burned(p)).toBe("95");
+  expect(await burned(p, 600)).toBe("95"); // two Polar sessions of 300 kcal
 
   await start(p, {
     __docs: {
