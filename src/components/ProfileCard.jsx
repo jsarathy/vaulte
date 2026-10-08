@@ -1,6 +1,7 @@
-// src/components/ProfileCard.jsx — My Account's profile card: initials, name, account id,
-// member-since date and the photo column.
+// src/components/ProfileCard.jsx — My Account's profile card: initials, name, member-since date
+// and the photo. On a phone the text stacks on the left and a smaller photo sits on the right.
 import ProfilePhoto from "./ProfilePhoto.jsx";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 
 const cardStyle = {
   padding: "24px 28px",
@@ -32,46 +33,39 @@ const nameStyle = {
   fontSize: "18px",
   letterSpacing: "2px",
 };
-const idBadgeStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "6px",
-  background: "rgba(212,175,55,0.1)",
-  border: "1px solid rgba(212,175,55,0.25)",
-  borderRadius: "20px",
-  padding: "3px 10px",
-  margin: "6px 0",
-};
-const idStyle = {
-  fontFamily: "'Cinzel',serif",
-  fontSize: "9px",
-  letterSpacing: "2px",
-  color: "rgba(212,175,55,0.7)",
-};
 const sinceStyle = {
   color: "rgba(240,234,214,0.4)",
   fontSize: "13px",
   fontStyle: "italic",
 };
 
+const phoneCardStyle = { ...cardStyle, padding: "16px", gap: "14px", alignItems: "flex-start" };
+const phoneTextStyle = {
+  flex: 1,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "8px",
+};
+
 export default function ProfileCard({ profile, photo }) {
+  const phone = useIsPhone();
   return (
-    <div style={cardStyle} className="fade-up-2">
-      <div style={initialsStyle}>
-        {profile.firstName?.[0]}
-        {profile.lastName?.[0]}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={nameStyle}>
-          {profile.firstName} {profile.lastName}
+    <div style={phone ? phoneCardStyle : cardStyle} className="fade-up-2">
+      <div style={phone ? phoneTextStyle : { display: "contents" }}>
+        <div style={initialsStyle}>
+          {profile.firstName?.[0]}
+          {profile.lastName?.[0]}
         </div>
-        <div style={idBadgeStyle}>
-          <span style={{ color: "rgba(212,175,55,0.5)", fontSize: "9px" }}>+</span>
-          <span style={idStyle}>{profile.uid}</span>
+        <div style={{ flex: 1 }}>
+          <div style={nameStyle}>
+            {profile.firstName} {profile.lastName}
+          </div>
+          <div style={{ ...sinceStyle, marginTop: "6px" }}>Member since {profile.createdAt}</div>
         </div>
-        <div style={sinceStyle}>Member since {profile.createdAt}</div>
       </div>
-      <ProfilePhoto photoURL={profile.photoURL} {...photo} />
+      <ProfilePhoto photoURL={profile.photoURL} small={phone} {...photo} />
     </div>
   );
 }

@@ -46,6 +46,27 @@ test.describe("phone", () => {
   });
 });
 
+test.describe("phone card", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the photo sits inside the card on the right; the text stacks on the left", async ({
+    page: p,
+  }) => {
+    await start(p);
+    const box = (l) => l.evaluate((e) => e.getBoundingClientRect().toJSON());
+    const card = await box(p.locator(".fade-up-2"));
+    const photo = await box(p.locator("label[for=photo-upload] > div"));
+    const name = await box(p.locator(".fade-up-2").getByText("Jane Smith"));
+    expect(photo.right).toBeLessThanOrEqual(card.right);
+    expect(photo.left).toBeGreaterThan(name.left);
+    expect(name.right).toBeLessThanOrEqual(photo.left);
+    await expect(p.locator(".fade-up-2")).not.toContainText("USR-");
+    const edit = p.getByRole("button", { name: "Edit Profile" });
+    const title = await box(p.getByRole("heading", { name: "My Account" }));
+    expect(Math.abs((await box(edit)).top + 20 - (title.top + title.height / 2))).toBeLessThan(8);
+  });
+});
+
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 

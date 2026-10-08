@@ -35,3 +35,10 @@ export const PlateIcon = () => (
     <path d="M20.5 20V4c-1.7 1.4-2.5 3.6-2.5 6.5V14h2.5" />
   </svg>
 );
+
+export const EditIcon = () => (
+  <svg {...svg}>
+    <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z" />
+    <path d="M14.5 7.5l3 3" />
+  </svg>
+);

@@ -4,12 +4,20 @@ import { useState } from "react";
 import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import ProfileCard from "./ProfileCard.jsx";
+import { EditIcon } from "./NavIcons.jsx";
 
-const headerStyle = {
+const headerStyle = { marginBottom: "32px" };
+const titleRowStyle = { display: "flex", alignItems: "center", gap: "14px" };
+const editButtonStyle = {
+  width: "40px",
+  height: "40px",
   display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  marginBottom: "32px",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "20px",
+  padding: 0,
+  letterSpacing: 0,
+  borderRadius: "50%",
 };
 const eyebrowStyle = {
   color: "rgba(212,175,55,0.4)",
@@ -148,13 +156,19 @@ export default function AccountPanel({ profile, photo, openEdit }) {
   return (
     <div>
       <div style={headerStyle} className="fade-up">
-        <div>
-          <div style={eyebrowStyle}>PROFILE</div>
+        <div style={eyebrowStyle}>PROFILE</div>
+        <div style={titleRowStyle}>
           <h2 style={{ ...hdg, fontSize: "26px", marginBottom: 0 }}>My Account</h2>
+          <button
+            className="btn-ghost"
+            style={editButtonStyle}
+            aria-label="Edit Profile"
+            title="Edit Profile"
+            onClick={openEdit}
+          >
+            <EditIcon />
+          </button>
         </div>
-        <button className="btn-ghost" onClick={openEdit}>
-          Edit Profile
-        </button>
       </div>
       <ProfileCard profile={profile} photo={photo} />
       {phone ? (
