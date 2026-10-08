@@ -43,8 +43,8 @@ test("days scroll sideways, 150 px each; the calculator is full-width underneath
   const grid = p.getByText("Compare days").locator("xpath=../following-sibling::div[1]");
   expect(await grid.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
   expect((await box(grid)).right).toBeLessThanOrEqual(390);
-  const first = await box(p.getByText("Sun, 4 Oct"));
-  const second = await box(p.getByText("Sat, 3 Oct"));
+  const first = await box(p.getByText(/Sun,? 4 Oct/));
+  const second = await box(p.getByText(/Sat,? 3 Oct/));
   expect(Math.round(second.left - first.left)).toBe(157); // 150 + the 7 px gap
   const calc = await box(p.getByText("Reference calculator"));
   expect(calc.top).toBeGreaterThan(first.top + 150); // under the days, not beside them
