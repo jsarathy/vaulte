@@ -1,7 +1,13 @@
 // src/components/MonthlyTargetsCard.jsx — monthly targets form (left column, under the calendar).
 // Follows the month shown on the calendar; loading and saving live in useMonthlyTargets.
 import { C, FONT } from "../constants/design.jsx";
-import { TARGET_FIELDS, monthKeyOf, monthLabelOf } from "../lib/monthlyTargets";
+import {
+  TARGET_FIELDS,
+  actualKey,
+  actualStatus,
+  monthKeyOf,
+  monthLabelOf,
+} from "../lib/monthlyTargets";
 import { useMonthlyTargets } from "../hooks/useMonthlyTargets";
 
 const cardStyle = { borderTop: `0.5px solid ${C.border}`, padding: "10px 12px" };
@@ -25,6 +31,14 @@ const labelRowStyle = {
   color: C.hint,
   marginBottom: "2px",
 };
+const pairStyle = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" };
+const captionStyle = { ...pairStyle, fontSize: "10px", color: C.hint, margin: "0 2px 2px" };
+const verdictStyle = (ok) => ({
+  fontSize: "10px",
+  textAlign: "right",
+  marginTop: "1px",
+  color: ok ? C.greenText : C.danger,
+});
 const inputStyle = {
   width: "100%",
   boxSizing: "border-box",
@@ -46,8 +60,12 @@ export default function MonthlyTargetsCard({ userId, year, month }) {
         <span style={titleStyle}>Targets · {monthLabelOf(year, month)}</span>
         <SaveStatus status={status} />
       </div>
+      <div style={captionStyle}>
+        <span>Target</span>
+        <span>Actual</span>
+      </div>
       {TARGET_FIELDS.map((f) => (
-        <TargetField key={f.key} field={f} value={vals[f.key]} onChange={onChange} />
+        <TargetField key={f.key} field={f} vals={vals} onChange={onChange} />
       ))}
     </div>
   );
@@ -62,7 +80,8 @@ function SaveStatus({ status }) {
   );
 }
 
-function TargetField({ field, value, onChange }) {
+function TargetField({ field, vals, onChange }) {
+  const verdict = actualStatus(field.key, vals[field.key], vals[actualKey(field.key)]);
   return (
     <div style={{ marginBottom: "6px" }}>
       <div style={labelRowStyle}>
@@ -72,16 +91,35 @@ function TargetField({ field, value, onChange }) {
         </span>
         {field.tol && <span>{field.tol}</span>}
       </div>
-      <input
-        type="number"
-        inputMode="decimal"
-        min="0"
-        step={field.step}
-        value={value}
-        placeholder="—"
-        onChange={(e) => onChange(field.key, e.target.value)}
-        style={inputStyle}
-      />
+      <div style={pairStyle}>
+        <ValueInput field={field} name={field.key} kind="target" vals={vals} onChange={onChange} />
+        <ValueInput
+          field={field}
+          name={actualKey(field.key)}
+          kind="actual"
+          vals={vals}
+          onChange={onChange}
+        />
+      </div>
+      {verdict && <div style={verdictStyle(verdict === "ok")}>{VERDICT[verdict]}</div>}
     </div>
+  );
+}
+
+const VERDICT = { ok: "✓ on target", off: "off target" };
+
+function ValueInput({ field, name, kind, vals, onChange }) {
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      min="0"
+      step={field.step}
+      value={vals[name]}
+      placeholder="—"
+      aria-label={`${field.label} ${kind}`}
+      onChange={(e) => onChange(name, e.target.value)}
+      style={inputStyle}
+    />
   );
 }

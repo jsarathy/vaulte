@@ -12,31 +12,37 @@ test.beforeEach(async ({ page }) => {
   );
   await page.addInitScript((oct) => {
     window.__docs = {
-      [oct]: { weightKg: 80.5, waistCm: 101, gym: 12, golf: null, sleepHrs: 7.25 },
+      [oct]: {
+        weightKg: 80.5,
+        waistCm: 101,
+        gym: 12,
+        golf: null,
+        sleepHrs: 7.25,
+        actuals: { weightKg: 80.6, gym: 5, sleepHrs: 6.5 },
+      },
     };
   }, OCT);
   await page.goto("/tracker.html");
   await page.getByText("Targets · Oct 2026").waitFor();
 });
 
-const field = (page, label) =>
-  page.locator("div", { hasText: label }).locator("xpath=following-sibling::input").first();
+const field = (page, label) => page.getByLabel(label, { exact: true });
 const savesTo = (page, path) =>
   page.evaluate((p) => window.__setDocs.filter((s) => s.path === p).map((s) => s.data), path);
 
 test("loads the month's saved targets", async ({ page }) => {
-  await expect(field(page, "Weight (kg)")).toHaveValue("80.5");
-  await expect(field(page, "Waist (cm)")).toHaveValue("101");
-  await expect(field(page, "Gym sessions")).toHaveValue("12");
-  await expect(field(page, "Golf sessions")).toHaveValue("");
-  await expect(field(page, "Sleep (avg) (hrs)")).toHaveValue("7.25");
+  await expect(field(page, "Weight target")).toHaveValue("80.5");
+  await expect(field(page, "Waist target")).toHaveValue("101");
+  await expect(field(page, "Gym sessions target")).toHaveValue("12");
+  await expect(field(page, "Golf sessions target")).toHaveValue("");
+  await expect(field(page, "Sleep (avg) target")).toHaveValue("7.25");
   await expect(page.getByText("± 0.2 kg")).toBeVisible();
 });
 
 test("an edit auto-saves the whole month with tolerances; blanks save as null", async ({
   page,
 }) => {
-  await field(page, "Weight (kg)").fill("79.8");
+  await field(page, "Weight target").fill("79.8");
   await expect(page.getByText("saving…")).toBeVisible();
   await expect(page.getByText("saved", { exact: true })).toBeVisible();
   const saves = await savesTo(page, OCT);
@@ -49,6 +55,7 @@ test("an edit auto-saves the whole month with tolerances; blanks save as null", 
     golf: null,
     sleepHrs: 7.25,
     tolerance: { weightKg: 0.2, waistCm: 1 },
+    actuals: { weightKg: 80.6, waistCm: null, gym: 5, golf: null, sleepHrs: 6.5 },
   });
   expect(saves[0].updated_at).toBeTruthy();
 });
@@ -56,8 +63,8 @@ test("an edit auto-saves the whole month with tolerances; blanks save as null", 
 test("quick successive edits are saved once", async ({ page }) => {
   // both edits in one step, well inside the 600 ms wait even on a busy machine
   const inputs = [
-    await field(page, "Gym sessions").elementHandle(),
-    await field(page, "Golf sessions").elementHandle(),
+    await field(page, "Gym sessions target").elementHandle(),
+    await field(page, "Golf sessions target").elementHandle(),
   ];
   await page.evaluate(([gym, golf]) => {
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
@@ -81,8 +88,8 @@ test("follows the calendar month: next month loads its own (empty) targets", asy
     .nth(1)
     .click();
   await page.getByText("Targets · Nov 2026").waitFor();
-  await expect(field(page, "Weight (kg)")).toHaveValue("");
-  await field(page, "Weight (kg)").fill("78");
+  await expect(field(page, "Weight target")).toHaveValue("");
+  await field(page, "Weight target").fill("78");
   await expect(page.getByText("saved", { exact: true })).toBeVisible();
   expect((await savesTo(page, NOV))[0]).toMatchObject({ month: "2026-11", weightKg: 78 });
   expect(await savesTo(page, OCT)).toHaveLength(0);
@@ -90,6 +97,38 @@ test("follows the calendar month: next month loads its own (empty) targets", asy
 
 test("a failed save shows 'not saved'", async ({ page }) => {
   await page.evaluate(() => (window.__failSetDoc = true));
-  await field(page, "Weight (kg)").fill("70");
+  await field(page, "Weight target").fill("70");
   await expect(page.getByText("not saved")).toBeVisible();
+});
+
+test("loads the month's actuals beside the targets", async ({ page }) => {
+  await expect(field(page, "Weight actual")).toHaveValue("80.6");
+  await expect(field(page, "Waist actual")).toHaveValue("");
+  await expect(field(page, "Gym sessions actual")).toHaveValue("5");
+  await expect(field(page, "Sleep (avg) actual")).toHaveValue("6.5");
+});
+
+test("an actual auto-saves with the month, and the verdict follows the numbers", async ({
+  page,
+}) => {
+  await expect(page.getByText("✓ on target")).toHaveCount(1); // weight 80.6 vs 80.5 ± 0.2
+  await expect(page.getByText("off target")).toHaveCount(2); // gym 5 < 12, sleep 6.5 < 7.25
+  await field(page, "Gym sessions actual").fill("12");
+  await field(page, "Weight actual").fill("81");
+  await expect(page.getByText("saved", { exact: true })).toBeVisible();
+  const saves = await savesTo(page, OCT);
+  expect(saves[saves.length - 1]).toMatchObject({
+    weightKg: 80.5,
+    actuals: { weightKg: 81, gym: 12, sleepHrs: 6.5 },
+  });
+  await expect(page.getByText("✓ on target")).toHaveCount(1); // gym now met; weight now outside
+  await expect(page.getByText("off target")).toHaveCount(2);
+});
+
+test("no verdict until both the target and the actual are filled in", async ({ page }) => {
+  await expect(field(page, "Golf sessions actual")).toHaveValue("");
+  await field(page, "Golf sessions actual").fill("2");
+  await expect(page.getByText("off target")).toHaveCount(2); // golf has no target yet
+  await field(page, "Golf sessions target").fill("4");
+  await expect(page.getByText("off target")).toHaveCount(3);
 });
