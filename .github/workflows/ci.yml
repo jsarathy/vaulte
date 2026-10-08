@@ -60,7 +60,7 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       - name: Runner cores
-        run: nproc
+        run: echo "::notice title=Runner cores::$(nproc) cores"
       - run: npm run test:ui -- --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
         if: failure()
