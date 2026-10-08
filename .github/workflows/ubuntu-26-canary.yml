@@ -8,6 +8,8 @@ on:
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/ubuntu-26-canary.yml]
 permissions:
   contents: read
 jobs:
@@ -38,3 +40,26 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run test:api
+  # A failed canary opens a GitHub issue (or adds a comment to the one already open), so the
+  # warning does not depend on an email being read.
+  report:
+    name: Open an issue if the canary failed
+    needs: [ui, api]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Ubuntu 26.04 canary failed"
+          open=$(gh issue list --repo "$REPO" --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$REPO" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "The Ubuntu 26.04 canary (Fix 45) failed: $RUN_URL. ubuntu-latest moves to 26.04 between 2026-10-19 and 2026-11-19; fix the failing step so CI keeps working."
+          fi
