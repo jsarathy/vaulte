@@ -1,9 +1,9 @@
 // src/components/ProfilePhoto.jsx — the profile photo column: the picture (or "add photo"),
 // the hidden file input and Remove Photo.
 
-const photoStyle = (photoURL) => ({
-  width: "200px",
-  height: "200px",
+const photoStyle = (photoURL, size) => ({
+  width: size,
+  height: size,
   borderRadius: "12px",
   backgroundImage: `url(${photoURL})`,
   backgroundSize: "cover",
@@ -11,9 +11,9 @@ const photoStyle = (photoURL) => ({
   border: "2px solid rgba(212,175,55,0.4)",
   boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
 });
-const placeholderStyle = {
-  width: "200px",
-  height: "200px",
+const placeholderStyle = (size) => ({
+  width: size,
+  height: size,
   borderRadius: "12px",
   border: "2px dashed rgba(212,175,55,0.3)",
   display: "flex",
@@ -23,7 +23,7 @@ const placeholderStyle = {
   gap: "8px",
   transition: "border-color 0.3s",
   background: "rgba(212,175,55,0.03)",
-};
+});
 const placeholderTextStyle = {
   fontFamily: "'Cinzel',serif",
   fontSize: "9px",
@@ -43,10 +43,10 @@ const removeStyle = {
   textTransform: "uppercase",
 };
 
-function PhotoPlaceholder() {
+function PhotoPlaceholder({ size, small }) {
   return (
-    <div style={placeholderStyle}>
-      <span style={{ fontSize: "40px" }}>[ photo ]</span>
+    <div style={placeholderStyle(size)}>
+      <span style={{ fontSize: small ? "22px" : "40px" }}>[ photo ]</span>
       <span style={placeholderTextStyle}>
         CLICK TO
         <br />
@@ -56,7 +56,8 @@ function PhotoPlaceholder() {
   );
 }
 
-export default function ProfilePhoto({ photoURL, handlePhotoChange, handleRemovePhoto }) {
+export default function ProfilePhoto({ photoURL, handlePhotoChange, handleRemovePhoto, small }) {
+  const size = small ? "112px" : "200px";
   return (
     <div style={{ flexShrink: 0, textAlign: "center" }}>
       <input
@@ -67,7 +68,11 @@ export default function ProfilePhoto({ photoURL, handlePhotoChange, handleRemove
         onChange={handlePhotoChange}
       />
       <label htmlFor="photo-upload" style={{ cursor: "pointer", display: "block" }}>
-        {photoURL ? <div style={photoStyle(photoURL)} /> : <PhotoPlaceholder />}
+        {photoURL ? (
+          <div style={photoStyle(photoURL, size)} />
+        ) : (
+          <PhotoPlaceholder size={size} small={small} />
+        )}
       </label>
       {photoURL && (
         <button onClick={handleRemovePhoto} style={removeStyle}>

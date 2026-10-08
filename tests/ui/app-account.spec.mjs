@@ -77,7 +77,7 @@ test("My Account: the profile card, info cards and linked accounts", async ({ pa
   await expect(main).toContainText("PROFILE");
   await expect(main.locator(".fade-up-2")).toContainText("JS");
   await expect(main.locator(".fade-up-2")).toContainText("Jane Smith");
-  await expect(main.locator(".fade-up-2")).toContainText("USR-ABC123");
+  await expect(main.locator(".fade-up-2")).not.toContainText("USR-ABC123");
   await expect(main.locator(".fade-up-2")).toContainText("Member since 1 October 2026");
   await expect(main.locator(".fade-up-2")).toContainText("CLICK TOADD PHOTO");
   await expect(button(page, "Remove Photo")).toBeHidden();
