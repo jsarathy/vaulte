@@ -2,6 +2,7 @@
 // Add Food form. Render only: state lives in useRecipePortion, logic in lib/recipePortion.
 import { C, FONT } from "../constants/design.jsx";
 import { isEstimatedWeight } from "../api/recipeWeights";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import {
   PORTION_UNITS,
   portionView,
@@ -52,6 +53,9 @@ const S = {
     fontFamily: FONT.sans,
     overflow: "hidden",
   },
+  // on a phone: never taller than the visible screen; the middle scrolls if it has to
+  boxPhone: { maxHeight: "94dvh", display: "flex", flexDirection: "column" },
+  bodyPhone: { padding: "12px 14px", overflowY: "auto", minHeight: 0 },
   header: {
     background: "#185FA5",
     color: "#fff",
@@ -201,7 +205,10 @@ function BaseNutrition({ recipe }) {
   );
 }
 
-function AmountInputs({ box }) {
+// phone: the drop-down's own width must not push the row past the box
+const SHRINK = { minWidth: 0 };
+
+function AmountInputs({ box, phone }) {
   return (
     <>
       <div style={S.howMuch}>How much?</div>
@@ -212,9 +219,13 @@ function AmountInputs({ box }) {
           step="0.1"
           value={box.qtyText}
           onChange={(e) => box.setQty(e.target.value)}
-          style={S.qty}
+          style={phone ? { ...S.qty, ...SHRINK } : S.qty}
         />
-        <select value={box.unit} onChange={(e) => box.setUnit(e.target.value)} style={S.unit}>
+        <select
+          value={box.unit}
+          onChange={(e) => box.setUnit(e.target.value)}
+          style={phone ? { ...S.unit, ...SHRINK } : S.unit}
+        >
           {PORTION_UNITS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -264,13 +275,14 @@ function Actions({ box, view, onLoad }) {
 /** box: useRecipePortion(); onLoad(formItem) fills the Add Food form. */
 export default function RecipePortionModal({ box, onLoad }) {
   const view = portionView(box.recipe, box);
+  const phone = useIsPhone();
   return (
     <div onClick={(e) => e.target === e.currentTarget && box.close()} style={S.backdrop}>
-      <div style={S.box}>
+      <div style={phone ? { ...S.box, ...S.boxPhone } : S.box}>
         <Header recipe={box.recipe} onClose={box.close} />
-        <div style={{ padding: "20px" }}>
+        <div style={phone ? S.bodyPhone : { padding: "20px" }}>
           <BaseNutrition recipe={box.recipe} />
-          <AmountInputs box={box} />
+          <AmountInputs box={box} phone={phone} />
           {!view.isLocal && (
             <div style={S.hint}>
               {claudeHint(box.unit)} Add a Wt/portion with ✏️ in Saved Recipes for instant results

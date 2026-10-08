@@ -2,6 +2,8 @@
 // actions in useAddFood.
 import { C, FONT } from "../constants/design.jsx";
 import { MACRO_FIELDS, recipeHint } from "../lib/addFood.js";
+import { usePhoneFold } from "../hooks/usePhoneFold.js";
+import FoldTitle from "./FoldTitle.jsx";
 
 const LABEL = {
   fontSize: "10px",
@@ -31,6 +33,10 @@ const S = {
   },
   title: { fontWeight: "bold", color: "#185FA5", marginBottom: "10px", fontSize: "13px" },
   dayMeal: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" },
+  dayMealPhone: { gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" },
+  // iPhone draws a date box taller and wider than a drop-down: make the two the same
+  alike: { height: "40px", minWidth: 0, display: "block", boxSizing: "border-box" },
+  date: { WebkitAppearance: "none", appearance: "none", textAlign: "left" },
   list: {
     position: "absolute",
     top: "100%",
@@ -93,22 +99,23 @@ function Labelled({ label, style, children }) {
   );
 }
 
-function DayAndMeal({ food }) {
+function DayAndMeal({ food, phone }) {
+  const alike = phone ? S.alike : null;
   return (
-    <div style={S.dayMeal}>
+    <div style={phone ? { ...S.dayMeal, ...S.dayMealPhone } : S.dayMeal}>
       <Labelled label="Day">
         <input
           type="date"
           value={food.day.date}
           onChange={(e) => food.day.setDate(e.target.value)}
-          style={FIELD}
+          style={{ ...FIELD, ...alike, ...(phone ? S.date : null) }}
         />
       </Labelled>
       <Labelled label="Meal">
         <select
           value={food.day.mealId}
           onChange={(e) => food.setMealId(e.target.value)}
-          style={FIELD}
+          style={{ ...FIELD, ...alike }}
         >
           <option value="">— select —</option>
           {food.mealOptions.map((o) => (
@@ -172,12 +179,10 @@ function MacroField({ field: [key, label], food }) {
   );
 }
 
-/** food: useAddFood(). */
-export default function AddFoodCard({ food }) {
+function FoodForm({ food, phone }) {
   return (
-    <div style={S.card}>
-      <div style={S.title}>Add Food Item</div>
-      <DayAndMeal food={food} />
+    <>
+      <DayAndMeal food={food} phone={phone} />
       <NameField food={food} />
       <div style={S.macros}>
         {MACRO_FIELDS.map((f) => (
@@ -193,6 +198,19 @@ export default function AddFoodCard({ food }) {
         </button>
       </div>
       {food.msg && <div style={S.msg(food.msg.ok)}>{food.msg.text}</div>}
+    </>
+  );
+}
+
+/** food: useAddFood(). A phone keeps it folded shut until the title is tapped. */
+export default function AddFoodCard({ food }) {
+  const fold = usePhoneFold();
+  return (
+    <div style={S.card}>
+      <FoldTitle fold={fold} style={{ ...S.title, marginBottom: fold.open ? "10px" : 0 }}>
+        Add Food Item
+      </FoldTitle>
+      {fold.open && <FoodForm food={food} phone={fold.phone} />}
     </div>
   );
 }

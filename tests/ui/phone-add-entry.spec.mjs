@@ -55,7 +55,7 @@ test("columns stack; nothing past the right edge; inputs are 16 px", async ({ pa
   await start(p);
   const food = await box(p.getByText("🥗 Add Food Entry"));
   const exercise = await box(p.getByText("🏋️ Exercise", { exact: true }));
-  expect(exercise.top).toBeGreaterThan(food.top + 300); // below the food column, not beside it
+  expect(exercise.top).toBeGreaterThan(food.top + 150); // below the food column, not beside it
   expect(exercise.left).toBeLessThan(40);
   const out = await p.evaluate(() =>
     [...document.querySelectorAll("body *")]
@@ -63,6 +63,7 @@ test("columns stack; nothing past the right edge; inputs are 16 px", async ({ pa
       .map((e) => e.tagName + " " + (e.textContent || "").slice(0, 30)),
   );
   expect(out).toEqual([]);
+  await p.getByRole("button", { name: /Add Food Item [+−]$/ }).click();
   const name = p.getByPlaceholder("e.g. Pinto bean stew (1 portion)");
   expect(await name.evaluate((e) => getComputedStyle(e).fontSize)).toBe("16px");
 });
@@ -89,4 +90,65 @@ test("recipe view: nutrition in 3 columns, inside the window", async ({ page: p 
   const cell = p.getByText("Nutrition per serving").locator("xpath=following-sibling::div[1]");
   expect(await cols(cell)).toBe(3);
   await inside(p.getByText("Wt/portion 300 g").locator("../.."));
+});
+
+const fold = (p, name) => p.getByRole("button", { name: new RegExp(`${name} [+−]$`) });
+
+test("Add Food Item, Polar Sessions and Steps by hour start folded and open on tap", async ({
+  page: p,
+}) => {
+  await start(p);
+  for (const name of ["Add Food Item", "Polar Sessions", "Steps by hour"]) {
+    await expect(fold(p, name)).toHaveAttribute("aria-expanded", "false");
+  }
+  await expect(p.getByPlaceholder("e.g. Pinto bean stew (1 portion)")).toHaveCount(0);
+  await expect(p.getByRole("button", { name: /Sync/ })).toHaveCount(0);
+  await fold(p, "Add Food Item").click();
+  await expect(fold(p, "Add Food Item")).toHaveAttribute("aria-expanded", "true");
+  await expect(p.getByPlaceholder("e.g. Pinto bean stew (1 portion)")).toBeVisible();
+  await fold(p, "Polar Sessions").click();
+  await fold(p, "Steps by hour").click();
+  await expect(fold(p, "Steps by hour")).toHaveAttribute("aria-expanded", "true");
+  await fold(p, "Add Food Item").click();
+  await expect(p.getByPlaceholder("e.g. Pinto bean stew (1 portion)")).toHaveCount(0);
+});
+
+test("Day and Meal boxes line up once Add Food Item is open", async ({ page: p }) => {
+  await start(p);
+  await fold(p, "Add Food Item").click();
+  const day = await box(p.locator("input[type=date]"));
+  const meal = await box(p.locator("select").first());
+  expect(day.top).toBe(meal.top);
+  expect(day.height).toBe(meal.height);
+  expect(day.width).toBe(meal.width);
+  expect(meal.left).toBeGreaterThan(day.right); // side by side, both inside the screen
+  expect(meal.right).toBeLessThanOrEqual(390);
+});
+
+test("the portion box for a chosen saved food fits a short screen without scrolling", async ({
+  page: p,
+}) => {
+  await p.setViewportSize({ width: 390, height: 664 }); // Chrome on an iPhone, toolbars showing
+  await start(p);
+  await fold(p, "Add Food Item").click();
+  const name = p.getByPlaceholder("e.g. Pinto bean stew (1 portion)");
+  await name.fill("Soup");
+  await name.press("Enter");
+  await expect(p.getByText("How much?")).toBeVisible();
+  const open = async () => {
+    const modal = p
+      .getByText("How much?")
+      .locator("xpath=ancestor::div[contains(@style,'overflow')][1]");
+    const b = await box(modal.locator("xpath=.."));
+    expect(b.top).toBeGreaterThanOrEqual(0);
+    expect(b.bottom).toBeLessThanOrEqual(664);
+    expect(b.right).toBeLessThanOrEqual(390);
+    const unit = await box(p.getByRole("combobox").last());
+    expect(unit.right).toBeLessThanOrEqual(b.right); // the unit drop-down stays inside the box
+    expect(await modal.evaluate((e) => e.scrollHeight <= e.clientHeight + 1)).toBe(true);
+  };
+  await open();
+  await p.getByRole("combobox").last().selectOption("g"); // grams: preview with all eight tiles
+  await expect(p.getByText("Net C").first()).toBeVisible();
+  await open();
 });
