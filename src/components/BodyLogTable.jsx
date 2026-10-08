@@ -103,7 +103,7 @@ function LogRow({ row, i, count, edits }) {
 /** edits: { saveField(i, key, value), deleteRow(row) } from useBodyLogEdits. */
 export default function BodyLogTable({ bodyLog, edits }) {
   return (
-    <div style={S.box}>
+    <div className="table-frame" style={S.box}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
         <Heads />
         <tbody>

@@ -13,7 +13,7 @@ const SCROLLBAR_CSS = `
 `;
 const S = {
   empty: (full) => ({
-    height: full ? "70vh" : "200px",
+    height: full ? "70dvh" : "200px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

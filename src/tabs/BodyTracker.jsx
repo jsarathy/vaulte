@@ -5,6 +5,8 @@ import useTrajectoryChart from "../hooks/useTrajectoryChart.js";
 import BodyLogPanel from "../components/BodyLogPanel.jsx";
 import BodyTrajectory from "../components/BodyTrajectory.jsx";
 import MeasurementSites from "../components/MeasurementSites.jsx";
+import { useIsPhone } from "../hooks/useIsPhone.js";
+import { columnStyle, pageStyle } from "../lib/phoneLayout.js";
 
 const FRAME = {
   flex: 1,
@@ -17,12 +19,13 @@ const FRAME = {
 
 export default function BodyTracker({ userId, bodyLog, setBodyLog, sex }) {
   const chart = useTrajectoryChart("waist"); // shared with the anatomy figure
+  const phone = useIsPhone();
   return (
-    <div style={FRAME}>
+    <div style={pageStyle(phone, FRAME)}>
       {/* ── LEFT: Body Log Table (55%) ── */}
-      <BodyLogPanel userId={userId} bodyLog={bodyLog} setBodyLog={setBodyLog} />
+      <BodyLogPanel phone={phone} userId={userId} bodyLog={bodyLog} setBodyLog={setBodyLog} />
       {/* ── RIGHT: Chart + Specs (43%) ── */}
-      <div style={{ flex: "0 0 43%", minWidth: 0 }}>
+      <div style={columnStyle(phone, 43)}>
         <BodyTrajectory bodyLog={bodyLog} chart={chart} />
         <MeasurementSites bodyLog={bodyLog} sex={sex} chart={chart} />
       </div>

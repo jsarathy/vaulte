@@ -170,7 +170,7 @@ test("empty state: fewer than two readings of the chosen site", async ({ page: p
   await frame(p).dblclick();
   expect(
     await p.getByText("Needs at least two R-Thigh readings").evaluate((d) => d.style.height),
-  ).toBe("70vh");
+  ).toBe("70dvh");
   await p.keyboard.press("Escape");
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   expect(errs).toEqual([]);

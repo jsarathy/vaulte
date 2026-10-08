@@ -188,7 +188,7 @@ test("empty states", async ({ page: p }) => {
   );
   await expect(chartSvg(p)).toHaveCount(0);
   await frame(p).dblclick();
-  expect(await msg.evaluate((d) => d.style.height)).toBe("70vh");
+  expect(await msg.evaluate((d) => d.style.height)).toBe("70dvh");
   await p.keyboard.press("Escape");
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
 

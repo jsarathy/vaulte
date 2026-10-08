@@ -1,5 +1,6 @@
 // src/components/BodyLogPanel.jsx — the Body tab's left column: heading, Renpho tape sync button
 // and its message, and the log table. Render only.
+import { columnStyle } from "../lib/phoneLayout.js";
 import { useBodyLogEdits, useTapeSync } from "../hooks/useBodyLog.js";
 import BodyLogTable from "./BodyLogTable.jsx";
 
@@ -30,12 +31,12 @@ function SyncNote({ msg }) {
   );
 }
 
-export default function BodyLogPanel({ userId, bodyLog, setBodyLog }) {
+export default function BodyLogPanel({ userId, bodyLog, setBodyLog, phone }) {
   const edits = useBodyLogEdits(userId, bodyLog, setBodyLog);
   const tape = useTapeSync(userId, bodyLog, setBodyLog);
   return (
-    <div style={{ flex: "0 0 55%", minWidth: 0 }}>
-      <div style={S.bar}>
+    <div style={columnStyle(phone, 55)}>
+      <div style={phone ? { ...S.bar, flexWrap: "wrap", gap: "8px 10px" } : S.bar}>
         <div style={S.title}>📏 Body Log</div>
         <button onClick={tape.syncBody} disabled={tape.syncing} style={S.sync(tape.syncing)}>
           {tape.syncing ? "Syncing…" : "⟳ Sync Renpho"}

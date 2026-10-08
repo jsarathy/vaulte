@@ -7,6 +7,8 @@ import PlanStatsEditor from "../components/PlanStatsEditor.jsx";
 import PlanCurveEditor from "../components/PlanCurveEditor.jsx";
 import usePlanEditing from "../hooks/usePlanEditing.js";
 import usePlanForm from "../hooks/usePlanForm.js";
+import { useIsPhone } from "../hooks/useIsPhone.js";
+import { columnStyle, pageStyle } from "../lib/phoneLayout.js";
 
 const S = {
   tab: {
@@ -17,15 +19,14 @@ const S = {
     alignItems: "flex-start",
     padding: "16px",
   },
-  right: { flex: "0 0 43%", minWidth: 0 },
 };
 
-function PlanColumn({ props }) {
+function PlanColumn({ props, phone }) {
   const cfg = props.weightPlanConfig;
   const plan = usePlanEditing({ ...props, cfg });
   const form = usePlanForm(props.setEditCfg);
   return (
-    <div style={S.right}>
+    <div style={columnStyle(phone, 43)}>
       <TrajectoryPanel weightLog={props.weightLog} cfg={cfg} />
       <PlanSpecsCard
         cfg={cfg}
@@ -41,9 +42,11 @@ function PlanColumn({ props }) {
  *  setEditCfg, savePlanConfig, renphoSyncing, renphoMsg, syncRenpho, purgeBefore */
 export default function WeightTracker(props) {
   const renpho = { syncing: props.renphoSyncing, msg: props.renphoMsg, sync: props.syncRenpho };
+  const phone = useIsPhone();
   return (
-    <div style={S.tab}>
+    <div style={pageStyle(phone, S.tab)}>
       <WeightLogPanel
+        phone={phone}
         userId={props.userId}
         weightLog={props.weightLog}
         setWeightLog={props.setWeightLog}
@@ -51,7 +54,7 @@ export default function WeightTracker(props) {
         purgeBefore={props.purgeBefore}
         renpho={renpho}
       />
-      <PlanColumn props={props} />
+      <PlanColumn props={props} phone={phone} />
     </div>
   );
 }
