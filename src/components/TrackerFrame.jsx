@@ -68,6 +68,24 @@ const S = {
     cursor: "pointer",
     flexShrink: 0,
   },
+  daysButtonOn: { background: "#d1d5db", border: "0.5px solid #9ca3af" },
+  fold: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    padding: "14px 12px",
+    background: "transparent",
+    border: "none",
+    borderTop: `0.5px solid ${C.border}`,
+    fontFamily: FONT.sans,
+    fontSize: "12px",
+    fontWeight: "600",
+    letterSpacing: "0.5px",
+    textTransform: "uppercase",
+    color: C.muted,
+    cursor: "pointer",
+  },
   drawer: {
     position: "absolute",
     top: 0,
@@ -100,13 +118,16 @@ function Wordmark() {
   );
 }
 
-function Tabs({ t, phone }) {
+function Tabs({ t, phone, onTab }) {
   return (
     <nav style={phone ? S.phoneNav : { display: "flex", gap: "4px" }}>
       {TABS.map(([id, label]) => (
         <button
           key={id}
-          onClick={() => t.setActiveTab(id)}
+          onClick={() => {
+            onTab?.();
+            t.setActiveTab(id);
+          }}
           style={{ ...S.tab(t.activeTab === id), ...(phone ? S.phoneTab : null) }}
         >
           {label}
@@ -117,18 +138,36 @@ function Tabs({ t, phone }) {
 }
 
 // Phone: the calendar sidebar moves behind a "Days" button; the tabs scroll sideways
-function Header({ t, phone, onDays }) {
+function Header({ t, phone, daysOpen, onDays, onTab }) {
   return (
     <div style={{ ...S.header, ...(phone ? S.phoneHeader : null) }}>
       {phone ? (
-        <button onClick={onDays} style={S.daysButton}>
+        <button
+          onClick={onDays}
+          aria-expanded={daysOpen}
+          style={{ ...S.daysButton, ...(daysOpen ? S.daysButtonOn : null) }}
+        >
           ☰ Days
         </button>
       ) : (
         <Wordmark />
       )}
-      <Tabs t={t} phone={phone} />
+      <Tabs t={t} phone={phone} onTab={onTab} />
       {!phone && <div style={{ width: "60px" }} />}
+    </div>
+  );
+}
+
+// Phone: Targets and Meds sit behind a tap, closed each time the drawer opens
+function Fold({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} style={S.fold}>
+        <span>{title}</span>
+        <span>{open ? "−" : "+"}</span>
+      </button>
+      {open && children}
     </div>
   );
 }
@@ -149,9 +188,20 @@ function Sidebar({ t, phone, onPick }) {
             return t.onCalendarClick(...args);
           }}
         />
-        <MonthlyTargetsCard userId={t.userId} year={t.calYear} month={t.calMonth} />
+        {phone ? (
+          <Fold title="Targets">
+            <MonthlyTargetsCard userId={t.userId} year={t.calYear} month={t.calMonth} />
+          </Fold>
+        ) : (
+          <MonthlyTargetsCard userId={t.userId} year={t.calYear} month={t.calMonth} />
+        )}
+        {phone && t.activeTab === "log" && (
+          <Fold title="Meds">
+            <MedsPanel userId={t.userId} date={t.currentDate} />
+          </Fold>
+        )}
       </div>
-      {t.activeTab === "log" && <MedsPanel userId={t.userId} date={t.currentDate} />}
+      {!phone && t.activeTab === "log" && <MedsPanel userId={t.userId} date={t.currentDate} />}
       {t.allDays.length > 0 && <SidebarStats days={t.allDays} />}
     </div>
   );
@@ -187,7 +237,13 @@ export default function TrackerFrame({ t }) {
     <div className="nt-root" style={S.root}>
       <RecipeModal recipe={t.recipeModal} onClose={() => t.setRecipeModal(null)} />
       <PolarLog t={t} />
-      <Header t={t} phone={phone} onDays={() => setDaysOpen((o) => !o)} />
+      <Header
+        t={t}
+        phone={phone}
+        daysOpen={daysOpen}
+        onDays={() => setDaysOpen((o) => !o)}
+        onTab={() => setDaysOpen(false)}
+      />
       <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
         {(!phone || daysOpen) && <Sidebar t={t} phone={phone} onPick={() => setDaysOpen(false)} />}
         <TrackerTabs t={t} />

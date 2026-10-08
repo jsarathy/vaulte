@@ -54,15 +54,32 @@ test.describe("phone", () => {
     await expect(p.getByText(/net kcal of/)).toBeVisible();
   });
 
-  test("Days button opens the calendar sidebar; picking a day closes it", async ({ page: p }) => {
+  test("Days button opens the calendar sidebar; Targets and Meds fold; Days turns grey", async ({
+    page: p,
+  }) => {
     await start(p);
-    await expect(p.locator(".nt-root").getByText("Targets · Oct 2026")).toHaveCount(0);
+    const fold = (n) => p.getByRole("button", { name: new RegExp(`^${n}`) });
+    const white = await days(p).evaluate((e) => getComputedStyle(e).backgroundColor);
+    await expect(fold("Targets")).toHaveCount(0);
     await days(p).click();
-    await expect(p.getByText("Targets · Oct 2026").first()).toBeVisible();
-    const drawer = await box(p.getByText("Targets · Oct 2026").first());
-    expect(drawer.right).toBeLessThanOrEqual(390);
-    await days(p).click();
+    expect(await days(p).evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe(white);
+    await expect(fold("Targets")).toHaveAttribute("aria-expanded", "false");
+    await expect(fold("Meds")).toHaveAttribute("aria-expanded", "false");
     await expect(p.getByText("Targets · Oct 2026")).toHaveCount(0);
+    await fold("Targets").click();
+    await expect(p.getByText("Targets · Oct 2026")).toBeVisible();
+    expect((await box(p.getByText("Targets · Oct 2026"))).right).toBeLessThanOrEqual(390);
+    await days(p).click();
+    await expect(fold("Targets")).toHaveCount(0);
+    expect(await days(p).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(white);
+  });
+
+  test("choosing a tab closes the Days drawer at once", async ({ page: p }) => {
+    await start(p);
+    await days(p).click();
+    await expect(p.getByRole("button", { name: /^Targets/ })).toBeVisible();
+    await p.locator(".nt-root nav").getByRole("button", { name: "Compare", exact: true }).click();
+    await expect(p.getByRole("button", { name: /^Targets/ })).toHaveCount(0);
   });
 });
 
