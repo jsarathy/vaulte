@@ -102,7 +102,8 @@ test("normaliseImage: wide images reduce to 1200 px wide as JPEG; small ones kee
     return h.describe(out);
   });
   expect(jpeg).toMatchObject({ name: "photo.jpg", type: "image/jpeg" });
-  expect(await p.evaluate(() => window.__heicCalls)).toEqual([]); // no conversion for these
+  // heic2any is fetched only when a HEIC photo arrives, so for these it was never even loaded
+  expect(await p.evaluate(() => window.__heicCalls ?? [])).toEqual([]);
 });
 
 test("normaliseImage: HEIC/HEIF by type or by name goes through heic2any first", async ({

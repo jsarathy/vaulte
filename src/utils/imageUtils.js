@@ -1,6 +1,5 @@
 // src/utils/imageUtils.js — photos for the "Log from Photo" flow: HEIC/HEIF converted to JPEG,
 // wide images reduced to 1200 px, and helpers for the API body and the <img> preview.
-import heic2any from "heic2any";
 
 const HEIC_TYPES = ["image/heic", "image/heif"];
 const MAX_WIDTH = 1200;
@@ -10,6 +9,8 @@ const isHeic = (file) => HEIC_TYPES.includes(file.type) || /\.hei[cf]$/i.test(fi
 const jpegFile = (blob) => new File([blob], "photo.jpg", { type: "image/jpeg" });
 
 async function heicToJpeg(file) {
+  // Loaded only when a HEIC photo is chosen: it is over half of the app's download (Fix 43.2)
+  const { default: heic2any } = await import("heic2any");
   const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
   // heic2any can return a single Blob or an array of Blobs
   return jpegFile(Array.isArray(result) ? result[0] : result);

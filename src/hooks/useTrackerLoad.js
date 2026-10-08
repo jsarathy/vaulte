@@ -57,6 +57,10 @@ async function loadPolarConnection(userId, set) {
   set.polarLastSync(conn.last_sync_at || null);
 }
 
+async function loadPolarSessions(userId, set) {
+  set.polarSessions(await data.loadPolarSessions(userId));
+}
+
 // The first day loaded is opened; Compare starts with the first days that have entries
 function openFirstDay(days, set) {
   const merged = days.map(ensureMealSlots);
@@ -73,13 +77,16 @@ function openFirstDay(days, set) {
 async function loadTracker(userId, set) {
   try {
     set.loading(true);
-    const days = await data.loadDays(userId);
-    await loadRecipes(userId, set);
-    await loadCalculator(userId, set.calc);
-    await loadWeight(userId, set);
-    await loadChat(userId, set);
-    await loadPolarConnection(userId, set);
-    set.polarSessions(await data.loadPolarSessions(userId));
+    // Independent reads run together, not one after another (Fix 43.3)
+    const [days] = await Promise.all([
+      data.loadDays(userId),
+      loadRecipes(userId, set),
+      loadCalculator(userId, set.calc),
+      loadWeight(userId, set),
+      loadChat(userId, set),
+      loadPolarConnection(userId, set),
+      loadPolarSessions(userId, set),
+    ]);
     openFirstDay(days, set);
   } catch (err) {
     console.error("Init error:", err);
