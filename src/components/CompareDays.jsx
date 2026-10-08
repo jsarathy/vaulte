@@ -1,5 +1,6 @@
 // src/components/CompareDays.jsx — the Compare tab's five day columns: a date head (click to swap
 // the day via a prompt) over the day's food kcal and macro rows, or "—" for a slot with no day
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import { fmt, formatDateShort, getDayTotals } from "../constants/helpers";
 import { C } from "../constants/design";
 import { MACRO_ROWS, slotDay, swapSlot } from "../lib/referenceDiet";
@@ -57,6 +58,15 @@ function DayColumn({ date, day, onPick }) {
   );
 }
 
+// Phone: the five days scroll sideways, 150 px each
+const PHONE_PANE = { ...daysPaneStyle, flex: "none", overflowY: "visible", padding: "10px" };
+const PHONE_GRID = {
+  ...daysGridStyle,
+  gridTemplateColumns: "repeat(5,150px)",
+  overflowX: "auto",
+  paddingBottom: "6px",
+};
+
 export default function CompareDays({ slots, data, allDays, setSlots, setData }) {
   const todayStr = new Date().toISOString().split("T")[0];
   const pick = (idx) => {
@@ -66,13 +76,14 @@ export default function CompareDays({ slots, data, allDays, setSlots, setData })
     setSlots(next.slots);
     setData(next.data);
   };
+  const phone = useIsPhone();
   return (
-    <div style={daysPaneStyle}>
+    <div style={phone ? PHONE_PANE : daysPaneStyle}>
       <div style={{ marginBottom: "12px" }}>
         <div style={daysTitleStyle}>Compare days</div>
         <div style={daysHintStyle}>Click a date to swap it out</div>
       </div>
-      <div style={daysGridStyle}>
+      <div style={phone ? PHONE_GRID : daysGridStyle}>
         {slots.map((date, idx) => (
           <DayColumn
             key={idx}

@@ -1,5 +1,7 @@
 // src/components/ReferenceCalculator.jsx — the Compare tab's Reference Diet Calculator: sex /
 // age / height / weight, protein and fat targets, BMR (Mifflin-St Jeor) and a row per activity level
+import { C } from "../constants/design";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import { bmr, activityRows } from "../lib/referenceDiet";
 import {
   calcPaneStyle,
@@ -112,7 +114,17 @@ function TargetFields({ p }) {
   );
 }
 
+// Phone: full width under the days instead of a 290 px column beside them
+const PHONE_PANE = {
+  ...calcPaneStyle,
+  width: "auto",
+  borderLeft: "none",
+  borderTop: `0.5px solid ${C.border}`,
+  overflowY: "visible",
+};
+
 export default function ReferenceCalculator({ p }) {
+  const phone = useIsPhone();
   const BMR = bmr({ sex: p.calcSex, age: p.calcAge, height: p.calcHeight, weight: p.calcWeight });
   const rows = activityRows(BMR, {
     weight: p.calcWeight,
@@ -120,7 +132,7 @@ export default function ReferenceCalculator({ p }) {
     fatPct: p.calcFatPct,
   });
   return (
-    <div style={calcPaneStyle}>
+    <div style={phone ? PHONE_PANE : calcPaneStyle}>
       <div style={calcTitleStyle}>Reference calculator</div>
       <BodyFields p={p} />
       <TargetFields p={p} />
