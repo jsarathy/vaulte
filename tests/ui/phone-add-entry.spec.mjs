@@ -14,7 +14,7 @@ const SOUP = {
   ingredients: [{ amount: "300g", item: "water" }],
   steps: ["Boil"],
 };
-test.use({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/London" });
+test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 
 const start = async (p) => {
   await p.route(

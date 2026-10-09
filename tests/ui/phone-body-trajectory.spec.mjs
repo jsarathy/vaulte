@@ -8,7 +8,7 @@ const BODY = [
   { id: "2026-09-20", waist: 101.5, hip: 109 },
   { id: "2026-10-01", waist: 99, hip: 108 },
 ];
-test.use({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/London" });
+test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 
 const start = async (p) => {
   await p.route(

@@ -23,8 +23,6 @@ const box = (loc) => loc.evaluate((e) => e.getBoundingClientRect().toJSON());
 const days = (p) => p.getByRole("button", { name: "☰ Days" });
 
 test.describe("phone", () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-
   test("Nutrition link stays on screen; the tracker fits the width and the height", async ({
     page: p,
   }) => {
@@ -102,8 +100,12 @@ test.describe("phone", () => {
   });
 });
 
-test("desktop: sidebar always shown, no Days button", async ({ page: p }) => {
-  await start(p);
-  await expect(days(p)).toHaveCount(0);
-  await expect(p.getByText("Targets · Oct 2026").first()).toBeVisible();
+test.describe("desktop", () => {
+  test.use({ viewport: { width: 1400, height: 900 } }); // the phone project is 390 wide
+
+  test("sidebar always shown, no Days button", async ({ page: p }) => {
+    await start(p);
+    await expect(days(p)).toHaveCount(0);
+    await expect(p.getByText("Targets · Oct 2026").first()).toBeVisible();
+  });
 });

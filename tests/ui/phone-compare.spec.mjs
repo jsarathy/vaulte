@@ -12,7 +12,7 @@ const DAYS = ["2026-10-04", "2026-10-03", "2026-10-02", "2026-10-01", "2026-09-3
     ],
   }),
 );
-test.use({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/London" });
+test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 
 const start = async (p) => {
   await p.route(
