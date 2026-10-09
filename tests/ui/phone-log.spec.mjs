@@ -30,7 +30,7 @@ const DAY = {
     { id: "mL", name: "🥗 Lunch", items: [] },
   ],
 };
-test.use({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/London" });
+test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 
 const start = async (p, open = true) => {
   await p.route(

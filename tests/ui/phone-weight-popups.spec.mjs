@@ -10,7 +10,7 @@ const WEIGHT = [
   { id: "2026-09-10", actual: 82.1, renpho: { bmi: 30, bodyfat: 28 } },
   { id: "2026-10-03", actual: 79.6, renpho: { bmi: 29, bodyfat: 26 } },
 ];
-test.use({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/London" });
+test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 
 const start = async (p) => {
   await p.route(

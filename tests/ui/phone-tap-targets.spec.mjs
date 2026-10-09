@@ -3,7 +3,7 @@
 // (buttons and days also 40 px wide), and no button's text is under 11 px.
 import { test, expect } from "@playwright/test";
 
-test.use({ viewport: { width: 390, height: 844 }, timezoneId: "Europe/London" });
+test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 
 const day = (date, n) => ({
   date,

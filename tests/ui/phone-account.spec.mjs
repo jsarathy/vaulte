@@ -24,8 +24,6 @@ const start = async (p) => {
 };
 
 test.describe("phone", () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-
   test("DETAILS and CONNECTED SERVICES start closed and open on tap", async ({ page: p }) => {
     await start(p);
     const details = p.getByRole("button", { name: /DETAILS/ });
@@ -47,8 +45,6 @@ test.describe("phone", () => {
 });
 
 test.describe("phone card", () => {
-  test.use({ viewport: { width: 390, height: 844 } });
-
   test("the photo sits inside the card on the right; the text stacks on the left", async ({
     page: p,
   }) => {

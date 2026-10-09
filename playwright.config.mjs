@@ -15,6 +15,15 @@ export default defineConfig({
       ? { executablePath: process.env.PW_CHROMIUM_PATH }
       : {},
   },
+  // Fix 43.11.1: phone-*.spec.mjs files run once, in the phone project; everything else on desktop.
+  projects: [
+    { name: "desktop", testIgnore: /phone-[^/]*\.spec\.mjs$/ },
+    {
+      name: "phone",
+      testMatch: /phone-[^/]*\.spec\.mjs$/,
+      use: { viewport: { width: 390, height: 844 } },
+    },
+  ],
   webServer: {
     command: "npx vite --config tests/ui/harness/vite.config.js --port 5180 --strictPort",
     url: "http://localhost:5180/addentry.html",
