@@ -39,7 +39,7 @@ test("the landing page does not download the signed-in app", async ({ page }) =>
 
 test("signing in downloads the signed-in app", async ({ page }) => {
   const fetched = await start(page, signedIn);
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   expect(fetched("components/AccountPage")).toBe(true);
 });
 

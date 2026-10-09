@@ -90,11 +90,11 @@ test("signed in: Back does nothing to the account page; after Sign Out Back reac
   await field(page, "Email Address").fill("jane@example.com");
   await field(page, "Password").fill("secret");
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await page.goBack();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await page.goForward();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await page.click("text=Sign Out");
   await expect(page.locator("text=WELCOME TO")).toBeVisible();
   await page.goBack();

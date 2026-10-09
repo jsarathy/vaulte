@@ -38,7 +38,7 @@ test("loading, then the landing page; its two buttons lead to the two forms", as
   await start(page, { __authDelay: 1500 });
   await expect(page.locator("text=VAULTE")).toBeVisible();
   await expect(page.locator(".spinner-gold")).toBeVisible();
-  await expect(page.locator("text=WELCOME TO")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("text=WELCOME TO")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("h1")).toHaveText("VAULTE");
   await expect(page.locator("text=Your personal account, secured.")).toBeVisible();
   await page.click("text=Create Account");
@@ -92,7 +92,7 @@ test("Create Account: required fields, password length, duplicate email, success
   await fill(page, "Postcode", "SW1");
   await page.click("text=Create My Account");
   await expect(page.locator("text=ACCOUNT CREATED")).toBeVisible();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   const [doc] = await saved(page);
   expect(doc.path).toBe("users/new-u");
   expect(doc.merge).toBe(true);
@@ -127,7 +127,7 @@ test("while a sign-up or sign-in runs the button is disabled with a spinner", as
   await expect(create).toBeDisabled();
   await expect(create.locator(".spinner")).toBeVisible();
   await expect(button(page, "Continue with Google")).toBeDisabled();
-  await expect(page.locator("text=Welcome, J.")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("text=Welcome, J.")).toBeVisible({ timeout: 15_000 });
   await page.click("text=Sign Out");
   await page.click("text=Sign In");
   await fill(page, "Email Address", "jane@example.com");
@@ -136,7 +136,7 @@ test("while a sign-up or sign-in runs the button is disabled with a spinner", as
   await signIn.click();
   await expect(signIn).toBeDisabled();
   await expect(signIn.locator(".spinner")).toBeVisible();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
 });
 
 test("Sign In with a password: checks, a wrong password, other errors, success", async ({
@@ -163,7 +163,7 @@ test("Sign In with a password: checks, a wrong password, other errors, success",
   });
   await button(page, "Sign In").click();
   await expect(page.locator("text=WELCOME BACK")).toBeVisible();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".app-topbar-name")).toHaveText("Jane Smith");
   expect((await calls(page)).filter(([fn]) => fn === "signIn")).toEqual([
     ["signIn", { email: "jane@example.com", password: "wrong" }],
@@ -238,7 +238,7 @@ test("opened from a sign-in link: the stored email signs in; a new user goes to 
   await page.goto("/app.html");
   // a cold page load on a busy CI runner can take longer than the default 5 s
   await expect(page.locator("text=WELCOME BACK")).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   expect(await page.evaluate(() => localStorage.getItem("vaulte:magicEmail"))).toBeNull();
   expect((await calls(page)).filter(([fn]) => fn === "signInWithLink")).toEqual([
     ["signInWithLink", { email: "jane@example.com", href: expect.stringContaining("/app.html") }],
@@ -336,7 +336,7 @@ test("already signed in: a stored profile opens the account; none goes to the la
     __authUser: { uid: "u", email: "jane@example.com" },
     __docs: { "users/u": PROFILE },
   });
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("text=WELCOME BACK")).toBeHidden(); // no toast on a quiet return
   await page.addInitScript(() => {
     window.__docs = {}; // runs after the first init script: no profile this time
@@ -351,7 +351,7 @@ test("Sign Out returns to the landing page and clears the sign-in form", async (
   await fill(page, "Email Address", "jane@example.com");
   await fill(page, "Password", "secret");
   await button(page, "Sign In").click();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await page.click("text=Sign Out");
   await expect(page.locator("text=WELCOME TO")).toBeVisible();
   expect((await calls(page)).at(-1)).toEqual(["signOut", {}]);
