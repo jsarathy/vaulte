@@ -20,6 +20,7 @@ import {
   signupErrorMessage,
   signupProblem,
 } from "../lib/authProfile.js";
+import { useAuthHistory } from "./useAuthHistory.js";
 
 const TOAST_MS = 3000;
 
@@ -170,6 +171,7 @@ function useOtherSignIns(session, run, setLoginData) {
 export function useAuthPages() {
   const { toast, showToast } = useToast();
   const session = useSession(showToast);
+  useAuthHistory(session.page, session.go);
   const { loading, run } = useBusy(session.setError);
   const signup = useSignup(session, run);
   const { login, setLoginData } = useLogin(session, run);
