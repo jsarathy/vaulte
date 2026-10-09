@@ -151,6 +151,7 @@ export const CLEAN_FILES = [
   "src/components/StartSkeleton.jsx",
   "src/components/PillButton.jsx",
   "src/components/PhonePopup.jsx",
+  "src/components/MetricMenu.jsx",
   "api/_renpho/client.js",
   "api/_renpho/days.js",
   "api/_renpho/weight.js",

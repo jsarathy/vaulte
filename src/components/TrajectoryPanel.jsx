@@ -2,6 +2,7 @@
 // the chart. Double-click fills the screen; Esc or double-click collapses. Render only.
 import useTrajectoryChart from "../hooks/useTrajectoryChart.js";
 import { metricHeading, metricInfo, metricTabs } from "../lib/weightMetrics.js";
+import MetricMenu from "./MetricMenu.jsx";
 import MetricTabs from "./MetricTabs.jsx";
 import TrajectoryChart from "./TrajectoryChart.jsx";
 import { useIsPhone } from "../hooks/useIsPhone.js";
@@ -12,9 +13,11 @@ const noteOf = (metric) => ({ title: metricHeading(metric), info: metricInfo(met
 export default function TrajectoryPanel({ weightLog, cfg }) {
   const chart = useTrajectoryChart();
   const phone = useIsPhone();
-  const tabs = <MetricTabs tabs={metricTabs(weightLog)} chart={chart} noteOf={noteOf} />;
+  const list = metricTabs(weightLog);
+  const tabs = <MetricTabs tabs={list} chart={chart} noteOf={noteOf} />;
+  const menu = phone ? <MetricMenu tabs={list} chart={chart} /> : null;
   return (
-    <TrajectoryFrame chart={chart} tabs={tabs} tapToClose={phone}>
+    <TrajectoryFrame chart={chart} tabs={tabs} touch={phone} menu={menu}>
       <TrajectoryChart weightLog={weightLog} cfg={cfg} chart={chart} />
     </TrajectoryFrame>
   );

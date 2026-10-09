@@ -171,6 +171,7 @@ function HoverAreas({ acts, L, setHoverPt }) {
       r={hitRadius(L)}
       fill="transparent"
       style={{ cursor: "pointer" }}
+      onClick={() => setHoverPt({ t: a.t, v: a.v })} // a tap on a phone
       onMouseEnter={() => setHoverPt({ t: a.t, v: a.v })}
       onMouseLeave={() => setHoverPt(null)}
     />
