@@ -3,6 +3,8 @@
 // useTrajectoryChart("waist"), shared with the anatomy figure.
 import { MEASURE, measureTabs } from "../lib/bodyMeasures.js";
 import { bodySeries } from "../lib/trajectoryChart.js";
+import { useIsPhone } from "../hooks/useIsPhone.js";
+import MetricMenu from "./MetricMenu.jsx";
 import MetricTabs from "./MetricTabs.jsx";
 import TrajectoryFrame from "./TrajectoryFrame.jsx";
 import { ChartBody, ChartEmpty, ChartLegend } from "./TrajectoryChart.jsx";
@@ -22,9 +24,11 @@ function BodyChart({ bodyLog, chart }) {
 }
 
 export default function BodyTrajectory({ bodyLog, chart }) {
+  const phone = useIsPhone();
   const tabs = <MetricTabs tabs={measureTabs} chart={chart} noteOf={chart.full ? noteOf : null} />;
+  const menu = phone ? <MetricMenu tabs={measureTabs} chart={chart} /> : null;
   return (
-    <TrajectoryFrame chart={chart} tabs={tabs} nowrap>
+    <TrajectoryFrame chart={chart} tabs={tabs} nowrap touch={phone} menu={menu}>
       <BodyChart bodyLog={bodyLog} chart={chart} />
     </TrajectoryFrame>
   );
