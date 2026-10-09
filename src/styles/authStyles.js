@@ -40,6 +40,9 @@ export const globalStyle = `
     input, select, textarea { font-size:16px !important; }
     .table-frame { max-height:calc(100dvh - 220px) !important; }
     .tap-target { min-width:40px; min-height:40px; }
+    button, summary, select, textarea, input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]):not([type=range]) { min-height:40px; }
+    button { min-width:40px; }
+    .btn-ghost { font-size:11px !important; }
     .app-main-account { padding:14px !important; }
     .app-main-nutrition { padding:6px !important; display:flex !important; flex-direction:column; overflow:hidden !important; }
     .app-main-nutrition .nt-wrap { margin:0 !important; flex:1; min-height:0; display:flex; flex-direction:column; }

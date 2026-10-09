@@ -37,7 +37,7 @@ const S = {
     border: "0.5px solid #e5e7eb",
     borderRadius: "6px",
     cursor: "pointer",
-    minHeight: "36px",
+    minHeight: "40px",
     padding: "4px 12px",
     fontSize: "12px",
   },

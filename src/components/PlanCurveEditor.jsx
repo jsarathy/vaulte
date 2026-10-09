@@ -38,7 +38,7 @@ const S = {
     color: "#185FA5",
     borderRadius: "4px",
     padding: "2px 8px",
-    fontSize: "10px",
+    fontSize: "11px",
     cursor: "pointer",
     marginTop: "2px",
   },

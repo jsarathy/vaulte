@@ -28,7 +28,7 @@ const S = {
     gap: "6px",
   },
   connected: {
-    fontSize: "10px",
+    fontSize: "11px",
     color: "#90CAF9",
     display: "flex",
     alignItems: "center",
@@ -47,7 +47,7 @@ const S = {
     color: "#fff",
     borderRadius: "4px",
     padding: "2px 8px",
-    fontSize: "10px",
+    fontSize: "11px",
     cursor: busy ? "not-allowed" : "pointer",
     fontWeight: "bold",
   }),
@@ -57,7 +57,7 @@ const S = {
     color: "rgba(255,255,255,0.6)",
     borderRadius: "4px",
     padding: "2px 8px",
-    fontSize: "10px",
+    fontSize: "11px",
     cursor: "pointer",
   },
   msg: (ok) => ({
