@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { useAuthPages } from "./hooks/useAuthPages.js";
 import { useAccountPage } from "./hooks/useAccountPage.js";
 import { currentUid } from "./api/authAccount.js";
@@ -5,7 +6,8 @@ import { bg, globalStyle } from "./styles/authStyles.js";
 import LandingPage from "./components/LandingPage.jsx";
 import SignupPage from "./components/SignupPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
-import AccountPage from "./components/AccountPage.jsx";
+// The signed-in app is its own download, fetched only after sign-in (Fix 43.2.2).
+const AccountPage = lazy(() => import("./components/AccountPage.jsx"));
 
 const wordmark = {
   fontFamily: "'Cinzel',serif",
@@ -54,6 +56,10 @@ export default function App() {
       />
     );
   if (page === "account" && profile)
-    return <AccountPage profile={profile} toast={toast} userId={currentUid()} {...account} />;
+    return (
+      <Suspense fallback={<LoadingPage />}>
+        <AccountPage profile={profile} toast={toast} userId={currentUid()} {...account} />
+      </Suspense>
+    );
   return null;
 }

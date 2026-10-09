@@ -30,6 +30,7 @@ const start = async (p, plan) => {
   await p.goto("/tracker.html");
   await p.getByText("October 2026").waitFor();
   await p.getByRole("button", { name: "Weight", exact: true }).click();
+  await p.getByTestId("tab-loading").waitFor({ state: "detached" });
 };
 const errors = (p) => {
   const errs = [];

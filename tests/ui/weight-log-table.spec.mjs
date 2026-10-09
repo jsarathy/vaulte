@@ -48,6 +48,7 @@ const start = async (p, init = {}) => {
   await p.goto("/tracker.html");
   await p.getByText("October 2026").waitFor();
   await p.getByRole("button", { name: "Weight", exact: true }).click();
+  await p.getByTestId("tab-loading").waitFor({ state: "detached" });
 };
 const withLog = (rows, plan) => ({
   __collections: { [P("weight_log")]: rows },
