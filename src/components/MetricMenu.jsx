@@ -13,7 +13,7 @@ const S = {
     cursor: "pointer",
     fontSize: "13px",
     fontWeight: "bold",
-    minHeight: "36px",
+    minHeight: "40px",
     padding: "6px 14px",
   },
   list: {
@@ -38,7 +38,7 @@ const S = {
     borderRadius: "6px",
     cursor: "pointer",
     fontSize: "13px",
-    minHeight: "36px",
+    minHeight: "40px",
     padding: "6px 10px",
     background: active ? "#185FA5" : "transparent",
     color: active ? "#fff" : "#374151",

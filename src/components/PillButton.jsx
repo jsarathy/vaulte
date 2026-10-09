@@ -7,7 +7,7 @@ const PILL = {
   cursor: "pointer",
   fontSize: "12px",
   fontWeight: "bold",
-  minHeight: "36px",
+  minHeight: "40px",
   padding: "6px 14px",
 };
 

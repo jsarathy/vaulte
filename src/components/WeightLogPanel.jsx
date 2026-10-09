@@ -20,7 +20,7 @@ const S = {
     fontWeight: "bold",
     cursor: busy ? "default" : "pointer",
   }),
-  syncPill: { borderRadius: "999px", minHeight: "36px", padding: "6px 14px", fontSize: "12px" },
+  syncPill: { borderRadius: "999px", minHeight: "40px", padding: "6px 14px", fontSize: "12px" },
   purge: {
     background: "#fff",
     border: "0.5px solid #c62828",

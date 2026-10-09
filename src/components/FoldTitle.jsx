@@ -9,7 +9,7 @@ const BUTTON = {
   cursor: "pointer",
   textAlign: "left",
   padding: 0,
-  minHeight: "32px",
+  minHeight: "40px",
   justifyContent: "space-between",
 };
 

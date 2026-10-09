@@ -65,6 +65,7 @@ const dayStyle = (c) => ({
 function Day({ cell, onPick }) {
   return (
     <div
+      className="tap-target"
       onClick={() => onPick(cell.date)}
       title={cell.kcal ? `${Math.round(cell.kcal)} kcal` : ""}
       style={dayStyle(cell)}

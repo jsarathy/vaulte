@@ -47,7 +47,7 @@ function DayTotals({ day }) {
 function DayColumn({ date, day, onPick }) {
   return (
     <div style={columnStyle}>
-      <div onClick={onPick} style={columnHeadStyle}>
+      <div className="tap-target" onClick={onPick} style={columnHeadStyle}>
         <span style={columnDateStyle}>{date ? formatDateShort(date) : "— pick —"}</span>
         <Chevron />
       </div>
