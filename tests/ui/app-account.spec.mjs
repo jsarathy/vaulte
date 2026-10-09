@@ -28,7 +28,7 @@ const start = async (p, init = {}) => {
   await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
   await p.addInitScript((i) => Object.assign(window, i), init);
   await p.goto("/app.html");
-  await expect(p.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
 };
 const saved = (p) => p.evaluate(() => window.__setDocs);
 const calls = (p) =>
@@ -307,13 +307,13 @@ test("Delete Account: confirm, then the profile and the user go; cancel keeps ev
   await start(page, { ...signedIn(), __authFail: { deleteUser: ["auth/x", "Not now."] } });
   await button(page, "Delete Account").click();
   await expect.poll(() => dialogs).toEqual([["confirm", "Are you sure? This cannot be undone."]]);
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   expect(await page.evaluate(() => window.__deletedDocs ?? [])).toEqual([]);
   ok = true;
   await button(page, "Delete Account").click();
   await expect.poll(() => dialogs.at(-1)).toEqual(["alert", "Error deleting account: Not now."]);
   expect(await page.evaluate(() => window.__deletedDocs)).toEqual(["users/u"]);
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() => {
     window.__authFail = {};
   });

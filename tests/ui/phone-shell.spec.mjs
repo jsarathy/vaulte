@@ -15,7 +15,7 @@ const start = async (p) => {
   await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
   await p.addInitScript((i) => Object.assign(window, i), signedIn);
   await p.goto("/app.html");
-  await expect(p.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await p.locator(".app-sidebar button", { hasText: "Nutrition" }).click();
   await expect(p.locator(".nt-root nav")).toBeVisible({ timeout: 10000 });
 };

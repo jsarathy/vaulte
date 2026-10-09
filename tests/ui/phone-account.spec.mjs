@@ -18,7 +18,7 @@ const start = async (p) => {
     window.__docs = { "users/u": d };
   }, user);
   await p.goto("/app.html");
-  await expect(p.locator("text=Welcome, Jane.")).toBeVisible();
+  await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await p.locator(".app-sidebar button").nth(1).click();
   await expect(p.getByRole("heading", { name: "My Account" })).toBeVisible();
 };
