@@ -64,7 +64,10 @@ const watch = (p) => {
   p.on("console", (m) => m.type() === "error" && out.logged.push(m.text()));
   return out;
 };
-const tab = (p, name) => p.getByRole("button", { name, exact: true }).click();
+const tab = async (p, name) => {
+  await p.getByRole("button", { name, exact: true }).click();
+  await p.getByTestId("tab-loading").waitFor({ state: "detached" }); // the tab's code downloads on first open
+};
 const openDay = (p) =>
   p.evaluate(
     () =>

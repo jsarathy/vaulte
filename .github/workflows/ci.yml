@@ -20,6 +20,19 @@ jobs:
       - run: npm run lint
       - name: Formatting (Prettier)
         run: npm run format:check
+  # Fix 43.2.5: the first download (entry script) must stay under its budget.
+  bundle:
+    name: Bundle size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run bundle:check
   unit:
     name: Unit tests
     runs-on: ubuntu-latest

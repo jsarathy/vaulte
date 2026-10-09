@@ -53,7 +53,10 @@ const watch = (p) => {
   });
   return out;
 };
-const tab = (p, name) => p.getByRole("button", { name, exact: true }).click();
+const tab = async (p, name) => {
+  await p.getByRole("button", { name, exact: true }).click();
+  await p.getByTestId("tab-loading").waitFor({ state: "detached" }); // the tab's code downloads on first open
+};
 const clickDay = (p, n) =>
   p.evaluate((d) => {
     [...document.querySelectorAll("div[title]")]

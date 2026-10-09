@@ -1,11 +1,14 @@
 // src/components/TrackerTabs.jsx — NutritionTracker's tab content. Render only; t = useTracker().
+import { lazy, Suspense } from "react";
 import { C } from "../constants/design.jsx";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import LogTab from "../tabs/LogTab";
-import CompareTab from "../tabs/CompareTab";
-import AddEntry from "../tabs/AddEntry";
-import WeightTracker from "../tabs/WeightTracker";
-import BodyTracker from "../tabs/BodyTracker";
+
+// Each other tab downloads the first time it is opened (Fix 43.2.3).
+const CompareTab = lazy(() => import("../tabs/CompareTab"));
+const AddEntry = lazy(() => import("../tabs/AddEntry"));
+const WeightTracker = lazy(() => import("../tabs/WeightTracker"));
+const BodyTracker = lazy(() => import("../tabs/BodyTracker"));
 
 const calc = (t) => ({
   calcSex: t.calcSex,
@@ -88,6 +91,24 @@ function Weight({ t }) {
 export default function TrackerTabs({ t }) {
   return (
     <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <Suspense
+        fallback={
+          <span
+            data-testid="tab-loading"
+            className="spinner-gold"
+            style={{ margin: "40px auto" }}
+          />
+        }
+      >
+        <OpenTab t={t} />
+      </Suspense>
+    </div>
+  );
+}
+
+function OpenTab({ t }) {
+  return (
+    <>
       {t.activeTab === "log" && <DailyLog t={t} />}
       {t.activeTab === "compare" && <Compare t={t} />}
       {t.activeTab === "add" && <AddEntry {...pick(t, ADD_ENTRY_PROPS)} />}
@@ -100,6 +121,6 @@ export default function TrackerTabs({ t }) {
           sex={t.weightPlanConfig?.sex}
         />
       )}
-    </div>
+    </>
   );
 }
