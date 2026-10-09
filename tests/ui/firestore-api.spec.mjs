@@ -67,6 +67,8 @@ test("days: load newest first, save, load one; a failed load logs and gives []",
   });
   const days = await api(p, (f) => f.loadAllDays("u"));
   expect(days.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-02", "2026-10-01"]);
+  const recent = await api(p, (f) => f.loadRecentDays("u", 2));
+  expect(recent.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-02"]); // the newest 2 only
   await api(p, (f) => f.saveDay("u", { date: "2026-10-04", meals: [] }));
   expect(await saves(p)).toEqual([
     { path: U("nutrition_days/2026-10-04"), data: { date: "2026-10-04", meals: [] } },
@@ -79,6 +81,8 @@ test("days: load newest first, save, load one; a failed load logs and gives []",
   await p.evaluate(() => (window.__failGetDocs = true));
   expect(await api(p, (f) => f.loadAllDays("u"))).toEqual([]);
   expect(logged.some((l) => l.startsWith("loadAllDays error:"))).toBe(true);
+  expect(await api(p, (f) => f.loadRecentDays("u", 2))).toEqual([]);
+  expect(logged.some((l) => l.startsWith("loadRecentDays error:"))).toBe(true);
   await p.evaluate(() => (window.__failSetDoc = true));
   const err = await api(p, (f) =>
     f.saveDay("u", { date: "x" }).then(

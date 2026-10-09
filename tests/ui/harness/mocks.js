@@ -38,18 +38,31 @@ export const getDoc = async (ref) => {
 };
 // getDocs: window.__collections[path] (e.g. "users/u/weight_log") when a test sets it, else
 // window.__polarDocs (Polar sessions); __polarDelay / __failGetDocs
+const cut = (rows, constraints = []) => {
+  const order = constraints.find((c) => c.orderBy)?.orderBy;
+  const max = constraints.find((c) => c.limit)?.limit;
+  const sorted = order
+    ? [...rows].sort((a, b) => String(b[order[0]]).localeCompare(String(a[order[0]])))
+    : rows;
+  return max ? sorted.slice(0, max) : sorted;
+};
 export const getDocs = async (ref) => {
   await new Promise((res) => setTimeout(res, window.__polarDelay || 0));
   if (window.__failGetDocs) throw new Error("Mock getDocs failure");
   const own = window.__collections?.[ref?.path];
   const rows = own ?? (window.__polarDocs || []);
   // a collection's rows are stored as { id, ...fields }; data() gives the fields only
-  const docs = rows.map(({ id, ...rest }) => ({ id, data: () => (own ? rest : { id, ...rest }) }));
+  const docs = cut(rows, ref?.constraints).map(({ id, ...rest }) => ({
+    id,
+    data: () => (own ? rest : { id, ...rest }),
+  }));
   return { forEach: (f) => docs.forEach(f), docs, empty: docs.length === 0 };
 };
 export const collection = (...a) => ({ path: a.slice(1).join("/") });
-export const orderBy = () => ({});
-export const query = () => ({});
+// query(ref, orderBy("f","desc"), limit(n)): getDocs sorts and cuts that collection the same way
+export const orderBy = (field, dir) => ({ orderBy: [field, dir] });
+export const limit = (n) => ({ limit: n });
+export const query = (ref, ...constraints) => ({ ...ref, constraints });
 export const where = () => ({});
 // onSnapshot: one reply, from window.__docs like getDoc, after any window.__getDocDelays delay;
 // a path in window.__failPaths errors instead
@@ -78,7 +91,13 @@ const DAYS = [
   day("2026-10-03", [], "Rest day"), // notes only
   day("2026-10-04", [{ id: "e", name: "Cycling (30 min)", kcal: -250, is_exercise: 1 }]), // exercise only
 ];
-export const loadAllDays = async () => window.__days ?? DAYS; // __days: e.g. [] for a new user
+// __days: e.g. [] for a new user; __allDaysDelay slows the read of every day (the first screen
+// reads only loadRecentDays)
+export const loadAllDays = async () => {
+  if (window.__allDaysDelay) await new Promise((res) => setTimeout(res, window.__allDaysDelay));
+  return window.__days ?? DAYS;
+};
+export const loadRecentDays = async (_u, n) => (window.__days ?? DAYS).slice(0, n);
 export const seedInitialData = async () => window.__seedDays ?? window.__days ?? DAYS;
 export const loadDay = async (_u, d) => DAYS.find((x) => x.date === d) || null;
 // saveDay: days recorded in window.__savedDays; window.__saveDayDelay / __failSaveDay

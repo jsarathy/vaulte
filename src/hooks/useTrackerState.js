@@ -13,9 +13,11 @@ export function useDayState() {
   const [currentDayData, setCurrentDayData] = useState(null);
   const [compareSlots, setCompareSlots] = useState(EMPTY_COMPARE);
   const [compareData, setCompareData] = useState(EMPTY_COMPARE);
+  const [daysComplete, setDaysComplete] = useState(false); // false until every stored day is in
   return {
     ...{ allDays, setAllDays, currentDate, setCurrentDate, currentDayData, setCurrentDayData },
     ...{ compareSlots, setCompareSlots, compareData, setCompareData },
+    ...{ daysComplete, setDaysComplete },
   };
 }
 

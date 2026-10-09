@@ -141,9 +141,9 @@ test("saving days: Compare slots, Daily log, sidebar stats", async ({ page: p })
 
 test("sidebar: newest 7 days after a save; a re-saved day counted once", async ({ page: p }) => {
   const kcal = { "09-27": 800, "09-28": 100, "09-29": 50 };
-  const dates = ["09-27", "09-28", "09-29", "09-30", "10-01", "10-02", "10-03", "10-04"];
+  const dates = ["10-04", "10-03", "10-02", "10-01", "09-30", "09-29", "09-28", "09-27"]; // newest first
   await start(p, { __days: dates.map((d) => day("2026-" + d, kcal[d] ?? 100)) });
-  expect(await stat(p, "7-day avg")).toBe("193 kcal"); // the first 7 as loaded: 1,350 / 7
+  expect(await stat(p, "7-day avg")).toBe("93 kcal"); // the newest 7, once all 8 days are in: 650 / 7
   expect(await stat(p, "Streak")).toBe("8 days");
   await addFood(p, "2026-10-05", 100);
   expect(await stat(p, "7-day avg")).toBe("93 kcal"); // newest 7: 650 / 7

@@ -9,6 +9,10 @@ import {
   unloggedSessions,
   chatMessagesFrom,
   compareStart,
+  RECENT_DAYS,
+  mergeDays,
+  mergeRows,
+  keepIfTouched,
   POLAR_RETURN,
 } from "../src/lib/trackerStart.js";
 
@@ -102,4 +106,50 @@ test("Polar return messages", () => {
   assert.deepEqual(POLAR_RETURN.get("error"), { ok: false, text: "Polar connection failed." });
   assert.equal(POLAR_RETURN.has("constructor"), false);
   assert.equal(POLAR_RETURN.size, 2);
+});
+
+test("the first screen reads the last 5 days", () => {
+  assert.equal(RECENT_DAYS, 5);
+});
+
+test("mergeDays: every day once, newest first; a day already on screen wins", () => {
+  const shown = [{ date: "2026-10-07", notes: "edited" }, { date: "2026-10-06" }];
+  const stored = [
+    { date: "2026-10-07", notes: "old" },
+    { date: "2026-10-06" },
+    { date: "2026-10-01" },
+  ];
+  assert.deepEqual(mergeDays(shown, stored), [
+    { date: "2026-10-07", notes: "edited" },
+    { date: "2026-10-06" },
+    { date: "2026-10-01" },
+  ]);
+  assert.deepEqual(mergeDays([], stored), stored);
+  assert.deepEqual(mergeDays(shown, []), shown);
+});
+
+test("mergeDays: when the stored days add none, the ones on screen are kept as they are", () => {
+  const shown = [{ date: "2026-10-01" }, { date: "2026-10-04" }]; // any order
+  assert.equal(mergeDays(shown, [{ date: "2026-10-04" }, { date: "2026-10-01" }]), shown);
+});
+
+test("mergeRows: every date once, oldest first; a row already on screen wins", () => {
+  const shown = [{ date: "2026-10-03", kg: 80 }];
+  const stored = [
+    { date: "2026-10-01", kg: 82 },
+    { date: "2026-10-03", kg: 99 },
+  ];
+  assert.deepEqual(mergeRows(shown, stored), [
+    { date: "2026-10-01", kg: 82 },
+    { date: "2026-10-03", kg: 80 },
+  ]);
+});
+
+test("keepIfTouched: Compare is replaced only while it still holds its first days", () => {
+  const first = ["2026-10-05", null, null];
+  const next = ["2026-10-05", "2026-10-02", "2026-09-30"];
+  assert.deepEqual(keepIfTouched(first, first, next), next);
+  assert.deepEqual(keepIfTouched([{ date: "2026-10-05" }, null, null], first, next), next);
+  const changed = ["2026-10-05", "2026-10-01", null];
+  assert.deepEqual(keepIfTouched(changed, first, next), changed);
 });
