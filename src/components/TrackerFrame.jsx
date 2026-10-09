@@ -211,7 +211,7 @@ function Sidebar({ t, phone, onPick }) {
         )}
       </div>
       {!phone && t.activeTab === "log" && <MedsPanel userId={t.userId} date={t.currentDate} />}
-      {t.allDays.length > 0 && <SidebarStats days={t.allDays} />}
+      {t.allDays.length > 0 && t.daysComplete && <SidebarStats days={t.allDays} />}
     </div>
   );
 }

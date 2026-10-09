@@ -1,6 +1,7 @@
 // src/api/firestore.js — all Firestore read/write helpers
 import { db } from "../firebase";
-import { doc, setDoc, getDoc, getDocs, deleteDoc, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, deleteDoc } from "firebase/firestore";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 import { genId } from "../constants/helpers";
 import { INITIAL_RECIPES } from "../constants/recipes";
 import { seedDays } from "../constants/seedDays";
@@ -36,6 +37,18 @@ export async function loadAllDays(uid) {
     return days.sort((a, b) => b.date.localeCompare(a.date));
   } catch (err) {
     console.error("loadAllDays error:", err);
+    return [];
+  }
+}
+
+/** The newest `count` days, newest first (the first screen; every day is read afterwards). */
+export async function loadRecentDays(uid, count) {
+  try {
+    const days = collection(db, "users", uid, "nutrition_days");
+    const snap = await getDocs(query(days, orderBy("date", "desc"), limit(count)));
+    return snap.docs.map((d) => d.data());
+  } catch (err) {
+    console.error("loadRecentDays error:", err);
     return [];
   }
 }

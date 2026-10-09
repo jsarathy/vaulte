@@ -65,3 +65,29 @@ export const POLAR_RETURN = new Map([
   ["connected", { ok: true, text: "Polar connected — click Sync to pull sessions." }],
   ["error", { ok: false, text: "Polar connection failed." }],
 ]);
+
+/** How many of the newest days the first screen waits for; the rest load afterwards. */
+export const RECENT_DAYS = 5;
+
+const dateOf = (x) => (x && typeof x === "object" ? x.date : x) ?? null;
+const unionByDate = (shown, stored) => [
+  ...shown,
+  ...stored.filter((r) => !shown.some((s) => s.date === r.date)),
+];
+
+/**
+ * Days read later joined to those on screen: each date once, newest first, on-screen wins.
+ * When they add no day, the ones on screen are returned as they are.
+ */
+export function mergeDays(shown, stored) {
+  const merged = unionByDate(shown, stored);
+  if (merged.length === shown.length) return shown;
+  return merged.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** weight_log / body_log rows read later joined to those on screen: oldest first, on-screen wins. */
+export const mergeRows = (shown, stored) => unionByDate(shown, stored).sort(byDate);
+
+/** Compare's slots or days (current) are replaced by next only if still the first ones (dates). */
+export const keepIfTouched = (current, first, next) =>
+  current.every((x, i) => dateOf(x) === dateOf(first[i])) ? next : current;

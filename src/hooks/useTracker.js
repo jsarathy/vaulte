@@ -32,6 +32,7 @@ const loadSetters = (s, calc) => ({
   ...{ polarSyncMsg: s.setPolarSyncMsg, allDays: s.setAllDays, currentDate: s.setCurrentDate },
   ...{ currentDayData: s.setCurrentDayData, chatDate: s.setChatDate },
   ...{ compareSlots: s.setCompareSlots, compareData: s.setCompareData },
+  ...{ daysComplete: s.setDaysComplete },
 });
 
 /** The reference calculator's values and setters under the tabs' prop names. */

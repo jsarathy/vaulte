@@ -267,15 +267,17 @@ test("start-up: optional parts can fail; the rest still loads", async ({ page: p
   expect(w.errs).toEqual([]);
 });
 
-test("start-up: a required part fails → logged, page shown without data", async ({ page: p }) => {
+test("start-up: the weight plan fails → logged, the first screen and the rest still load", async ({
+  page: p,
+}) => {
   const w = watch(p);
   await start(p, { ...FULL, __failPaths: [P("weight_plan/settings")] });
   await p.getByText("October 2026").waitFor();
   await expect(p.getByText("Loading your log…")).toHaveCount(0);
-  expect(w.logged.some((l) => l.startsWith("Init error:"))).toBe(true);
-  expect(await openDay(p)).toBe(null); // days are set last
+  expect(w.logged.some((l) => l.startsWith("weight load failed"))).toBe(true);
+  expect(await openDay(p)).toBe("1"); // the weight plan is not needed for the first screen
   await tab(p, "Compare");
-  expect(await calculator(p)).toEqual(["f", "40", "165", "70", "1.6", "25"]); // loaded before
+  expect(await calculator(p)).toEqual(["f", "40", "165", "70", "1.6", "25"]);
 });
 
 test("start-up: recipes failing → logged, no day opened; the other parts still load", async ({

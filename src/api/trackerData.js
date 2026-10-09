@@ -2,9 +2,10 @@
 // reference calculator's save.
 import { db } from "../firebase";
 import { doc, getDoc, getDocs, collection, setDoc } from "firebase/firestore";
-import { loadAllDays, seedInitialData } from "./firestore";
+import { loadAllDays, loadRecentDays, seedInitialData } from "./firestore";
 import { DEFAULT_PLAN_CONFIG } from "../constants/weightPlan";
 import { calculatorDoc, datedRows, unloggedSessions } from "../lib/trackerStart.js";
+import { RECENT_DAYS } from "../lib/trackerStart.js";
 
 const userDoc = (userId, ...path) => doc(db, "users", userId, ...path);
 const userDocs = (userId, name) => getDocs(collection(db, "users", userId, name));
@@ -13,11 +14,14 @@ const dataOf = async (ref) => {
   return snap.exists() ? snap.data() : null;
 };
 
-/** The user's days; a new user's are seeded first. */
-export async function loadDays(userId) {
-  const days = await loadAllDays(userId);
+/** The newest days, for the first screen; a new user's example days are seeded first. */
+export async function loadFirstDays(userId) {
+  const days = await loadRecentDays(userId, RECENT_DAYS);
   return days.length === 0 ? seedInitialData(userId) : days;
 }
+
+/** Every stored day, newest first. */
+export const loadEveryDay = (userId) => loadAllDays(userId);
 
 export const loadCalculator = (userId) => dataOf(userDoc(userId, "settings", "calculator"));
 export const saveCalculator = (userId, values) =>
