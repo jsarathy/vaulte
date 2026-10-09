@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import config from "../playwright.config.mjs";
+import { PROJECTS, DESKTOP_SCREEN } from "./ui/projects.mjs";
+
+const config = { projects: PROJECTS, use: { viewport: DESKTOP_SCREEN } };
 
 const project = (name) => config.projects.find((p) => p.name === name);
 const runsIn = (p, file) => {
