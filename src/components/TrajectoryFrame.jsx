@@ -1,6 +1,7 @@
 // src/components/TrajectoryFrame.jsx — a Trajectory panel's frame (Weight and Body tabs): heading
 // with the metric tabs, and the chart box. Double-click fills the screen (the heading moves inside);
 // Esc or double-click collapses. Render only; chart = useTrajectoryChart().
+import { createPortal } from "react-dom";
 
 const S = {
   heading: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" },
@@ -36,20 +37,37 @@ const S = {
 };
 const unwrapped = (style, nowrap) => (nowrap ? { ...style, whiteSpace: "nowrap" } : style);
 
-function ExpandedHeading({ tabs, nowrap }) {
+function ExpandedHeading({ tabs, nowrap, tapToClose }) {
   return (
     <div style={S.fullBar}>
       <div style={S.fullHeading}>
         <span style={unwrapped(S.fullTitle, nowrap)}>📉 Trajectory</span>
         {tabs}
       </div>
-      <span style={S.hint}>Esc or double-click to collapse</span>
+      <span style={S.hint}>{tapToClose ? "Tap to close" : "Esc or double-click to collapse"}</span>
     </div>
   );
 }
 
+// tapToClose (Weight tab on a phone): one tap on the full-screen chart closes it, except on a button
+const closeOnTap = (chart) => (e) => {
+  if (chart.full && !e.target.closest("button")) chart.toggleFull();
+};
+
 /** nowrap: keep the title on one line (Body tab). children: the chart. */
-export default function TrajectoryFrame({ chart, tabs, nowrap, children }) {
+export default function TrajectoryFrame({ chart, tabs, nowrap, tapToClose, children }) {
+  const hint = tapToClose ? "Tap to close" : "Double-click or press Esc to collapse";
+  const box = (
+    <div
+      onDoubleClick={chart.toggleFull}
+      onClick={tapToClose ? closeOnTap(chart) : undefined}
+      title={chart.full ? hint : "Double-click to expand"}
+      style={chart.full ? S.full : S.compact}
+    >
+      {chart.full && <ExpandedHeading tabs={tabs} nowrap={nowrap} tapToClose={tapToClose} />}
+      {children}
+    </div>
+  );
   return (
     <>
       {!chart.full && (
@@ -58,14 +76,7 @@ export default function TrajectoryFrame({ chart, tabs, nowrap, children }) {
           {tabs}
         </div>
       )}
-      <div
-        onDoubleClick={chart.toggleFull}
-        title={chart.full ? "Double-click or press Esc to collapse" : "Double-click to expand"}
-        style={chart.full ? S.full : S.compact}
-      >
-        {chart.full && <ExpandedHeading tabs={tabs} nowrap={nowrap} />}
-        {children}
-      </div>
+      {chart.full && tapToClose ? createPortal(box, document.body) : box}
     </>
   );
 }
