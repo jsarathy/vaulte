@@ -47,21 +47,19 @@ const strays = (p) =>
       .map((e) => e.tagName + " " + (e.textContent || "").slice(0, 30)),
   );
 
-test("Weight: log, chart and plan stacked; the table scrolls inside its frame", async ({
+test("Weight: pills, chart underneath; the log's table scrolls inside its pop-up", async ({
   page: p,
 }) => {
   await start(p, "Weight");
-  const log = await box(p.getByText("⚖️ Weight Log"));
+  const log = await box(p.getByRole("button", { name: "⚖️ Weight Log", exact: true }));
   const chart = await box(p.getByText(/Trajectory/).first());
-  const plan = await box(p.getByText("Plan Specifications"));
-  expect(chart.top).toBeGreaterThan(log.top + 150); // below the log, not beside it
-  expect(plan.top).toBeGreaterThan(chart.top + 150);
-  expect([log.left, chart.left, plan.left].every((x) => x < 40)).toBe(true);
+  expect(chart.top).toBeGreaterThan(log.bottom); // below the pills
+  expect([log.left, chart.left].every((x) => x < 40)).toBe(true);
   expect(await strays(p)).toEqual([]);
-  const frame = p.locator("table").first().locator("..");
+  await p.getByRole("button", { name: "⚖️ Weight Log", exact: true }).click();
+  const frame = p.getByRole("dialog").locator("table").locator("..");
   expect(await frame.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true); // sideways inside
   expect((await box(frame)).right).toBeLessThanOrEqual(390);
-  expect(await frame.evaluate((e) => getComputedStyle(e).maxHeight)).toBe("624px"); // 844 - 220
 });
 
 test("Body: log, chart and measurement sites stacked; nothing past the edge", async ({
