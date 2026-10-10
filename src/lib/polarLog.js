@@ -58,3 +58,15 @@ export function polarExerciseItem(s, id) {
     polar_session_id: s.id,
   };
 }
+
+const hasSession = (meal, id) => (meal.items || []).some((i) => i.polar_session_id === id);
+
+/** Where a logged session went: { date, meal } from the stored days, or null if not found. */
+export function loggedPlace(allDays, session) {
+  const places = allDays.flatMap((day) =>
+    (day.meals || [])
+      .filter((m) => hasSession(m, session.id))
+      .map((m) => ({ date: day.date, meal: m.name })),
+  );
+  return places[0] || null;
+}

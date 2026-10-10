@@ -1,7 +1,7 @@
 // src/components/PolarLogModal.jsx — "log a Polar session": the session's stats and heart rate,
 // a meal slot, and Log session. Render only; state and logging in usePolarLog.
 import { C, FONT, border } from "../constants/design.jsx";
-import { sessionStats, sessionWhen, sportName } from "../lib/polarLog.js";
+import { sessionStats, sessionWhen, sportName, loggedPlace } from "../lib/polarLog.js";
 import { usePolarLog } from "../hooks/usePolarLog";
 import PolarHRSparkline from "./PolarHRSparkline";
 
@@ -139,9 +139,35 @@ function MealSlot({ log }) {
   );
 }
 
+// A session already logged: where it went, and no way to log it again
+function LoggedNote({ session, allDays }) {
+  const place = loggedPlace(allDays, session);
+  return (
+    <div style={{ marginBottom: "14px", fontSize: "12px", color: C.greenText }}>
+      <div style={{ ...CAPTION, marginBottom: "5px" }}>Already logged</div>
+      {place ? `Logged to ${place.meal} on ${place.date}` : "Logged"}
+    </div>
+  );
+}
+
+function Actions({ log, logged, onClose }) {
+  return (
+    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+      <button onClick={onClose} style={S.cancel}>
+        {logged ? "Close" : "Cancel"}
+      </button>
+      {!logged && (
+        <button disabled={log.logging} onClick={log.log} style={S.log(log.logging)}>
+          {log.logging ? "Logging…" : "Log session"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function LogBox(props) {
   const log = usePolarLog(props);
-  const { session, onClose } = props;
+  const { session, onClose, allDays } = props;
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()} style={S.backdrop}>
       <div style={S.box}>
@@ -149,15 +175,12 @@ function LogBox(props) {
         <div style={{ padding: "14px 16px" }}>
           <Stats session={session} />
           <PolarHRSparkline session={session} />
-          <MealSlot log={log} />
-          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-            <button onClick={onClose} style={S.cancel}>
-              Cancel
-            </button>
-            <button disabled={log.logging} onClick={log.log} style={S.log(log.logging)}>
-              {log.logging ? "Logging…" : "Log session"}
-            </button>
-          </div>
+          {session.logged ? (
+            <LoggedNote session={session} allDays={allDays} />
+          ) : (
+            <MealSlot log={log} />
+          )}
+          <Actions log={log} logged={session.logged} onClose={onClose} />
         </div>
       </div>
     </div>
