@@ -23,7 +23,13 @@ const S = {
     fontWeight: "500",
     fontFamily: FONT.sans,
   }),
-  error: { fontSize: "11px", color: C.danger, marginTop: "8px" },
+  error: {
+    fontSize: "11px",
+    color: C.danger,
+    marginTop: "8px",
+    whiteSpace: "pre-line",
+    overflowWrap: "anywhere",
+  },
 };
 
 /** canFetch: show the button (Polar knows the session). */

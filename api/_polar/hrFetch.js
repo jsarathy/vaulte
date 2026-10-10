@@ -33,12 +33,20 @@ export function candidateUrls(session, sessionId, connPolarUserId) {
   ].filter(Boolean);
 }
 
+/** One attempt as reported back: url, status, ok, and the start of Polar's reply when it failed. */
+export const attemptOf = (url, result) => ({
+  url,
+  status: result.status,
+  ok: result.ok,
+  ...(result.ok ? {} : { detail: String(result.body ?? "").slice(0, 150) }),
+});
+
 /** The first URL's JSON, with every attempt noted: { data, attempts }; data null if none. */
 export async function firstSamples(urls, headers) {
   const attempts = [];
   for (const url of urls) {
     const result = await safeFetchJSON(url, headers);
-    attempts.push({ url, status: result.status, ok: result.ok });
+    attempts.push(attemptOf(url, result));
     if (result.ok) return { data: result.data, attempts };
   }
   return { data: null, attempts };
@@ -77,7 +85,7 @@ export function matchExercise(list, startTime) {
 /** { attempt, list }: the v3 list (array, or { exercises }); list null when it cannot be read. */
 export async function listRecentExercises(headers) {
   const result = await safeFetchJSON(V3_LIST, headers);
-  const attempt = { url: V3_LIST, status: result.status, ok: result.ok };
+  const attempt = attemptOf(V3_LIST, result);
   if (!result.ok) return { attempt, list: null };
   const list = Array.isArray(result.data) ? result.data : result.data?.exercises;
   return { attempt, list: Array.isArray(list) ? list : null };
