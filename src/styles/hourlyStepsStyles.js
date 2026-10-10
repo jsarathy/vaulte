@@ -76,12 +76,13 @@ export const browseButtonStyle = (dark) => ({
   fontSize: dark ? "11px" : "16px",
   cursor: "pointer",
 });
+// The real date input sits invisibly over the button, so a tap lands on it (iOS opens its picker only for that)
+export const browseWrapStyle = { position: "relative", display: "inline-flex" };
 export const hiddenPickerStyle = {
   position: "absolute",
-  right: 0,
-  bottom: 0,
-  width: "1px",
-  height: "1px",
+  inset: 0,
+  width: "100%",
+  height: "100%",
   opacity: 0,
-  pointerEvents: "none",
+  cursor: "pointer",
 };

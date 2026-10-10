@@ -58,7 +58,7 @@ test("loading, empty and drawn states; the card's title bar", async ({ page: p }
   const head = p.getByText("Steps by hour").locator("..");
   expect(await style(head, "backgroundColor")).toBe("rgb(24, 95, 165)");
   await expect(head).toContainText(/Sat,? 3 Oct 2026/);
-  await expect(head.getByRole("button", { name: "📅 Browse by date" })).toBeVisible();
+  await expect(head.getByLabel("📅 Browse by date")).toBeVisible();
   expect(await style(head.getByText(/Sat,? 3 Oct 2026/), "fontSize")).toBe("11px");
   await expect(card(p)).toContainText(`${SUM.toLocaleString()} steps`);
   await expect(card(p)).toContainText("peak 07:00 · 1,234");
@@ -138,7 +138,7 @@ test("browse by date: picker, max today, reload; the Add Entry date", async ({ p
       window.__picked = (window.__picked || 0) + 1;
     };
   });
-  const btn = card(p).getByRole("button", { name: "📅 Browse by date" });
+  const btn = card(p).getByLabel("📅 Browse by date");
   await btn.click();
   await btn.dblclick();
   expect(await p.evaluate(() => window.__picked)).toBe(3);
@@ -164,9 +164,7 @@ test("expand: full-screen drawing, labels, Esc and double-click collapse", async
   await expect(full(p)).toContainText("Esc or double-click to collapse");
   expect(await style(full(p).getByText("⌚ Steps by hour"), "fontSize")).toBe("24px");
   expect(await style(full(p).getByText(/Sat,? 3 Oct 2026/), "fontSize")).toBe("20px");
-  expect(await style(full(p).getByRole("button", { name: "📅 Browse by date" }), "fontSize")).toBe(
-    "16px",
-  );
+  expect(await style(full(p).locator("button"), "fontSize")).toBe("16px");
   await expect(full(p)).not.toContainText("07:00–08:00"); // hover cleared on expand
   await p.mouse.move(0, 0);
   await expect(full(p)).toContainText(`${SUM.toLocaleString()} steps`);
@@ -191,7 +189,7 @@ test("expand: full-screen drawing, labels, Esc and double-click collapse", async
   expect(Number(await top.getAttribute("x1"))).toBeCloseTo(34 * 1.6 * 1.5, 5);
 
   await p.evaluate(() => (HTMLInputElement.prototype.showPicker = () => {})); // no native picker
-  await full(p).getByRole("button", { name: "📅 Browse by date" }).dblclick(); // never collapses
+  await full(p).getByLabel("📅 Browse by date").dblclick(); // never collapses
   await expect(full(p)).toBeVisible();
   await column(p, 6);
   await expect(full(p)).toContainText("06:00–07:00 · 150 steps");
@@ -218,4 +216,20 @@ test("expand: re-fits when the window is resized", async ({ page: p }) => {
   await expect(chart(p)).toHaveAttribute("viewBox", `0 0 ${box[0]} ${box[1] - 4}`);
   await p.setViewportSize({ width: 500, height: 300 });
   await expect(chart(p)).toHaveAttribute("viewBox", /^0 0 600 300$/); // floors
+});
+
+test("browse by date: the date input covers the button, so a tap lands on it (Fix 57)", async ({
+  page: p,
+}) => {
+  await start(p);
+  const input = card(p).getByLabel("📅 Browse by date");
+  const button = card(p).getByText("📅 Browse by date", { exact: true });
+  const [i, b] = await Promise.all([input.boundingBox(), button.boundingBox()]);
+  expect(i.width).toBeGreaterThanOrEqual(b.width - 1);
+  expect(i.height).toBeGreaterThanOrEqual(b.height - 1);
+  const hit = await p.evaluate(
+    ({ x, y }) => document.elementFromPoint(x, y)?.getAttribute("type"),
+    { x: b.x + b.width / 2, y: b.y + b.height / 2 },
+  );
+  expect(hit).toBe("date");
 });
