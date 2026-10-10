@@ -213,6 +213,7 @@ export const CLEAN_FILES = [
   "src/lib/hrChart.js",
   "src/components/HRChart.jsx",
   "src/components/PolarDetailModal.jsx",
+  "src/components/NoHeartRate.jsx",
   "src/lib/dayBudget.js",
   "src/components/DayHeader.jsx",
   "src/components/CalorieBar.jsx",

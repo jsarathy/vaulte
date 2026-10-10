@@ -11,6 +11,7 @@ import {
   startedAt,
 } from "../lib/polarDetail.js";
 import HRChart from "./HRChart.jsx";
+import NoHeartRate from "./NoHeartRate.jsx";
 
 const S = {
   backdrop: {
@@ -71,26 +72,6 @@ const S = {
     marginBottom: "3px",
   },
   statValue: { fontFamily: FONT.mono, fontWeight: "500", fontSize: "14px", color: C.text },
-  noHR: {
-    background: C.bg,
-    borderRadius: "6px",
-    border: `0.5px solid ${C.border}`,
-    padding: "16px",
-    textAlign: "center",
-  },
-  note: { fontSize: "12px", color: C.muted, marginBottom: "12px" },
-  fetch: (busy) => ({
-    background: busy ? C.hint : C.blue,
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "8px 18px",
-    cursor: busy ? "not-allowed" : "pointer",
-    fontSize: "12px",
-    fontWeight: "500",
-    fontFamily: FONT.sans,
-  }),
-  error: { fontSize: "11px", color: C.danger, marginTop: "8px" },
 };
 
 function Header({ session, onClose }) {
@@ -120,26 +101,6 @@ function Stats({ session }) {
   );
 }
 
-function FetchHeartRate({ hr }) {
-  return (
-    <>
-      <button onClick={hr.fetchNow} disabled={hr.fetching} style={S.fetch(hr.fetching)}>
-        {hr.fetching ? "Fetching…" : "Fetch HR data"}
-      </button>
-      {hr.error && <div style={S.error}>{hr.error}</div>}
-    </>
-  );
-}
-
-function NoHeartRate({ session, hr }) {
-  return (
-    <div style={S.noHR}>
-      <div style={S.note}>Heart rate data wasn't captured at sync time.</div>
-      {canFetchHeartRate(session) && <FetchHeartRate hr={hr} />}
-    </div>
-  );
-}
-
 // Always mounted, so a fetch's state outlives the box (as before)
 export default function PolarDetailModal({ detail, userId }) {
   const session = detail.session;
@@ -154,7 +115,7 @@ export default function PolarDetailModal({ detail, userId }) {
           {hasHeartRate(session) ? (
             <HRChart session={session} />
           ) : (
-            <NoHeartRate session={session} hr={hr} />
+            <NoHeartRate hr={hr} canFetch={canFetchHeartRate(session)} />
           )}
         </div>
       </div>
