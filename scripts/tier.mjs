@@ -46,12 +46,17 @@ function changedFiles() {
   ];
 }
 
-async function main() {
+// Rate the given files (default: everything changed since origin/main) against the real code.
+export async function rateChange(given = []) {
   const { cruise } = await import("dependency-cruiser");
   const { output } = await cruise(["src", "api"], { exclude: { path: "node_modules" } });
   const map = JSON.parse(readFileSync("tests/ui/spec-map.json", "utf8"));
-  const given = process.argv.slice(2);
-  const r = tierOf(given.length ? given : changedFiles(), output.modules, map);
+  const changed = given.length ? given : changedFiles();
+  return { ...tierOf(changed, output.modules, map), changed, map };
+}
+
+async function main() {
+  const r = await rateChange(process.argv.slice(2));
   console.log(`Tier ${r.tier}`);
   r.reasons.forEach((x) => console.log(`  why: ${x}`));
   r.checks.forEach((x) => console.log(`  run: ${x}`));

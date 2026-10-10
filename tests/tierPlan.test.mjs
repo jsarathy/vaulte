@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { uiPlan, checksFor } from "../scripts/tier/plan.mjs";
+import { uiPlan, checksFor, stepsFor } from "../scripts/tier/plan.mjs";
 
 // Ten specs; each exercises its own file, and "src/shared.js" is exercised by seven of them.
 const SPECS = Array.from({ length: 10 }, (_, i) => `tests/ui/s${i}.spec.mjs`);
@@ -78,4 +78,36 @@ test("checks: lint and unit tests always, then the UI plan, then the extras for 
 test("checks name the specs so they can be copied", () => {
   const some = checksFor(2, { mode: "selected", specs: [SPECS[4]] });
   assert.ok(some.some((c) => c.includes(SPECS[4])));
+});
+
+const cmds = (steps) => steps.flatMap((s) => s.cmds);
+
+test("steps carry the commands to run, in order", () => {
+  const steps = stepsFor(2, { mode: "selected", specs: [SPECS[4], SPECS[5]] });
+  assert.deepEqual(cmds(steps), [
+    "npm run -s lint",
+    "npm run -s format:check",
+    "npm test",
+    `npx playwright test ${SPECS[4]} ${SPECS[5]}`,
+  ]);
+});
+
+test("a full UI plan runs the whole suite", () => {
+  assert.ok(cmds(stepsFor(3, { mode: "full", specs: [] })).includes("npm run test:ui"));
+});
+
+test("tier 4 adds the API tests and the audit, and a manual step that has no command", () => {
+  const steps = stepsFor(4, { mode: "none", specs: [] });
+  assert.ok(cmds(steps).includes("npm run test:api"));
+  assert.ok(cmds(steps).includes("npm run audit:ci"));
+  const manual = steps.find((s) => /live site/.test(s.label));
+  assert.deepEqual(manual.cmds, []);
+});
+
+test("checks are just the labels of the steps", () => {
+  const ui = { mode: "none", specs: [] };
+  assert.deepEqual(
+    checksFor(4, ui),
+    stepsFor(4, ui).map((s) => s.label),
+  );
 });

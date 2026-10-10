@@ -21,16 +21,32 @@ export function uiPlan(tier, changed, map) {
   return specs.length ? { mode: "selected", specs } : { mode: "none", specs: [] };
 }
 
-function uiLines(ui) {
+function uiStep(ui) {
   if (ui.mode === "none") return [];
-  if (ui.mode === "full") return [`full UI suite locally${ui.why ? ` (${ui.why})` : ""}`];
+  if (ui.mode === "full") {
+    return [
+      { label: `full UI suite locally${ui.why ? ` (${ui.why})` : ""}`, cmds: ["npm run test:ui"] },
+    ];
+  }
   const n = ui.specs.length;
-  return [`UI: ${n} spec${n === 1 ? "" : "s"}: npx playwright test ${ui.specs.join(" ")}`];
+  const label = `UI: ${n} spec${n === 1 ? "" : "s"}: npx playwright test ${ui.specs.join(" ")}`;
+  return [{ label, cmds: [`npx playwright test ${ui.specs.join(" ")}`] }];
 }
 
-const TOP_TIER = ["API tests", "dependency audit and secret scan", "manual check on the live site"];
+const TOP_TIER = [
+  { label: "API tests", cmds: ["npm run test:api"] },
+  { label: "dependency audit (the secret scan runs in CI)", cmds: ["npm run audit:ci"] },
+  { label: "manual check on the live site", cmds: [] },
+];
 
-export function checksFor(tier, ui) {
-  const base = ["lint and format", "unit tests", ...uiLines(ui)];
+// The steps to run before pushing: a label and the shell commands for each (none = done by hand).
+export function stepsFor(tier, ui) {
+  const base = [
+    { label: "lint and format", cmds: ["npm run -s lint", "npm run -s format:check"] },
+    { label: "unit tests", cmds: ["npm test"] },
+    ...uiStep(ui),
+  ];
   return tier === 4 ? [...base, ...TOP_TIER] : base;
 }
+
+export const checksFor = (tier, ui) => stepsFor(tier, ui).map((s) => s.label);

@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "quality": "node scripts/quality-report.mjs",
     "tier": "node scripts/tier.mjs",
+    "check": "node scripts/check.mjs",
     "spec-map": "node scripts/spec-map.mjs",
     "test:ui": "playwright test",
     "test:api": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-vaulte \"npm run -s test:api:run\"",
