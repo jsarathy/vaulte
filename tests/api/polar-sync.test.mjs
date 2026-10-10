@@ -9,6 +9,7 @@ const UID = "user-1";
 const CONN = `users/${UID}/polar/connection`;
 const POLAR = "https://www.polaraccesslink.com";
 const TX = `${POLAR}/v3/users/777/exercise-transactions`;
+const V3 = `${POLAR}/v3/exercises?samples=true`;
 const EX = (id) => `${TX}/42/exercises/${id}`;
 const AUTH = { Authorization: "Bearer tok-abc", Accept: "application/json" };
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -72,8 +73,19 @@ const twoExercises = () => ({
   [`PUT ${TX}/42`]: ok({}),
   [EX(11)]: ok(exercise(11)),
   [`${EX(11)}/samples`]: ok(samples("0,0,88,90,0,95", { "recording-rate": 1 })),
-  [EX(12)]: ok(exercise(12, { "detailed-sport-info": undefined, sport: "RUNNING" })),
+  [EX(12)]: ok(
+    exercise(12, {
+      "detailed-sport-info": undefined,
+      sport: "RUNNING",
+      "start-time": "2026-10-02T09:00:00",
+    }),
+  ),
   [`${EX(12)}/samples`]: { status: 404, json: samples("50") }, // an error body is not samples
+  // the recent-exercises list (v3) has the HR the samples endpoint would not give
+  [V3]: ok([
+    { start_time: "2026-10-02T09:00:40", ...samples("0,70,72", { "recording-rate": 2 }) },
+    { start_time: "2026-10-01T07:00:00", ...samples("1,1,1") }, // not used: session 11 has its own HR
+  ]),
 });
 
 beforeEach(clearFirestore);
@@ -143,6 +155,7 @@ test("exercises and their HR samples are fetched, the transaction committed, ses
       `GET ${EX(11)}/samples`,
       `GET ${EX(12)}`,
       `GET ${EX(12)}/samples`,
+      `GET ${V3}`, // for session 12, which has no HR yet
       `PUT ${TX}/42`, // committed only after every sample was fetched
     ],
   );
@@ -171,8 +184,8 @@ test("exercises and their HR samples are fetched, the transaction committed, ses
   const s12 = await session("12");
   assert.equal(s12.sport, "RUNNING"); // falls back to the plain sport
   assert.equal(s11.sport, "INDOOR_CYCLING"); // the detailed sport wins
-  assert.equal(s12.hr_samples, null); // no samples endpoint
-  assert.equal(s12.recording_rate_s, null);
+  assert.deepEqual(s12.hr_samples, [70, 72]); // filled from the recent list (v3)
+  assert.equal(s12.recording_rate_s, 2);
   assert.match((await read(CONN)).last_sync_at, ISO);
 });
 
@@ -261,4 +274,24 @@ test("an unexpected failure is a 500 with the message", async () => {
   });
   const out = await call({ userId: UID });
   assert.deepEqual([out.statusCode, out.body], [500, { error: "commit exploded" }]);
+});
+
+test("recent list failing, or every session already having HR: no change, sync still succeeds", async () => {
+  await connect();
+  stubPolar({ ...twoExercises(), [V3]: { status: 500, text: "down" } });
+  let out = await call({ userId: UID });
+  assert.equal(out.statusCode, 200);
+  assert.equal((await session("12")).hr_samples, null);
+
+  stubPolar({ ...twoExercises(), [V3]: new Error("reset") });
+  out = await call({ userId: UID });
+  assert.equal(out.statusCode, 200);
+  assert.equal(out.body.newSessions, 2);
+
+  const withHr = twoExercises();
+  withHr[`${EX(12)}/samples`] = ok(samples("60,61"));
+  stubPolar(withHr); // no V3 route: a call to it would throw and fail the sync's stub
+  out = await call({ userId: UID });
+  assert.equal(out.statusCode, 200);
+  assert.ok(calls.every((c) => !c.url.includes("/v3/exercises?")));
 });

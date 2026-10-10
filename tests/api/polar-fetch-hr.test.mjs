@@ -11,6 +11,7 @@ const CONN = `users/${UID}/polar/connection`;
 const SESSION = `users/${UID}/polar_sessions/${SID}`;
 const POLAR = "https://www.polaraccesslink.com";
 const BY_USER = (uid) => `${POLAR}/v3/users/${uid}/exercises/${SID}/samples`;
+const V3 = `${POLAR}/v3/exercises?samples=true`;
 const EX_URL = `${POLAR}/v3/users/777/exercise-transactions/42/exercises/${SID}`;
 const AUTH = { Authorization: "Bearer tok-abc", Accept: "application/json" };
 
@@ -128,17 +129,18 @@ test("falls back to the connection's polar user, then the exercise URL", async (
   );
 });
 
-test("422 when the session has no Polar identifiers at all", async () => {
+test("no Polar identifiers: nothing is tried but the recent list, which finds no match", async () => {
   await seed();
   await connect({ polar_user_id: null });
-  stubPolar({});
+  stubPolar({ [V3]: ok([]) });
   const r = await call({ userId: UID, sessionId: SID });
-  assert.equal(r.statusCode, 422);
-  assert.deepEqual(r.body, {
-    error: "no_url",
-    message: "No Polar identifiers found for this session. Re-sync a fresh session.",
-  });
-  assert.deepEqual(calls, []);
+  assert.equal(r.statusCode, 502);
+  assert.equal(r.body.error, "samples_unavailable");
+  assert.deepEqual(r.body.attempts, [{ url: V3, status: 200, ok: true, matched: false }]);
+  assert.deepEqual(
+    calls.map((c) => c.url),
+    [V3],
+  );
 });
 
 test("502 with the attempts when every URL fails (error, empty body, bad JSON, thrown)", async () => {
@@ -147,6 +149,7 @@ test("502 with the attempts when every URL fails (error, empty body, bad JSON, t
   stubPolar({
     [BY_USER(777)]: { status: 500, text: "boom" },
     [`${EX_URL}/samples`]: { status: 200, text: "   " },
+    [V3]: { status: 403, text: "consents" },
   });
   let r = await call({ userId: UID, sessionId: SID });
   assert.equal(r.statusCode, 502);
@@ -155,20 +158,83 @@ test("502 with the attempts when every URL fails (error, empty body, bad JSON, t
   assert.deepEqual(r.body.attempts, [
     { url: BY_USER(777), status: 500, ok: false },
     { url: `${EX_URL}/samples`, status: 200, ok: false },
+    { url: V3, status: 403, ok: false, matched: false },
   ]);
   assert.equal((await read(SESSION)).hr_samples, undefined);
 
-  stubPolar({ [BY_USER(777)]: { status: 200, text: "<html>not json" } });
+  stubPolar({
+    [BY_USER(777)]: { status: 200, text: "<html>not json" },
+    [V3]: { status: 200, text: "x" },
+  });
   await seed(); // no exercise_url: one URL only
   r = await call({ userId: UID, sessionId: SID });
   assert.equal(r.statusCode, 502);
-  assert.deepEqual(r.body.attempts, [{ url: BY_USER(777), status: 200, ok: false }]);
+  assert.deepEqual(r.body.attempts, [
+    { url: BY_USER(777), status: 200, ok: false },
+    { url: V3, status: 200, ok: false, matched: false },
+  ]);
 
   stubPolar({ [BY_USER(777)]: new Error("socket hang up") }); // a thrown fetch → 500
   r = await call({ userId: UID, sessionId: SID });
   assert.equal(r.statusCode, 500);
   assert.deepEqual(r.body, { error: "socket hang up" });
   assert.ok(q.logs.some((l) => l.startsWith("ERR polar-fetch-hr error:")));
+});
+
+const FAIL_URLS = { [BY_USER(777)]: { status: 404, text: "gone" } };
+const listed = (start, data = "80,0,90") => ({
+  start_time: start,
+  samples: [{ "sample-type": "0", data, "recording-rate": 5 }],
+});
+
+test("recent list (v3): matched by start time within 2 minutes; HR stored and returned", async () => {
+  await seed({ start_time: "2026-10-01T07:00:00" });
+  await connect();
+  stubPolar({
+    ...FAIL_URLS,
+    [V3]: ok([listed("2026-09-30T07:00:00"), listed("2026-10-01T07:01:30")]),
+  });
+  const r = await call({ userId: UID, sessionId: SID });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.body, { ok: true, hr_samples: [80, null, 90], recording_rate_s: 5 });
+  assert.deepEqual((await read(SESSION)).hr_samples, [80, null, 90]);
+  assert.deepEqual(
+    calls.map((c) => c.url),
+    [BY_USER(777), V3],
+  );
+});
+
+test("recent list (v3): an { exercises } wrapper works; a match with no HR channel is no_hr", async () => {
+  await seed({ start_time: "2026-10-01T07:00:00" });
+  await connect();
+  const noHr = { start_time: "2026-10-01T07:00:00", samples: [{ "sample-type": "3", data: "1" }] };
+  stubPolar({ ...FAIL_URLS, [V3]: ok({ exercises: [noHr] }) });
+  const r = await call({ userId: UID, sessionId: SID });
+  assert.equal(r.statusCode, 404);
+  assert.equal(r.body.error, "no_hr");
+});
+
+test("no match and older than Polar's 30 days: too_old; a recent session stays unavailable", async () => {
+  const day = 86400000;
+  await seed({
+    start_time: "2026-09-03T08:00:00",
+    fetched_at: new Date(Date.now() - 40 * day).toISOString(),
+  });
+  await connect();
+  stubPolar({ ...FAIL_URLS, [V3]: ok([listed("2026-10-01T07:00:00")]) });
+  let r = await call({ userId: UID, sessionId: SID });
+  assert.equal(r.statusCode, 404);
+  assert.equal(r.body.error, "too_old");
+  assert.match(r.body.message, /30 days/);
+  assert.equal(r.body.attempts.at(-1).matched, false);
+
+  await seed({
+    start_time: "2026-09-03T08:00:00",
+    fetched_at: new Date(Date.now() - 5 * day).toISOString(),
+  });
+  r = await call({ userId: UID, sessionId: SID });
+  assert.equal(r.statusCode, 502);
+  assert.equal(r.body.error, "samples_unavailable");
 });
 
 test("404 no_hr: no heart-rate channel (types listed), or every value zero", async () => {

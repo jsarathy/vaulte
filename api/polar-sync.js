@@ -2,7 +2,7 @@
 // into users/{uid}/polar_sessions. The client, HR samples, session shape and Firestore access
 // live in api/_polar/ (not deployed as functions).
 import { polarClient } from "./_polar/client.js";
-import { fetchSessions } from "./_polar/sessions.js";
+import { fetchSessions, fillMissingHr } from "./_polar/sessions.js";
 import { getAdminDb, loadConnection, saveSessions, stampSync } from "./_polar/store.js";
 
 const reply = (status, body) => ({ status, body });
@@ -20,7 +20,8 @@ async function syncUser(userId) {
     return reply(502, { error: "Failed to create Polar transaction", detail: tx.error });
   const urls = await polar.listExercises(tx.id);
   if (!urls) return reply(502, { error: "Failed to list exercises" });
-  const sessions = await fetchSessions(urls, polar); // before the commit: Polar forgets them after
+  const fetched = await fetchSessions(urls, polar); // before the commit: Polar forgets them after
+  const sessions = await fillMissingHr(fetched, polar.auth);
   await polar.commitTransaction(tx.id);
   await saveSessions(db, userId, sessions);
   return reply(200, { newSessions: sessions.length, sessions });

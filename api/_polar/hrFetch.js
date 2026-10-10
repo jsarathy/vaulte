@@ -58,3 +58,33 @@ export function hrChannel(samplesData) {
   if (!hr_samples) return noHr("All HR values were zero — watch may not have had a lock.");
   return { hr_samples, recording_rate_s: hrSet["recording-rate"] || DEFAULT_RATE_S };
 }
+
+// --- the current v3 exercises list (no transaction): the last 30 days uploaded to Flow, with samples
+export const V3_LIST = `${POLAR}/v3/exercises?samples=true`;
+const WITHIN_MS = 2 * 60 * 1000;
+export const WINDOW_DAYS = 30;
+
+const asTime = (naive) => Date.parse(String(naive).slice(0, 19) + "Z"); // "2026-09-03T08:00:00", no zone
+const startOf = (ex) => ex.start_time || ex["start-time"];
+
+/** The listed exercise that started when the stored session did (within 2 minutes), or null. */
+export function matchExercise(list, startTime) {
+  if (!startTime) return null;
+  const t = asTime(startTime);
+  return list.find((ex) => Math.abs(asTime(startOf(ex)) - t) <= WITHIN_MS) || null;
+}
+
+/** { attempt, list }: the v3 list (array, or { exercises }); list null when it cannot be read. */
+export async function listRecentExercises(headers) {
+  const result = await safeFetchJSON(V3_LIST, headers);
+  const attempt = { url: V3_LIST, status: result.status, ok: result.ok };
+  if (!result.ok) return { attempt, list: null };
+  const list = Array.isArray(result.data) ? result.data : result.data?.exercises;
+  return { attempt, list: Array.isArray(list) ? list : null };
+}
+
+/** True when the session is older than Polar's 30-day window (counted from when it was fetched). */
+export function outsideWindow(session, now = Date.now()) {
+  const since = session.fetched_at || session.start_time;
+  return since ? now - asTime(since) > WINDOW_DAYS * 86400000 : false;
+}
