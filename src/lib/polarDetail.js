@@ -45,10 +45,16 @@ export const hasHeartRate = (s) => (s.hr_samples || []).filter((v) => v != null)
 /** Heart rate can be fetched from Polar for a session it knows about. */
 export const canFetchHeartRate = (s) => Boolean(s.exercise_url || s.polar_user_id);
 
+const seenLines = (a) =>
+  a.seen ? [`Polar listed ${a.listed}:`, ...a.seen.map((line) => "  " + line)] : [];
+
 const attemptLine = (a) =>
-  `${new URL(a.url).pathname}: ${a.status}${a.detail ? " " + a.detail : ""}${
-    a.matched === false ? " (no session at that time)" : ""
-  }`;
+  [
+    `${new URL(a.url).pathname}: ${a.status}${a.detail ? " " + a.detail : ""}${
+      a.matched === false ? " (no session at that time)" : ""
+    }`,
+    ...seenLines(a),
+  ].join("\n");
 
 /** The message for a failed fetch reply, with what each Polar call answered (Fix 61). */
 export function fetchError(data) {

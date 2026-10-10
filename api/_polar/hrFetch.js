@@ -1,6 +1,7 @@
 // api/_polar/hrFetch.js — one stored session's heart-rate samples fetched on demand
 // (polar-fetch-hr): the URLs worth trying, the first that answers with JSON, the HR channel.
 import { parseHrSamples } from "./samples.js";
+import { parseDurationMin } from "../../src/constants/helpers.js";
 
 const POLAR = "https://www.polaraccesslink.com";
 const DEFAULT_RATE_S = 5;
@@ -75,12 +76,31 @@ export const WINDOW_DAYS = 30;
 const asTime = (naive) => Date.parse(String(naive).slice(0, 19) + "Z"); // "2026-09-03T08:00:00", no zone
 const startOf = (ex) => ex.start_time || ex["start-time"];
 
-/** The listed exercise that started when the stored session did (within 2 minutes), or null. */
-export function matchExercise(list, startTime) {
-  if (!startTime) return null;
-  const t = asTime(startTime);
-  return list.find((ex) => Math.abs(asTime(startOf(ex)) - t) <= WITHIN_MS) || null;
+const DAY_MS = 86400000;
+const startNear = (ex, session, ms) =>
+  Math.abs(asTime(startOf(ex)) - asTime(session.start_time)) <= ms;
+const sameEffort = (ex, session) =>
+  ex.calories === session.calories &&
+  Math.abs(parseDurationMin(ex.duration) - (session.duration_min || 0)) <= 1;
+
+/** The listed exercise for the stored session: it started at the same time (within 2 minutes), or
+ *  (Polar's clock may differ from the one first stored) the same calories and duration within a day. */
+export function matchExercise(list, session) {
+  if (!session.start_time) return null;
+  const exact = list.find((ex) => startNear(ex, session, WITHIN_MS));
+  return (
+    exact || list.find((ex) => sameEffort(ex, session) && startNear(ex, session, DAY_MS)) || null
+  );
 }
+
+/** What the list held, one short line each (for the error when nothing matches). */
+export const summariseList = (list) =>
+  list
+    .slice(0, 8)
+    .map(
+      (ex) =>
+        `${startOf(ex)} ${ex.calories ?? "?"} kcal ${Math.round(parseDurationMin(ex.duration))} min`,
+    );
 
 /** { attempt, list }: the v3 list (array, or { exercises }); list null when it cannot be read. */
 export async function listRecentExercises(headers) {
@@ -88,7 +108,11 @@ export async function listRecentExercises(headers) {
   const attempt = attemptOf(V3_LIST, result);
   if (!result.ok) return { attempt, list: null };
   const list = Array.isArray(result.data) ? result.data : result.data?.exercises;
-  return { attempt, list: Array.isArray(list) ? list : null };
+  const exercises = Array.isArray(list) ? list : null;
+  return {
+    attempt: exercises ? { ...attempt, listed: exercises.length } : attempt,
+    list: exercises,
+  };
 }
 
 /** True when the session is older than Polar's 30-day window (counted from when it was fetched). */

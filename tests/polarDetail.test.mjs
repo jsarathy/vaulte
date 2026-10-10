@@ -72,6 +72,23 @@ test("heart rate: shown, fetchable, errors", () => {
   assert.equal(fetchError({ error: "e" }), "e");
   assert.equal(fetchError({}), "Failed to fetch HR data.");
   assert.equal(fetchError({ message: "m", attempts: [] }), "m");
+  const seen = fetchError({
+    message: "m",
+    attempts: [
+      {
+        url: "https://www.polaraccesslink.com/v3/exercises?samples=true",
+        status: 200,
+        ok: true,
+        listed: 2,
+        matched: false,
+        seen: ["2026-09-25T09:42:00 250 kcal 32 min"],
+      },
+    ],
+  });
+  assert.equal(
+    seen,
+    "m\nPolar answered:\n/v3/exercises: 200 (no session at that time)\nPolar listed 2:\n  2026-09-25T09:42:00 250 kcal 32 min",
+  );
   assert.equal(
     fetchError({
       message: "m",

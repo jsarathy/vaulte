@@ -58,7 +58,7 @@ export async function fetchSessions(urls, polar) {
 
 /** One session with the heart rate of the matching recent exercise, if it has none itself. */
 const withHr = (s, list) => {
-  const match = s.hr_samples ? null : matchExercise(list, s.start_time);
+  const match = s.hr_samples ? null : matchExercise(list, s);
   return match ? { ...s, ...hrFromSampleSets(match.samples) } : s;
 };
 

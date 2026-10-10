@@ -8,6 +8,7 @@ import {
   hrChannel,
   listRecentExercises,
   matchExercise,
+  summariseList,
   outsideWindow,
 } from "./_polar/hrFetch.js";
 
@@ -31,10 +32,11 @@ const TOO_OLD = (attempts) =>
 /** The v3 list's match for the session: { data: { samples }, attempt } or { data: null, attempt }. */
 async function fromRecentList(session, headers) {
   const { attempt, list } = await listRecentExercises(headers);
-  const match = list && matchExercise(list, session.start_time);
+  const match = list && matchExercise(list, session);
+  const seen = match || !list ? {} : { seen: summariseList(list) };
   return {
     data: match ? { samples: match.samples } : null,
-    attempt: { ...attempt, matched: !!match },
+    attempt: { ...attempt, matched: !!match, ...seen },
   };
 }
 
