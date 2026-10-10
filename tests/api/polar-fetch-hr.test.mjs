@@ -24,7 +24,8 @@ const stubPolar = (routes) => {
     const u = String(url);
     if (!u.includes("polaraccesslink.com")) return realFetch(url, opts);
     calls.push({ url: u, headers: opts.headers });
-    const r = routes[u];
+    const route = routes[u];
+    const r = typeof route === "function" ? route(opts) : route;
     if (r === undefined) throw new Error(`unexpected Polar call ${u}`);
     if (r instanceof Error) throw r;
     return {
@@ -137,7 +138,7 @@ test("no Polar identifiers: nothing is tried but the recent list, which finds no
   assert.equal(r.statusCode, 502);
   assert.equal(r.body.error, "samples_unavailable");
   assert.deepEqual(r.body.attempts, [
-    { url: V3, status: 200, ok: true, listed: 0, matched: false, seen: [] },
+    { url: V3, status: 200, ok: true, listed: 0, matched: false, auth: "user token", seen: [] },
   ]);
   assert.deepEqual(
     calls.map((c) => c.url),
@@ -160,7 +161,7 @@ test("502 with the attempts when every URL fails (error, empty body, bad JSON, t
   assert.deepEqual(r.body.attempts, [
     { url: BY_USER(777), status: 500, ok: false, detail: "boom" },
     { url: `${EX_URL}/samples`, status: 200, ok: false, detail: "(empty body)" },
-    { url: V3, status: 403, ok: false, detail: "consents", matched: false },
+    { url: V3, status: 403, ok: false, detail: "consents", auth: "user token", matched: false },
   ]);
   assert.equal((await read(SESSION)).hr_samples, undefined);
 
@@ -173,7 +174,7 @@ test("502 with the attempts when every URL fails (error, empty body, bad JSON, t
   assert.equal(r.statusCode, 502);
   assert.deepEqual(r.body.attempts, [
     { url: BY_USER(777), status: 200, ok: false, detail: "<html>not json" },
-    { url: V3, status: 200, ok: false, detail: "x", matched: false },
+    { url: V3, status: 200, ok: false, detail: "x", auth: "user token", matched: false },
   ]);
 
   stubPolar({ [BY_USER(777)]: new Error("socket hang up") }); // a thrown fetch → 500
@@ -314,4 +315,32 @@ test("recent list (v3): an hour-off clock still matches on the same calories and
   assert.equal(last.matched, false);
   assert.equal(last.listed, 1);
   assert.deepEqual(last.seen, ["2026-09-25T09:42:00 400 kcal 45 min"]); // what Polar did list
+});
+
+test("recent list (v3): with the client credentials too, only this Polar user's exercise is used", async () => {
+  Object.assign(process.env, { POLAR_CLIENT_ID: "cid", POLAR_CLIENT_SECRET: "sec" });
+  try {
+    await seed({ start_time: "2026-10-01T07:00:00" });
+    await connect();
+    const basic = `Basic ${Buffer.from("cid:sec").toString("base64")}`;
+    const other = {
+      ...listed("2026-10-01T07:00:00", "11,12,13"),
+      polar_user: `${POLAR}/v3/users/999`,
+    };
+    const mine = { ...listed("2026-10-01T07:00:20"), polar_user: `${POLAR}/v3/users/777` };
+    stubPolar({
+      ...FAIL_URLS,
+      [V3]: (opts) => ok(opts.headers.Authorization === basic ? [other, mine] : []), // user token: empty
+    });
+    const r = await call({ userId: UID, sessionId: SID });
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(r.body.hr_samples, [80, null, 90]); // not the other user's 11,12,13
+    assert.deepEqual(
+      calls.filter((c) => c.url === V3).map((c) => c.headers.Authorization === basic),
+      [false, true], // the user's token first, then the client credentials
+    );
+  } finally {
+    delete process.env.POLAR_CLIENT_ID;
+    delete process.env.POLAR_CLIENT_SECRET;
+  }
 });

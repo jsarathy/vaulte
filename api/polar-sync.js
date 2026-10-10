@@ -21,7 +21,7 @@ async function syncUser(userId) {
   const urls = await polar.listExercises(tx.id);
   if (!urls) return reply(502, { error: "Failed to list exercises" });
   const fetched = await fetchSessions(urls, polar); // before the commit: Polar forgets them after
-  const sessions = await fillMissingHr(fetched, polar.auth);
+  const sessions = await fillMissingHr(fetched, polar.auth, polar.polar_user_id);
   await polar.commitTransaction(tx.id);
   await saveSessions(db, userId, sessions);
   return reply(200, { newSessions: sessions.length, sessions });

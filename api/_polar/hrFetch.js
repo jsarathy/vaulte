@@ -120,3 +120,56 @@ export function outsideWindow(session, now = Date.now()) {
   const since = session.fetched_at || session.start_time;
   return since ? now - asTime(since) > WINDOW_DAYS * 86400000 : false;
 }
+
+/** Basic auth with the app's client id and secret (the /v3/exercises list is client-level, with a
+ *  polar_user on each exercise); null when they are not set. */
+export function clientHeaders(env = process.env) {
+  const { POLAR_CLIENT_ID: id, POLAR_CLIENT_SECRET: secret } = env;
+  if (!id || !secret) return null;
+  return {
+    Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+    Accept: "application/json",
+  };
+}
+
+/** The exercises of one Polar user (each carries a polar_user URL); all when the user is unknown. */
+export const ofUser = (list, polarUserId) =>
+  polarUserId
+    ? list.filter((ex) => !ex.polar_user || String(ex.polar_user).endsWith(`/${polarUserId}`))
+    : list;
+
+const withSeen = ({ attempt, auth, mine, match }) => ({
+  ...attempt,
+  auth,
+  matched: !!match,
+  ...(match || !mine ? {} : { seen: summariseList(mine) }),
+});
+
+/** One credential's list searched for the session: { match, attempt }. */
+async function searchList(listing, auth, { session, polarUserId }) {
+  const { attempt, list } = await listing;
+  const mine = list && ofUser(list, polarUserId);
+  const match = mine && matchExercise(mine, session);
+  return { match, attempt: withSeen({ attempt, auth, mine, match }) };
+}
+
+/** Looks sessions up in the recent list, with the user's token then the client credentials. Each
+ *  list is fetched once however many sessions are looked up. find(session) → { match, attempts }. */
+export function recentFinder(userHeaders, polarUserId) {
+  const tries = [
+    ["user token", userHeaders],
+    ["client credentials", clientHeaders()],
+  ].filter(([, headers]) => headers);
+  const listings = tries.map(([auth, headers]) => [auth, listRecentExercises(headers)]);
+  return {
+    async find(session) {
+      const attempts = [];
+      for (const [auth, listing] of listings) {
+        const found = await searchList(listing, auth, { session, polarUserId });
+        attempts.push(found.attempt);
+        if (found.match) return { match: found.match, attempts };
+      }
+      return { match: null, attempts };
+    },
+  };
+}
