@@ -136,7 +136,9 @@ test("no Polar identifiers: nothing is tried but the recent list, which finds no
   const r = await call({ userId: UID, sessionId: SID });
   assert.equal(r.statusCode, 502);
   assert.equal(r.body.error, "samples_unavailable");
-  assert.deepEqual(r.body.attempts, [{ url: V3, status: 200, ok: true, matched: false }]);
+  assert.deepEqual(r.body.attempts, [
+    { url: V3, status: 200, ok: true, listed: 0, matched: false, seen: [] },
+  ]);
   assert.deepEqual(
     calls.map((c) => c.url),
     [V3],
@@ -290,4 +292,26 @@ test("values: non-numbers become null after the first beat; the channel key may 
     hr_samples: [65, null, null, 70, null],
     recording_rate_s: 2,
   });
+});
+
+test("recent list (v3): an hour-off clock still matches on the same calories and duration; a different effort does not", async () => {
+  await seed({ start_time: "2026-09-25T10:42:00", calories: 250, duration_min: 32 });
+  await connect();
+  const at = (start, calories, duration) => ({ ...listed(start), calories, duration });
+  stubPolar({
+    ...FAIL_URLS,
+    [V3]: ok([at("2026-09-25T09:42:00", 400, "PT45M"), at("2026-09-25T09:42:10", 250, "PT32M20S")]),
+  });
+  let r = await call({ userId: UID, sessionId: SID });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.body.hr_samples, [80, null, 90]);
+
+  stubPolar({ ...FAIL_URLS, [V3]: ok([at("2026-09-25T09:42:00", 400, "PT45M")]) });
+  await seed({ start_time: "2026-09-25T10:42:00", calories: 250, duration_min: 32 });
+  r = await call({ userId: UID, sessionId: SID });
+  assert.equal(r.statusCode, 502);
+  const last = r.body.attempts.at(-1);
+  assert.equal(last.matched, false);
+  assert.equal(last.listed, 1);
+  assert.deepEqual(last.seen, ["2026-09-25T09:42:00 400 kcal 45 min"]); // what Polar did list
 });
