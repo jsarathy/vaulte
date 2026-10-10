@@ -246,6 +246,7 @@ export const CLEAN_FILES = [
   "src/lib/referenceDiet.js",
   "src/styles/compareStyles.js",
   "src/components/CompareDays.jsx",
+  "src/components/CompareTable.jsx",
   "src/components/ReferenceCalculator.jsx",
   "src/tabs/CompareTab.jsx",
   "api/_polar/hrFetch.js",

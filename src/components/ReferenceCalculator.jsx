@@ -1,7 +1,9 @@
 // src/components/ReferenceCalculator.jsx — the Compare tab's Reference Diet Calculator: sex /
 // age / height / weight, protein and fat targets, BMR (Mifflin-St Jeor) and a row per activity level
-import { C } from "../constants/design";
+import { useState } from "react";
 import { useIsPhone } from "../hooks/useIsPhone.js";
+import PillButton from "./PillButton.jsx";
+import PhonePopup from "./PhonePopup.jsx";
 import { bmr, activityRows } from "../lib/referenceDiet";
 import {
   calcPaneStyle,
@@ -114,17 +116,10 @@ function TargetFields({ p }) {
   );
 }
 
-// Phone: full width under the days instead of a 290 px column beside them
-const PHONE_PANE = {
-  ...calcPaneStyle,
-  width: "auto",
-  borderLeft: "none",
-  borderTop: `0.5px solid ${C.border}`,
-  overflowY: "visible",
-};
+// Phone: a pill at the top of the tab; the calculator opens as a pop-up card
+const PILL_ROW = { padding: "10px 10px 0", flex: "none" };
 
-export default function ReferenceCalculator({ p }) {
-  const phone = useIsPhone();
+function CalculatorBody({ p }) {
   const BMR = bmr({ sex: p.calcSex, age: p.calcAge, height: p.calcHeight, weight: p.calcWeight });
   const rows = activityRows(BMR, {
     weight: p.calcWeight,
@@ -132,8 +127,7 @@ export default function ReferenceCalculator({ p }) {
     fatPct: p.calcFatPct,
   });
   return (
-    <div style={phone ? PHONE_PANE : calcPaneStyle}>
-      <div style={calcTitleStyle}>Reference calculator</div>
+    <>
       <BodyFields p={p} />
       <TargetFields p={p} />
       <div style={bmrStyle}>
@@ -145,6 +139,28 @@ export default function ReferenceCalculator({ p }) {
           <ActivityLevel key={i} row={row} first={i === 0} />
         ))}
       </div>
+    </>
+  );
+}
+
+export default function ReferenceCalculator({ p }) {
+  const phone = useIsPhone();
+  const [open, setOpen] = useState(false);
+  if (!phone)
+    return (
+      <div style={calcPaneStyle}>
+        <div style={calcTitleStyle}>Reference calculator</div>
+        <CalculatorBody p={p} />
+      </div>
+    );
+  return (
+    <div style={PILL_ROW}>
+      <PillButton onClick={() => setOpen(true)}>Reference calculator</PillButton>
+      {open && (
+        <PhonePopup title="Reference calculator" onClose={() => setOpen(false)}>
+          <CalculatorBody p={p} />
+        </PhonePopup>
+      )}
     </div>
   );
 }
