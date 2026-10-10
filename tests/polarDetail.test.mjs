@@ -71,6 +71,27 @@ test("heart rate: shown, fetchable, errors", () => {
   assert.equal(fetchError({ message: "m", error: "e" }), "m");
   assert.equal(fetchError({ error: "e" }), "e");
   assert.equal(fetchError({}), "Failed to fetch HR data.");
+  assert.equal(fetchError({ message: "m", attempts: [] }), "m");
+  assert.equal(
+    fetchError({
+      message: "m",
+      attempts: [
+        {
+          url: "https://www.polaraccesslink.com/v3/users/7/exercises/3/samples",
+          status: 404,
+          ok: false,
+          detail: "gone",
+        },
+        {
+          url: "https://www.polaraccesslink.com/v3/exercises?samples=true",
+          status: 200,
+          ok: true,
+          matched: false,
+        },
+      ],
+    }),
+    "m\nPolar answered:\n/v3/users/7/exercises/3/samples: 404 gone\n/v3/exercises: 200 (no session at that time)",
+  );
 });
 
 test("chart: scale, line, average and zones", () => {

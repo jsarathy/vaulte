@@ -306,7 +306,7 @@
     "DIV | background: rgb(249, 250, 251); border-radius: 6px; border: 0.5px solid rgb(229, 231, 235); padding: 16px; text-align: center;",
     "DIV | font-size: 12px; color: rgb(107, 114, 128); margin-bottom: 12px; | \"Heart rate data wasn't captured at sync time.\"",
     "BUTTON | background: rgb(55, 138, 221); color: rgb(255, 255, 255); border: none; border-radius: 6px; padding: 8px 18px; cursor: pointer; font-size: 12px; font-weight: 500; font-family: \"DM Sans\", system-ui, sans-serif; | \"Fetch HR data\"",
-    "DIV | font-size: 11px; color: rgb(198, 40, 40); margin-top: 8px; | \"Polar says no\""
+    "DIV | font-size: 11px; color: rgb(198, 40, 40); margin-top: 8px; white-space: pre-line; overflow-wrap: anywhere; | \"Polar says no\""
   ],
   "fetched": [
     "DIV | position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.4); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;",

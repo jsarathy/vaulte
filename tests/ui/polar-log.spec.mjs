@@ -340,7 +340,20 @@ test("a session without heart rate can fetch it from the log box, logged or not 
   page: p,
 }) => {
   const requests = [];
-  let reply = { status: 404, json: { message: "Polar says no" } };
+  let reply = {
+    status: 502,
+    json: {
+      message: "Polar says no",
+      attempts: [
+        {
+          url: "https://www.polaraccesslink.com/v3/exercises?samples=true",
+          status: 403,
+          ok: false,
+          detail: "consents",
+        },
+      ],
+    },
+  };
   await start(p, [{ ...WALK, hr_samples: null, logged: true }]);
   await p.route("**/api/polar-fetch-hr", (r) => {
     requests.push(JSON.parse(r.request().postData()));
@@ -353,6 +366,7 @@ test("a session without heart rate can fetch it from the log box, logged or not 
   const fetchBtn = box(p).getByRole("button", { name: "Fetch HR data" });
   await fetchBtn.click();
   await expect(box(p).getByText("Polar says no")).toBeVisible();
+  await expect(box(p).getByText("/v3/exercises: 403 consents")).toBeVisible(); // what Polar answered (Fix 61)
   expect(requests).toEqual([{ userId: "u", sessionId: "p4" }]);
   reply = { status: 200, json: { hr_samples: [90, 100, 110, 120, 130], recording_rate_s: 30 } };
   await fetchBtn.click();

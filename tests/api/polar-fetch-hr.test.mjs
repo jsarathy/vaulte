@@ -156,9 +156,9 @@ test("502 with the attempts when every URL fails (error, empty body, bad JSON, t
   assert.equal(r.body.error, "samples_unavailable");
   assert.match(r.body.message, /^Polar returned no HR sample data\. .*Reconnect button\.$/);
   assert.deepEqual(r.body.attempts, [
-    { url: BY_USER(777), status: 500, ok: false },
-    { url: `${EX_URL}/samples`, status: 200, ok: false },
-    { url: V3, status: 403, ok: false, matched: false },
+    { url: BY_USER(777), status: 500, ok: false, detail: "boom" },
+    { url: `${EX_URL}/samples`, status: 200, ok: false, detail: "(empty body)" },
+    { url: V3, status: 403, ok: false, detail: "consents", matched: false },
   ]);
   assert.equal((await read(SESSION)).hr_samples, undefined);
 
@@ -170,8 +170,8 @@ test("502 with the attempts when every URL fails (error, empty body, bad JSON, t
   r = await call({ userId: UID, sessionId: SID });
   assert.equal(r.statusCode, 502);
   assert.deepEqual(r.body.attempts, [
-    { url: BY_USER(777), status: 200, ok: false },
-    { url: V3, status: 200, ok: false, matched: false },
+    { url: BY_USER(777), status: 200, ok: false, detail: "<html>not json" },
+    { url: V3, status: 200, ok: false, detail: "x", matched: false },
   ]);
 
   stubPolar({ [BY_USER(777)]: new Error("socket hang up") }); // a thrown fetch → 500
