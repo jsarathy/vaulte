@@ -145,7 +145,7 @@ test("polar log box: header, stats, chart and zones", async ({ page: p }) => {
     ["Duration", "0 min"],
     ["Calories", "150 kcal"],
   ]);
-  await expect(box(p).getByText(/Heart rate/)).toHaveCount(0);
+  await expect(box(p).getByText(/Heart rate ·/)).toHaveCount(0);
   // backdrop closes; a click inside doesn't
   await box(p).getByText("Calories").click();
   await expect(box(p)).toHaveCount(1);
@@ -334,4 +334,41 @@ test("an already-logged session shows where it went, with no slot picker (Fix 51
   await expect(box(p).getByRole("button", { name: "Log session" })).toHaveCount(0);
   await box(p).getByRole("button", { name: "Close" }).click();
   await expect(box(p)).toHaveCount(0);
+});
+
+test("a session without heart rate can fetch it from the log box, logged or not (Fix 60)", async ({
+  page: p,
+}) => {
+  const requests = [];
+  let reply = { status: 404, json: { message: "Polar says no" } };
+  await start(p, [{ ...WALK, hr_samples: null, logged: true }]);
+  await p.route("**/api/polar-fetch-hr", (r) => {
+    requests.push(JSON.parse(r.request().postData()));
+    r.fulfill({ status: reply.status, json: reply.json });
+  });
+  await p.getByRole("button", { name: "Browse all sessions" }).click();
+  await p.getByText("logged", { exact: true }).click();
+  await expect(box(p).getByText("Already logged")).toBeVisible();
+  await expect(box(p).getByText("Heart rate data wasn't captured at sync time.")).toBeVisible();
+  const fetchBtn = box(p).getByRole("button", { name: "Fetch HR data" });
+  await fetchBtn.click();
+  await expect(box(p).getByText("Polar says no")).toBeVisible();
+  expect(requests).toEqual([{ userId: "u", sessionId: "p4" }]);
+  reply = { status: 200, json: { hr_samples: [90, 100, 110, 120, 130], recording_rate_s: 30 } };
+  await fetchBtn.click();
+  await expect(box(p).getByText(/^Heart rate · /)).toBeVisible();
+  await expect(fetchBtn).toHaveCount(0);
+});
+
+test("an unlogged session without heart rate offers the fetch too; none without a start time", async ({
+  page: p,
+}) => {
+  await start(p, [{ ...RIDE, hr_samples: null }, PLAIN]);
+  await row(p, "Indoor Cycling").click();
+  await expect(box(p).getByRole("button", { name: "Fetch HR data" })).toBeVisible();
+  await expect(slot(p)).toBeVisible(); // still logs as before
+  await box(p).getByRole("button", { name: "Cancel" }).click();
+  await row(p, "Exercise").click(); // PLAIN: a date only, no start time, no Polar ids
+  await expect(box(p).getByText("Heart rate data wasn't captured at sync time.")).toBeVisible();
+  await expect(box(p).getByRole("button", { name: "Fetch HR data" })).toHaveCount(0);
 });

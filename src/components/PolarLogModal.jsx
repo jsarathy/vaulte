@@ -1,7 +1,11 @@
 // src/components/PolarLogModal.jsx — "log a Polar session": the session's stats and heart rate,
 // a meal slot, and Log session. Render only; state and logging in usePolarLog.
 import { C, FONT, border } from "../constants/design.jsx";
+import { useState } from "react";
 import { sessionStats, sessionWhen, sportName, loggedPlace } from "../lib/polarLog.js";
+import { canFetchHeartRate, hasHeartRate } from "../lib/polarDetail.js";
+import { useHeartRateFetch } from "../hooks/usePolarDetail.js";
+import NoHeartRate from "./NoHeartRate";
 import { usePolarLog } from "../hooks/usePolarLog";
 import PolarHRSparkline from "./PolarHRSparkline";
 
@@ -165,16 +169,31 @@ function Actions({ log, logged, onClose }) {
   );
 }
 
+// The heart-rate chart, or (Fix 60) a button to fetch it from Polar; Polar finds a session by its
+// start time, so any session with one can be tried
+function HeartRate({ session, hr }) {
+  if (hasHeartRate(session)) return <PolarHRSparkline session={session} />;
+  const canFetch = Boolean(session.start_time) || canFetchHeartRate(session);
+  return (
+    <div style={{ marginBottom: "14px" }}>
+      <NoHeartRate hr={hr} canFetch={canFetch} />
+    </div>
+  );
+}
+
 function LogBox(props) {
   const log = usePolarLog(props);
-  const { session, onClose, allDays } = props;
+  const [fetched, setFetched] = useState(null);
+  const { onClose, allDays, userId } = props;
+  const session = fetched || props.session;
+  const hr = useHeartRateFetch(session, userId, setFetched);
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()} style={S.backdrop}>
       <div style={S.box}>
         <Header session={session} onClose={onClose} />
         <div style={{ padding: "14px 16px" }}>
           <Stats session={session} />
-          <PolarHRSparkline session={session} />
+          <HeartRate session={session} hr={hr} />
           {session.logged ? (
             <LoggedNote session={session} allDays={allDays} />
           ) : (
