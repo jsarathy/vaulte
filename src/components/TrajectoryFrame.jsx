@@ -1,6 +1,6 @@
 // src/components/TrajectoryFrame.jsx — a Trajectory panel's frame (Weight and Body tabs): heading
 // with the metric tabs, and the chart box. Double-click fills the screen (the heading moves inside);
-// Esc or double-click collapses. Render only; chart = useTrajectoryChart().
+// a second double-click collapses it. Render only; chart = useTrajectoryChart().
 import { createPortal } from "react-dom";
 
 const S = {
@@ -44,9 +44,7 @@ function ExpandedHeading({ tabs, nowrap, touch, menu }) {
         {menu ?? <span style={unwrapped(S.fullTitle, nowrap)}>📉 Trajectory</span>}
         {menu ? null : tabs}
       </div>
-      <span style={S.hint}>
-        {touch ? "Double-tap to close" : "Esc or double-click to collapse"}
-      </span>
+      <span style={S.hint}>{touch ? "Double-tap to close" : "Double-click to collapse"}</span>
     </div>
   );
 }
@@ -56,7 +54,7 @@ function ExpandedHeading({ tabs, nowrap, touch, menu }) {
  * menu: replaces the title and metric tabs with a drop-down. children: the chart.
  */
 export default function TrajectoryFrame({ chart, tabs, nowrap, touch, menu, children }) {
-  const hint = touch ? "Double-tap to close" : "Double-click or press Esc to collapse";
+  const hint = touch ? "Double-tap to close" : "Double-click to collapse";
   const box = (
     <div
       onDoubleClick={chart.toggleFull}

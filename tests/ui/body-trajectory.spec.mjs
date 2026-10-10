@@ -131,9 +131,9 @@ test("measurement pills: all twelve, Waist first chosen; notes only when expande
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
 
   await frame(p).dblclick({ position: { x: 150, y: 150 } });
-  await expect(frame(p)).toHaveAttribute("title", "Double-click or press Esc to collapse");
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
   await pill(p, "Chest").dblclick(); // inside the panel now: still not a toggle
-  await expect(frame(p)).toHaveAttribute("title", "Double-click or press Esc to collapse");
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
   await pill(p, "Chest").hover();
   await expect(note(p, "Chest")).toHaveText(
     "Chest (cm)Around the fullest part of the chest at nipple level, tape under the armpits and level across the back. Read it after a normal breath out.",
@@ -171,7 +171,7 @@ test("empty state: fewer than two readings of the chosen site", async ({ page: p
   expect(
     await p.getByText("Needs at least two R-Thigh readings").evaluate((d) => d.style.height),
   ).toBe("70dvh");
-  await p.keyboard.press("Escape");
+  await frame(p).dblclick();
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   expect(errs).toEqual([]);
 });
@@ -202,7 +202,7 @@ test("expand, scroll to the latest reading, hover, collapse", async ({ page: p }
   const LATE = { id: "2027-03-01", waist: 95.5, hip: 101 };
   await start(p, [...ROWS, LATE]);
   await frame(p).dblclick({ position: { x: 150, y: 150 } });
-  await expect(p.getByText("Esc or double-click to collapse")).toBeVisible();
+  await expect(p.getByText("Double-click to collapse", { exact: true })).toBeVisible();
   await expect(heading(p)).toHaveCount(1); // the heading moves into the panel
   expect(await heading(p).getAttribute("style")).toBe(
     "font-size: 16px; font-weight: bold; color: rgb(24, 95, 165); white-space: nowrap;",
@@ -244,16 +244,17 @@ test("expand, scroll to the latest reading, hover, collapse", async ({ page: p }
   await expect(chartSvg(p).locator("g[style] > text")).toHaveText("01/03/2027 · 101.0 cm");
   matchGolden("hip-expanded-hover-last", await shape(p));
 
-  await p.keyboard.press("Escape");
+  await frame(p).dblclick({ position: { x: 300, y: 300 } });
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   const radii = await chartSvg(p)
     .locator('circle[fill="#378ADD"]')
     .evaluateAll((cs) => [...new Set(cs.map((c) => c.getAttribute("r")))]);
   expect(radii).toHaveLength(1);
   await frame(p).dblclick({ position: { x: 150, y: 150 } });
-  await frame(p).dblclick({ position: { x: 300, y: 300 } });
-  await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
+  // Esc no longer collapses; a double-click does
   await p.keyboard.press("Escape");
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
+  await frame(p).dblclick({ position: { x: 300, y: 300 } });
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   expect(errs).toEqual([]);
 });
