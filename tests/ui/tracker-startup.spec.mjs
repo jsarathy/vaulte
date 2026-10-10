@@ -301,6 +301,7 @@ test("start-up: not signed in", async ({ page: p }) => {
   expect(await openDay(p)).toBe(null);
 });
 
+// The message lasts 6 s from page load; on a slow CI shard the lazy Add entry tab can arrive late.
 test("returning from Polar sign-in", async ({ page: p }) => {
   await start(p, FULL, "/tracker.html?polar=connected&x=1", false);
   await p.getByText("October 2026").waitFor();
