@@ -1,6 +1,6 @@
 // tests/ui/saved-recipes.spec.mjs — the Saved Recipes list (Fix 26 PR 9): row details, singular
 // delete wording, notices (replaced, cleared by × but not by the backdrop), empty list.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const BASE = {
   id: "sb",

@@ -3,7 +3,7 @@
 // 2-wk Loss, row shading, past / current rows) pinned in tests/ui/fixtures/weight-log-table.json,
 // and editing Wk / Dose / Actual (saved per change; failures logged).
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test weight-log-table
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/weight-log-table.json", import.meta.url);

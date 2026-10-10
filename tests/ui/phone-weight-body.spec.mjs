@@ -2,7 +2,7 @@
 // 390 x 844 in the signed-in page: the log, chart and plan / measurement boxes stacked in one
 // column, nothing past the right edge (the log tables scroll sideways inside their frames),
 // and the table frames sized to the visible height (dvh).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const WEIGHT = [
   { id: "2026-08-17", week: 0, dose: "2.5mg", actual: 84.2 },

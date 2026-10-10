@@ -1,7 +1,7 @@
 // tests/ui/recipe-portion-modal.spec.mjs — the "How much?" box for adding a saved recipe (Fix 26 PR 5)
 // Pins the box's behaviour before it moves out of AddEntry: labels, live scaling, Claude
 // fallback states, reset on open, closing, and what is loaded into the form.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const DAL = {
   id: "p1",

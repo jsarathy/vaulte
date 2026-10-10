@@ -1,7 +1,7 @@
 // tests/ui/compare-tab.spec.mjs — the Compare tab (Fix 26 PR 40): the five day columns (kcal and
 // macro rows, "—" for an empty slot, swapping a day by date via the prompt) and the Reference
 // calculator (inputs, BMR by Mifflin-St Jeor for each sex, the activity rows' TDEE and macros).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const P = (x) => `users/u/${x}`;
 const item = (name, kcal, m = {}) => ({ id: name, name, kcal, ...m });

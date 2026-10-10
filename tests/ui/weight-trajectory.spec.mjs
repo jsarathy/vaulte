@@ -4,7 +4,7 @@
 // reading, re-fitting on resize, and the expanded view's hover label.
 // Re-record the drawings only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test
 // weight-trajectory (then review the JSON diff).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/weight-trajectory.json", import.meta.url);

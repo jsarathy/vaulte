@@ -2,7 +2,7 @@
 // bubble, dragging by the header, resizing from every edge and corner (clamped to the display and
 // the minimum size, remembered in localStorage), re-fitting on a browser resize, the header
 // buttons, the message-count line, Enter / Shift+Enter, placeholders and the date / meal bar.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const P = (x) => `users/u/${x}`;
 const start = async (p, init = {}, viewport) => {

@@ -1,7 +1,7 @@
 // tests/ui/tracker-actions.spec.mjs — NutritionTracker's own actions (Fix 26 PR 19): saving a
 // day (Compare slots follow), deleting an entry, switching day, calendar clicks per tab, the
 // sidebar's 7-day average and streak, weight plan save, Renpho sync, purge, and Polar sync.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const P = (x) => `users/u/${x}`;
 const day = (date, kcal, id = "m" + date) => ({

@@ -1,6 +1,6 @@
 // tests/ui/recipe-propagation.spec.mjs — Fix 22 — dependent recipes update automatically
 // Converted from the one-off browser check used when the fix shipped; kept so it re-runs on every PR.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test("Fix 22 — dependent recipes update automatically", async ({ page: p }) => {
   const errs = [];

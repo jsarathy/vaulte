@@ -2,7 +2,7 @@
 // (Fix 26 PR 6): dependents notice, Save disabled while recalculating, edits don't touch the
 // saved copy until Save, whitespace-only changes don't need a recalculation, new ids, and
 // Claude recipes without a usable portion weight.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const A = {
   id: "ra",

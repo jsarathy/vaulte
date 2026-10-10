@@ -3,7 +3,7 @@
 // the two columns stacked, nothing past the right edge, inputs at 16 px (no zoom when typing on
 // an iPhone), the boxes inside the window, thumb-sized recipe buttons, and the recipe grids
 // narrowed in the recipe view (3 columns; the editor's 4 is not covered).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const SOUP = {
   id: "r1",

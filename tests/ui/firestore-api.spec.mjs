@@ -1,7 +1,7 @@
 // tests/ui/firestore-api.spec.mjs — src/api/firestore.js over the harness's Firestore mock
 // (Fix 26 PR 43): recipes and days read / saved / deleted at their paths, read failures
 // logged and empty, and the seed data for a new account (pinned to fixtures/seed-days.json).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync } from "node:fs";
 
 const GOLDEN = JSON.parse(readFileSync(new URL("./fixtures/seed-days.json", import.meta.url)));

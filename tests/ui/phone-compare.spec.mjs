@@ -1,7 +1,7 @@
 // tests/ui/phone-compare.spec.mjs — the Compare tab on a phone (Fix 43.8), at 390 x 844 in the
 // signed-in page: the Reference calculator is a pill at the top that opens a pop-up card (Fix 58), the five days are
 // ONE card with the macro names once down the left, and nothing sticks out past the right edge.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const DAYS = ["2026-10-04", "2026-10-03", "2026-10-02", "2026-10-01", "2026-09-30"].map(
   (date, i) => ({

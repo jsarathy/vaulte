@@ -2,7 +2,7 @@
 // days (or seeded days), saved recipes, calculator inputs (and saving them), weight plan,
 // weight and body logs, chat history, Polar connection and sessions, failures, and the
 // ?polar=connected / ?polar=error return from Polar's sign-in.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const P = (x) => `users/u/${x}`;
 const FULL = {

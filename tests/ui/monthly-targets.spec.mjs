@@ -1,5 +1,5 @@
 // tests/ui/monthly-targets.spec.mjs — Monthly targets form (Fix 14), pinned before the Fix 26 refactor.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const OCT = "users/u/monthly_targets/2026-10";
 const NOV = "users/u/monthly_targets/2026-11";

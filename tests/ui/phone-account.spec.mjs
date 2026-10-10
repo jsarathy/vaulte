@@ -1,6 +1,6 @@
 // tests/ui/phone-account.spec.mjs — My Account on a phone (Fix 43.10): DETAILS and CONNECTED
 // SERVICES start closed, open on tap and use the full width. Desktop shows everything as before.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const user = {
   firstName: "Jane",

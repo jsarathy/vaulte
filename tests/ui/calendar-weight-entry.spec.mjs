@@ -1,7 +1,7 @@
 // tests/ui/calendar-weight-entry.spec.mjs — the sidebar calendar and the weight entry box
 // (Fix 26 PR 16): month grid, day marks, month paging, and adding / editing / deleting a
 // weight_log row from the Weight tab.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const start = async (p, init = {}) => {
   await p.route(

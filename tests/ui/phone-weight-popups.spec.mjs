@@ -3,7 +3,7 @@
 // plan open as pop-ups on a tap; the Trajectory fills the screen on a double tap and closes on
 // another double tap, a single tap on a reading shows its value, and the metrics are a drop-down
 // under the Trajectory heading.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const WEIGHT = [
   { id: "2026-08-17", week: 0, dose: "2.5mg", actual: 84.2, renpho: { bmi: 31, bodyfat: 30 } },

@@ -1,7 +1,7 @@
 // tests/ui/image-utils.spec.mjs — src/utils/imageUtils.js in a real browser (Fix 26 PR 42):
 // HEIC/HEIF conversion (by type or name; heic2any mocked), reducing wide images to 1200 px,
 // JPEG output, load and compression failures, base64 for the API and blob: previews.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const start = async (p) => {
   await p.goto("/imageutils.html");

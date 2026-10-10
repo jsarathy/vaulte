@@ -1,7 +1,7 @@
 // tests/ui/phone-shell.spec.mjs — the signed-in page on a phone (Fix 43.4): the Nutrition link
 // stays on screen, the tracker fills the space, the five tabs scroll sideways and the calendar
 // sidebar sits behind a "Days" button. Desktop keeps its sidebar (no Days button).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const signedIn = {
   __authUser: { uid: "u", email: "jane@example.com" },
