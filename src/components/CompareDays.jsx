@@ -4,6 +4,7 @@ import { useIsPhone } from "../hooks/useIsPhone.js";
 import { fmt, formatDateShort, getDayTotals } from "../constants/helpers";
 import { C } from "../constants/design";
 import { MACRO_ROWS, slotDay, swapSlot } from "../lib/referenceDiet";
+import CompareTable from "./CompareTable";
 import {
   daysPaneStyle,
   daysTitleStyle,
@@ -58,14 +59,8 @@ function DayColumn({ date, day, onPick }) {
   );
 }
 
-// Phone: the five days scroll sideways, 150 px each
+// Phone: the days are one card (CompareTable), not five
 const PHONE_PANE = { ...daysPaneStyle, flex: "none", overflowY: "visible", padding: "10px" };
-const PHONE_GRID = {
-  ...daysGridStyle,
-  gridTemplateColumns: "repeat(5,150px)",
-  overflowX: "auto",
-  paddingBottom: "6px",
-};
 
 export default function CompareDays({ slots, data, allDays, setSlots, setData }) {
   const todayStr = new Date().toISOString().split("T")[0];
@@ -83,16 +78,23 @@ export default function CompareDays({ slots, data, allDays, setSlots, setData })
         <div style={daysTitleStyle}>Compare days</div>
         <div style={daysHintStyle}>Click a date to swap it out</div>
       </div>
-      <div style={phone ? PHONE_GRID : daysGridStyle}>
-        {slots.map((date, idx) => (
-          <DayColumn
-            key={idx}
-            date={date}
-            day={slotDay(date, allDays, data[idx])}
-            onPick={() => pick(idx)}
-          />
-        ))}
-      </div>
+      {phone ? (
+        <CompareTable
+          days={slots.map((date, idx) => ({ date, day: slotDay(date, allDays, data[idx]) }))}
+          onPick={pick}
+        />
+      ) : (
+        <div style={daysGridStyle}>
+          {slots.map((date, idx) => (
+            <DayColumn
+              key={idx}
+              date={date}
+              day={slotDay(date, allDays, data[idx])}
+              onPick={() => pick(idx)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

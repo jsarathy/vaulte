@@ -1,6 +1,6 @@
 // tests/ui/phone-compare.spec.mjs — the Compare tab on a phone (Fix 43.8), at 390 x 844 in the
-// signed-in page: the five days scroll sideways (150 px each), the Reference calculator sits
-// full-width under them, and nothing else sticks out past the right edge.
+// signed-in page: the Reference calculator is a pill at the top that opens a pop-up card (Fix 58), the five days are
+// ONE card with the macro names once down the left, and nothing sticks out past the right edge.
 import { test, expect } from "@playwright/test";
 
 const DAYS = ["2026-10-04", "2026-10-03", "2026-10-02", "2026-10-01", "2026-09-30"].map(
@@ -36,33 +36,43 @@ const start = async (p) => {
 };
 const box = (loc) => loc.evaluate((e) => e.getBoundingClientRect().toJSON());
 
-test("days scroll sideways, 150 px each; the calculator is full-width underneath", async ({
-  page: p,
-}) => {
+const pill = (p) => p.getByRole("button", { name: "Reference calculator", exact: true });
+const popup = (p) => p.getByRole("dialog", { name: "Reference calculator" });
+
+test("the calculator is a pill at the top that opens as a pop-up card", async ({ page: p }) => {
   await start(p);
-  const grid = p.getByText("Compare days").locator("xpath=../following-sibling::div[1]");
-  expect(await grid.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
-  expect((await box(grid)).right).toBeLessThanOrEqual(390);
-  const first = await box(p.getByText(/Sun,? 4 Oct/));
-  const second = await box(p.getByText(/Sat,? 3 Oct/));
-  expect(Math.round(second.left - first.left)).toBe(157); // 150 + the 7 px gap
-  const calc = await box(p.getByText("Reference calculator"));
-  expect(calc.top).toBeGreaterThan(first.top + 150); // under the days, not beside them
-  expect(calc.left).toBeLessThan(40);
+  await expect(p.getByText("Age", { exact: true })).toHaveCount(0);
+  expect((await box(pill(p))).top).toBeLessThan((await box(p.getByText("Compare days"))).top);
+  await pill(p).click();
+  await expect(popup(p)).toBeVisible();
+  await expect(popup(p).getByText("Age", { exact: true })).toBeVisible();
+  await expect(popup(p).getByText("BMR")).toBeVisible();
+  await popup(p).getByRole("button", { name: "Close" }).click();
+  await expect(popup(p)).toHaveCount(0);
 });
 
-test("nothing past the right edge outside the sideways-scrolling parts; the calculator works", async ({
-  page: p,
-}) => {
+test("one card: macro names once, a column per day", async ({ page: p }) => {
   await start(p);
-  const out = await p.evaluate(() =>
-    [...document.querySelectorAll("body *")]
-      .filter((e) => !e.closest("nav") && !e.closest("[style*='overflow-x: auto']"))
-      .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
-      .map((e) => e.tagName + " " + (e.textContent || "").slice(0, 30)),
-  );
-  expect(out).toEqual([]);
-  const age = p.getByText("Age", { exact: true }).locator("..").locator("input");
+  await expect(p.locator("table")).toHaveCount(1);
+  for (const name of ["kcal", "Fat", "Carbs", "Net C", "Fibre", "Protein", "Sugar"])
+    await expect(p.getByRole("rowheader", { name, exact: true })).toHaveCount(1);
+  await expect(p.locator("thead button")).toHaveCount(5);
+  await expect(p.getByRole("cell", { name: "400", exact: true })).toBeVisible();
+  await expect(p.getByRole("cell", { name: "600", exact: true })).toBeVisible();
+  const t = await box(p.locator("table"));
+  expect(t.left).toBeGreaterThanOrEqual(0);
+  expect(t.right).toBeLessThanOrEqual(390);
+  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test("tapping a date head swaps the day; the calculator still works", async ({ page: p }) => {
+  await start(p);
+  p.once("dialog", (d) => d.accept("2026-09-30"));
+  await p.locator("thead button").first().click();
+  await expect(p.locator("thead button").first()).toHaveText(/Wed,? 30 Sep/);
+  expect((await box(p.locator("thead button").first())).height).toBeGreaterThanOrEqual(40);
+  await pill(p).click();
+  const age = popup(p).getByText("Age", { exact: true }).locator("..").locator("input");
   await age.fill("40");
   await expect(age).toHaveValue("40");
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
