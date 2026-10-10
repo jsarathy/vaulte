@@ -18,7 +18,7 @@
     "spec-map": "node scripts/spec-map.mjs",
     "test:ui": "playwright test",
     "test:api": "npx --yes firebase-tools@15.32.1 emulators:exec --only firestore --project demo-vaulte \"npm run -s test:api:run\"",
-    "test:api:run": "node --test --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/api/github-reporter.mjs --test-reporter-destination=stdout tests/api/*.test.mjs",
+    "test:api:run": "node --test --experimental-test-coverage --test-coverage-include=\"api/**\" --test-concurrency=1 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/api/github-reporter.mjs --test-reporter-destination=stdout tests/api/*.test.mjs",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=tests/** tests/*.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
