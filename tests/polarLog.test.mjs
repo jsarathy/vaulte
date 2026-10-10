@@ -9,6 +9,7 @@ import {
   durationMin,
   sessionStats,
   polarExerciseItem,
+  loggedPlace,
 } from "../src/lib/polarLog.js";
 import { CHART, ZONES, heartRateChart } from "../src/lib/polarHeartRate.js";
 
@@ -139,4 +140,21 @@ test("heart-rate chart: scale, points, average, zones", () => {
     ZONES.map((z) => z.color),
     ["#B5D4F4", "#C0DD97", "#FAC775", "#F0997B", "#E24B4A"],
   );
+});
+
+test("loggedPlace: the day and meal a session went to; null when not stored", () => {
+  const days = [
+    { date: "2026-10-02", meals: [{ name: "Lunch", items: [{ id: "a" }] }] },
+    {
+      date: "2026-10-03",
+      meals: [
+        { name: "Breakfast", items: [] },
+        { name: "Exercise", items: [{ polar_session_id: "p1" }] },
+      ],
+    },
+    { date: "2026-10-04" },
+  ];
+  assert.deepEqual(loggedPlace(days, { id: "p1" }), { date: "2026-10-03", meal: "Exercise" });
+  assert.equal(loggedPlace(days, { id: "zz" }), null);
+  assert.equal(loggedPlace([], { id: "p1" }), null);
 });

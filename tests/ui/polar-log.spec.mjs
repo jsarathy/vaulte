@@ -37,16 +37,20 @@ const EDGES = {
 const PLAIN = { id: "p2", date: "2026-10-09", calories: 150 };
 const NODATE = { id: "p3", sport: "RUNNING", duration_min: 30, calories: 300, hr_samples: [100] };
 
-const start = async (p, sessions) => {
+const start = async (p, sessions, days = []) => {
   await p.route(
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
   await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
-  await p.addInitScript((ss) => {
-    window.__docs = { "users/u/polar/connection": { connected: true } };
-    window.__collections = { "users/u/polar_sessions": ss };
-  }, sessions);
+  await p.addInitScript(
+    ({ ss, days }) => {
+      window.__docs = { "users/u/polar/connection": { connected: true } };
+      window.__collections = { "users/u/polar_sessions": ss };
+      if (days.length) window.__days = days;
+    },
+    { ss: sessions, days },
+  );
   await p.goto("/tracker.html");
   await p.getByText("October 2026").waitFor();
   await p.getByRole("button", { name: "Add entry", exact: true }).click();
@@ -304,4 +308,30 @@ test("polar log box: a day not stored yet, and no date", async ({ page: p }) => 
     await ev(() => new Date().toISOString().split("T")[0]),
   );
   expect(errs).toEqual([]);
+});
+
+test("an already-logged session shows where it went, with no slot picker (Fix 51)", async ({
+  page: p,
+}) => {
+  const day = {
+    date: "2026-10-03",
+    notes: "",
+    meals: [
+      {
+        id: "ex1",
+        name: "Exercise",
+        is_exercise: true,
+        items: [{ id: "i1", name: "Cycle", kcal: -400, polar_session_id: "p1" }],
+      },
+    ],
+  };
+  await start(p, [{ ...RIDE, logged: true }], [day]);
+  await p.getByRole("button", { name: "Browse all sessions" }).click();
+  await p.getByText("logged", { exact: true }).click();
+  await expect(box(p).getByText("Already logged")).toBeVisible();
+  await expect(box(p).getByText("Logged to Exercise on 2026-10-03")).toBeVisible();
+  await expect(slot(p)).toHaveCount(0);
+  await expect(box(p).getByRole("button", { name: "Log session" })).toHaveCount(0);
+  await box(p).getByRole("button", { name: "Close" }).click();
+  await expect(box(p)).toHaveCount(0);
 });
