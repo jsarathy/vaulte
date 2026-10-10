@@ -1,5 +1,5 @@
 // src/components/TrajectoryPanel.jsx — the Weight tab's Trajectory panel: heading, metric tabs and
-// the chart. Double-click fills the screen; Esc or double-click collapses. Render only.
+// the chart. Double-click fills the screen; double-click again collapses. Render only.
 import useTrajectoryChart from "../hooks/useTrajectoryChart.js";
 import { metricHeading, metricInfo, metricTabs } from "../lib/weightMetrics.js";
 import MetricMenu from "./MetricMenu.jsx";

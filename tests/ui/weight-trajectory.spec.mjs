@@ -190,7 +190,7 @@ test("empty states", async ({ page: p }) => {
   await expect(chartSvg(p)).toHaveCount(0);
   await frame(p).dblclick();
   expect(await msg.evaluate((d) => d.style.height)).toBe("70dvh");
-  await p.keyboard.press("Escape");
+  await frame(p).dblclick();
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
 
   // a Renpho metric with a single reading (plan curve ignored off the Weight tab)
@@ -299,15 +299,15 @@ test("expand, scroll to the latest reading, collapse; hover label", async ({ pag
   await pill(p, "Weight").dblclick();
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   await frame(p).dblclick({ position: { x: 200, y: 120 } });
-  await expect(frame(p)).toHaveAttribute("title", "Double-click or press Esc to collapse");
-  await expect(p.getByText("Esc or double-click to collapse")).toBeVisible();
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
+  await expect(p.getByText("Double-click to collapse", { exact: true })).toBeVisible();
   await expect(p.getByText("📉 Trajectory")).toHaveCount(1); // header moves into the panel
   expect(await legend(p)).toEqual({
     items: ["Projected", "Actual", "2-wk avg"],
     fontSize: "12px",
   });
   await pill(p, "Weight").dblclick(); // inside the panel now: still not a toggle
-  await expect(frame(p)).toHaveAttribute("title", "Double-click or press Esc to collapse");
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
 
   // the latest reading is scrolled into view (three quarters across)
   const scroll = () =>
@@ -344,7 +344,7 @@ test("expand, scroll to the latest reading, collapse; hover label", async ({ pag
   await chartSvg(p).locator('circle[fill="transparent"]').nth(0).dispatchEvent("mouseout");
   await chartSvg(p).evaluate((svg) => (svg.parentElement.scrollLeft = 0)); // switching re-scrolls
   await pill(p, "BMI").click();
-  await expect(frame(p)).toHaveAttribute("title", "Double-click or press Esc to collapse");
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
   await expect(chartSvg(p).locator("g[style] rect")).toHaveCount(0);
   await expect.poll(async () => (await scroll()).left).toBeGreaterThan(0);
   matchGolden("bmi-expanded", await shape(p));
@@ -352,8 +352,8 @@ test("expand, scroll to the latest reading, collapse; hover label", async ({ pag
   await expect(chartSvg(p).locator("g[style] > text")).toHaveText(/^\d\d\/\d\d\/2026 · \d+\.\d$/);
   matchGolden("bmi-expanded-hover", await shape(p));
 
-  // Esc collapses; hover state is cleared (no enlarged dot in the compact chart)
-  await p.keyboard.press("Escape");
+  // a double-click collapses; hover state is cleared (no enlarged dot in the compact chart)
+  await frame(p).dblclick({ position: { x: 300, y: 300 } });
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   expect((await shape(p)).svg.viewBox).toBe("0 0 380 230");
   // the hover is cleared one render after the view changes, so wait for a single radius
@@ -366,10 +366,10 @@ test("expand, scroll to the latest reading, collapse; hover label", async ({ pag
     .toBe(1);
   await frame(p).dblclick({ position: { x: 200, y: 120 } });
   await expect(chartSvg(p).locator("g[style] rect")).toHaveCount(0);
-  // double-click collapses too; Esc when collapsed does nothing
-  await frame(p).dblclick({ position: { x: 300, y: 300 } });
-  await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
+  // Esc no longer collapses; a double-click does
   await p.keyboard.press("Escape");
+  await expect(frame(p)).toHaveAttribute("title", "Double-click to collapse");
+  await frame(p).dblclick({ position: { x: 300, y: 300 } });
   await expect(frame(p)).toHaveAttribute("title", "Double-click to expand");
   expect(errs).toEqual([]);
 });
