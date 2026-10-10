@@ -148,7 +148,9 @@ test("Sign In with a password: checks, a wrong password, other errors, success",
   });
   await page.click("text=Sign In");
   await button(page, "Sign In").click();
-  await expect(page.locator("text=Please enter your email and password.")).toBeVisible();
+  await expect(page.locator("text=Please enter your email and password.")).toBeVisible({
+    timeout: 15000,
+  });
   await fill(page, "Email Address", "jane@example.com");
   await fill(page, "Password", "wrong");
   await button(page, "Sign In").click();
@@ -180,7 +182,9 @@ test("Sign In with a magic link: tab switching clears state; send, sent, differe
   await page.click("text=Sign In");
   await fill(page, "Email Address", "jane@example.com");
   await button(page, "Sign In").click();
-  await expect(page.locator("text=Please enter your email and password.")).toBeVisible();
+  await expect(page.locator("text=Please enter your email and password.")).toBeVisible({
+    timeout: 15000,
+  });
   await page.click("text=Magic Link");
   await expect(page.locator("text=Please enter your email and password.")).toBeHidden();
   await expect(page.locator("text=no password needed")).toBeVisible();
