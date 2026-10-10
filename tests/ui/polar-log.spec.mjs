@@ -1,6 +1,6 @@
 // tests/ui/polar-log.spec.mjs — the "log a Polar session" box (Fix 26 PR 17): header, stats,
 // heart-rate chart and zones, meal slot, and logging the session as an exercise entry.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const RIDE = {
   id: "p1",

@@ -1,7 +1,7 @@
 // tests/ui/phone-log.spec.mjs — the Daily log on a phone (Fix 43.5), at 390 x 844: nothing past
 // the right edge, the calorie bar's pills under the figure, thumb-sized
 // arrows, and meal cards as header + stacked entries (name over labelled figures, remove).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const LS = "vaulte_collapsed_meals";
 const DAY = {

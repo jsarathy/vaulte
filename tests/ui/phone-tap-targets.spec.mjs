@@ -1,7 +1,7 @@
 // tests/ui/phone-tap-targets.spec.mjs — tap-target rule for the phone (Fix 43.4.5), at 390 x 844:
 // every button, select, text box and tappable day on the signed-in screens is at least 40 px tall
 // (buttons and days also 40 px wide), and no button's text is under 11 px.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test.use({ timezoneId: "Europe/London" }); // 390 x 844 comes from the phone project
 

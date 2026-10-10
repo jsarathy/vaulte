@@ -1,6 +1,6 @@
 // tests/ui/recipe-weight-guards.spec.mjs — src/api/recipeWeights.js edge cases (Fix 26 PR 4)
 // Drives the module directly in the harness page (same mocked Firestore/Claude as the app).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import path from "node:path";
 
 const moduleUrl = "/@fs" + path.resolve("src/api/recipeWeights.js").replaceAll("\\", "/");

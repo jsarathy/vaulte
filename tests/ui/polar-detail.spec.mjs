@@ -3,7 +3,7 @@
 // fetching heart rate afterwards, and the heart-rate chart, pinned in
 // tests/ui/fixtures/polar-detail.json.
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test polar-detail
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/polar-detail.json", import.meta.url);

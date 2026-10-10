@@ -15,3 +15,6 @@ vaulte_pat.txt
 # UI test output (Fix 12)
 test-results/
 playwright-report/
+
+# per-test coverage for the spec map (Fix 40)
+.ui-coverage/

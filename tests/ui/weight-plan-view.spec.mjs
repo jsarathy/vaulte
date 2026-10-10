@@ -2,7 +2,7 @@
 // (Fix 26 PR 23): heading buttons (Edit, Cancel, Save Plan), Personal Stats, Projection Curve and
 // the Milestone Roadmap, pinned in tests/ui/fixtures/weight-plan-view.json.
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test weight-plan-view
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/weight-plan-view.json", import.meta.url);

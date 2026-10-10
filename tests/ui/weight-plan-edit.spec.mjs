@@ -3,7 +3,7 @@
 // curve anchors (edit, add, remove, dates) and the tab's layout, pinned in
 // tests/ui/fixtures/weight-plan-edit.json.
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test weight-plan-edit
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/weight-plan-edit.json", import.meta.url);

@@ -1,6 +1,6 @@
 // tests/ui/polar-sessions.spec.mjs — the Polar Sessions card on Add Entry (Fix 26 PR 10): not
 // connected, unlogged sessions, "all logged" with recent sessions, and Browse all sessions.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const CYCLE = {
   id: "p1",

@@ -1,7 +1,7 @@
 // tests/ui/phone-body-trajectory.spec.mjs — the Body tab's Trajectory on a phone (Fix 56), at
 // 390 x 844: the sites are a drop-down under the Trajectory heading; a double tap fills the
 // screen and another closes it; a single tap on a reading shows its value.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const BODY = [
   { id: "2026-09-01", waist: 103, hip: 110 },

@@ -1,6 +1,6 @@
 // tests/ui/add-entry-layout.spec.mjs — Add Entry's frame (Fix 26 PR 14): the column buttons, the
 // Polar card header (Connected, Sync, Reconnect, sync message) and the steps card's date.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const CONFIRM =
   "This will re-authorise your Polar account with updated permissions (needed for HR data). Continue?";

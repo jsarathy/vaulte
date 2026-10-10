@@ -1,6 +1,6 @@
 // tests/ui/app-lazy-load.spec.mjs — the app downloads in pieces (Fix 43.2.2, 43.2.3): the sign-in
 // pages do not fetch the signed-in app, and a tab's code is fetched only when it is opened.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const PROFILE = {
   firstName: "Jane",

@@ -1,7 +1,7 @@
 // tests/ui/app-auth-history.spec.mjs — the browser's Back / Forward buttons on the sign-in
 // pages (Fix 53): each page has its own history entry, so Back returns to the page before
 // instead of leaving the site; the signed-in pages are left alone.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const PROFILE = {
   firstName: "Jane",

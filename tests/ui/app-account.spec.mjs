@@ -2,7 +2,7 @@
 // sidebar, the Home panel, the My Account panel (profile card, photo upload / removal, info
 // cards, linked accounts), Edit Profile (fields, password change, failures, closing) and
 // Delete Account. Firebase is mocked (tests/ui/harness/mocks.js).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const PROFILE = {
   firstName: "Jane",

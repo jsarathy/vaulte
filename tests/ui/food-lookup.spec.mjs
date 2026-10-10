@@ -1,7 +1,7 @@
 // tests/ui/food-lookup.spec.mjs — "Get Nutrition" box for a food that isn't a saved recipe
 // (Fix 26 PR 8): opening, amount sent to Claude, filling the form, errors, saving to Saved
 // recipes (per portion, by weight, duplicates), and Add Item's automatic add.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const APPLE = {
   kind: "INGREDIENT",

@@ -3,7 +3,7 @@
 // (recipe link, Polar link, plain), removing an entry, the Apple Watch card's toggle, pinned
 // in tests/ui/fixtures/meal-cards.json.
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test meal-cards --workers=1
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/meal-cards.json", import.meta.url);

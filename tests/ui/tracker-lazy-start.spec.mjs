@@ -1,7 +1,7 @@
 // tests/ui/tracker-lazy-start.spec.mjs — the first screen does not wait for everything (Fix 43.3):
 // it needs the 5 newest days, recipes and the calculator; older days, the weight and body logs,
 // chat and Polar load right after, and a skeleton shows meanwhile.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const logged = (date) => ({
   date,

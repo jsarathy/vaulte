@@ -1,7 +1,7 @@
 // tests/ui/tracker-chat.spec.mjs — the Claude chat on NutritionTracker (Fix 26 PR 20): asking
 // questions (history kept, limited, saved), errors, clearing, logging food from the chat, and
 // the page frame (tabs, header).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const P = (x) => `users/u/${x}`;
 const EGG = {

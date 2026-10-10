@@ -1,7 +1,7 @@
 // tests/ui/hourly-steps.spec.mjs — the Add Entry "Steps by hour" card (Fix 26 PR 39): loading,
 // empty and drawn states, the step axis, bars and hover, browsing by date, expanding to full screen
 // (measured drawing, value labels, every hour labelled) and collapsing with Esc or a double-click.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test.use({ timezoneId: "Europe/London" });
 

@@ -1,6 +1,6 @@
 // tests/ui/photo-log.spec.mjs — "Log from Photo" on Add Entry (Fix 26 PR 12): Claude identifies
 // foods in a photo; load one into the form, log all into a meal, or save them as a recipe.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";

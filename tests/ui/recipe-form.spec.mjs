@@ -1,7 +1,7 @@
 // tests/ui/recipe-form.spec.mjs — the recipe builder's editable form (Fix 26 PR 7): every field
 // reaches the saved recipe, list rows add/edit/remove the right entry, link badges and
 // highlighting, the saved-name list, the (est.) marker and the Recalculate button's states.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const STEW = {
   id: "fs",

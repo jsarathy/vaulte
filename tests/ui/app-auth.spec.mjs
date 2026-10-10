@@ -2,7 +2,7 @@
 // landing, Create Account (checks, errors, the saved profile), Sign In (password, magic link,
 // Google), the sign-in link return, and the signed-in start-up. Firebase is mocked
 // (tests/ui/harness/mocks.js; calls in window.__authCalls / __setDocs).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const PROFILE = {
   firstName: "Jane",

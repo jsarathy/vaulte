@@ -3,7 +3,7 @@
 // minutes, flights with kcal at the calculator's weight), Polar-session exclusions from 5-min
 // slots and from daily totals ("estimated"), the kcal reported up to the day's net kcal, and a
 // listener failure.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test.use({ timezoneId: "Europe/London" });
 const P = (x) => `users/u/${x}`;

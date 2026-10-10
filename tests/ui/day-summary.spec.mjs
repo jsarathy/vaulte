@@ -2,7 +2,7 @@
 // its arrows, the calorie bar (net kcal, energy target, activity tier, macro pills, "Left",
 // fat burned, progress bar), pinned in tests/ui/fixtures/day-summary.json.
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test day-summary
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/day-summary.json", import.meta.url);

@@ -2,7 +2,7 @@
 // Saved Recipes: header (name, source, ×), description, the tag row (prep, cook, Wt/portion
 // with "(est.)", serves), nutrition per serving, ingredients, numbered method, notes; a bare
 // recipe shows only what it has; closing by ×, by the backdrop, not by the card.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const FULL = {
   id: "r-full",

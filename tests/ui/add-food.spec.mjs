@@ -1,6 +1,6 @@
 // tests/ui/add-food.spec.mjs — the "Add Food Item" form on Add Entry (Fix 26 PR 13): day and
 // meal, name autocomplete from saved recipes, macros (net carbs derived), Clear and Add Item.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const STEW = {
   id: "s1",

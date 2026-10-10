@@ -1,6 +1,6 @@
 // tests/ui/recipe-edit.spec.mjs — Fix 18 — edit saved recipes, nutrition recalculated
 // Converted from the one-off browser check used when the fix shipped; kept so it re-runs on every PR.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test("Fix 18 — edit saved recipes, nutrition recalculated", async ({ page: p }) => {
   const errs = [];

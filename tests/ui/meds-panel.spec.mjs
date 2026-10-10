@@ -1,6 +1,6 @@
 // tests/ui/meds-panel.spec.mjs — the Meds panel in the Daily log sidebar (Fix 26 PR 15): meds for
 // the day, filled count, loading, typing and saving on leaving a field, and switching days.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 const PATH = (d) => `users/u/routine_log/${d}`;
 const DOCS = {

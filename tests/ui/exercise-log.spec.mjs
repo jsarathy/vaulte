@@ -1,6 +1,6 @@
 // tests/ui/exercise-log.spec.mjs — "Log Manual Exercise" on Add Entry (Fix 26 PR 11): search,
 // pick, calculate (kcal, HR zone, fat burn), log into a meal slot, errors, reset, closing.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test("log manual exercise", async ({ page: p }) => {
   const errs = [];

@@ -4,7 +4,7 @@
 // tests/ui/fixtures/body-anatomy.json.
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test
 // body-anatomy --workers=1 (then review the JSON diff).
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/body-anatomy.json", import.meta.url);

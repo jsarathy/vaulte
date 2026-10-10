@@ -1,6 +1,6 @@
 // tests/ui/recipe-links.spec.mjs — Fix 21 — recipes built from saved recipes
 // Converted from the one-off browser check used when the fix shipped; kept so it re-runs on every PR.
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./cover.mjs";
 
 test("Fix 21 — recipes built from saved recipes", async ({ page: p }) => {
   const errs = [];
