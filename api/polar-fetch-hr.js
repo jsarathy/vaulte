@@ -6,9 +6,7 @@ import {
   candidateUrls,
   firstSamples,
   hrChannel,
-  listRecentExercises,
-  matchExercise,
-  summariseList,
+  recentFinder,
   outsideWindow,
 } from "./_polar/hrFetch.js";
 
@@ -29,23 +27,15 @@ const TOO_OLD = (attempts) =>
     attempts,
   });
 
-/** The v3 list's match for the session: { data: { samples }, attempt } or { data: null, attempt }. */
-async function fromRecentList(session, headers) {
-  const { attempt, list } = await listRecentExercises(headers);
-  const match = list && matchExercise(list, session);
-  const seen = match || !list ? {} : { seen: summariseList(list) };
-  return {
-    data: match ? { samples: match.samples } : null,
-    attempt: { ...attempt, matched: !!match, ...seen },
-  };
-}
-
 /** The samples reply and every attempt: the per-session URLs first, then the recent-exercises list. */
-async function findSamples(session, urls, headers) {
+async function findSamples({ session, urls, headers, polarUserId }) {
   const first = await firstSamples(urls, headers);
   if (first.data) return first;
-  const recent = await fromRecentList(session, headers);
-  return { data: recent.data, attempts: [...first.attempts, recent.attempt] };
+  const { match, attempts } = await recentFinder(headers, polarUserId).find(session);
+  return {
+    data: match ? { samples: match.samples } : null,
+    attempts: [...first.attempts, ...attempts],
+  };
 }
 
 function rejection(req) {
@@ -55,17 +45,29 @@ function rejection(req) {
   return null;
 }
 
-/** { status, body }: the samples saved on the session, or why not. */
-async function fetchHr(db, { userId, sessionId }) {
+/** The session and connection to fetch for, or the { status, body } reply that says why not. */
+async function load(db, { userId, sessionId }) {
   const ref = db.doc(`users/${userId}/polar_sessions/${sessionId}`);
   const sessionDoc = await ref.get();
-  if (!sessionDoc.exists) return fail(404, { error: "Session not found" });
+  if (!sessionDoc.exists) return { fail: fail(404, { error: "Session not found" }) };
   const connDoc = await db.doc(`users/${userId}/polar/connection`).get();
-  if (!connDoc.exists) return fail(401, { error: "Polar not connected" });
-  const { access_token, polar_user_id } = connDoc.data();
-  const urls = candidateUrls(sessionDoc.data(), sessionId, polar_user_id);
-  const session = sessionDoc.data();
-  const { data, attempts } = await findSamples(session, urls, authHeaders(access_token));
+  if (!connDoc.exists) return { fail: fail(401, { error: "Polar not connected" }) };
+  return { ref, session: sessionDoc.data(), conn: connDoc.data() };
+}
+
+/** { status, body }: the samples saved on the session, or why not. */
+async function fetchHr(db, ids) {
+  const loaded = await load(db, ids);
+  if (loaded.fail) return loaded.fail;
+  const { ref, session, conn } = loaded;
+  const urls = candidateUrls(session, ids.sessionId, conn.polar_user_id);
+  const headers = authHeaders(conn.access_token);
+  const { data, attempts } = await findSamples({
+    session,
+    urls,
+    headers,
+    polarUserId: conn.polar_user_id,
+  });
   if (!data) return outsideWindow(session) ? TOO_OLD(attempts) : UNAVAILABLE(attempts);
   const hr = hrChannel(data);
   if (hr.status) return hr;

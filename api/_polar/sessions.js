@@ -1,7 +1,7 @@
 // api/_polar/sessions.js — Polar exercises fetched into the users/{uid}/polar_sessions/{id} shape.
 import { parseDurationMin } from "../../src/constants/helpers.js";
 import { fetchHrSamples, hrFromSampleSets } from "./samples.js";
-import { listRecentExercises, matchExercise } from "./hrFetch.js";
+import { recentFinder } from "./hrFetch.js";
 
 /** Calories, heart-rate summary and other stats an exercise may carry. */
 function exerciseStats(ex) {
@@ -56,19 +56,20 @@ export async function fetchSessions(urls, polar) {
   return sessions;
 }
 
-/** One session with the heart rate of the matching recent exercise, if it has none itself. */
-const withHr = (s, list) => {
-  const match = s.hr_samples ? null : matchExercise(list, s);
+/** The session with the heart rate of its match in the recent list, if it has none itself. */
+async function withHr(s, finder) {
+  if (s.hr_samples) return s;
+  const { match } = await finder.find(s);
   return match ? { ...s, ...hrFromSampleSets(match.samples) } : s;
-};
+}
 
 /** The sessions, those without heart rate filled from Polar's recent-exercises list (v3). A failed
  *  list changes nothing (logged). */
-export async function fillMissingHr(sessions, headers) {
+export async function fillMissingHr(sessions, headers, polarUserId) {
   if (sessions.every((s) => s.hr_samples)) return sessions;
+  const finder = recentFinder(headers, polarUserId);
   try {
-    const { list } = await listRecentExercises(headers);
-    return list ? sessions.map((s) => withHr(s, list)) : sessions;
+    return await Promise.all(sessions.map((s) => withHr(s, finder)));
   } catch (err) {
     console.warn("recent exercises list failed:", err.message);
     return sessions;
