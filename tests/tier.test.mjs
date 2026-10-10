@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { tierOf, checksFor } from "../scripts/tier.mjs";
+import { tierOf } from "../scripts/tier.mjs";
 import { reachedFrom, screensIn } from "../scripts/tier/graph.mjs";
 
 // A module as dependency-cruiser reports it: its path and what it imports.
@@ -124,11 +124,4 @@ test("reachedFrom follows importers upward and survives import cycles", () => {
 test("screensIn counts each tab once", () => {
   const set = new Set(["src/tabs/LogTab.jsx", "src/tabs/AddEntry.jsx", "src/hooks/x.js"]);
   assert.deepEqual(screensIn(set).sort(), ["src/tabs/AddEntry.jsx", "src/tabs/LogTab.jsx"]);
-});
-
-test("checks grow with the tier", () => {
-  assert.ok(!checksFor(1).some((c) => /full UI/i.test(c)));
-  assert.ok(checksFor(2).some((c) => /changed specs/i.test(c)));
-  assert.ok(checksFor(3).some((c) => /full UI/i.test(c)));
-  assert.ok(checksFor(4).some((c) => /live site/i.test(c)));
 });

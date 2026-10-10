@@ -2,22 +2,10 @@
 // Usage: npm run tier   (compares the working tree with origin/main)
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { pathRule } from "./tier/rules.mjs";
+import { checksFor, uiPlan } from "./tier/plan.mjs";
 import { isScreen, reachedFrom, reachesShell, screensIn, importsFirebase } from "./tier/graph.mjs";
-
-const CHECKS = {
-  1: ["lint and format", "unit tests"],
-  2: ["UI: the changed specs locally; CI runs the full sharded suite"],
-  3: ["full UI suite locally", "mutation check on the new tests"],
-  4: ["API tests", "dependency audit and secret scan", "manual check on the live site"],
-};
-
-export function checksFor(tier) {
-  return Object.entries(CHECKS)
-    .filter(([t]) => Number(t) <= tier)
-    .flatMap(([, list]) => list)
-    .filter((c) => tier < 3 || !/changed specs/.test(c));
-}
 
 function byReach(file, modules) {
   const reached = reachedFrom(modules, [file], isScreen);
@@ -34,14 +22,15 @@ export function tierFor(file, modules) {
   return { tier: 3, why: "not covered by a tier rule" };
 }
 
-export function tierOf(changed, modules) {
+export function tierOf(changed, modules, map = {}) {
   const rated = changed.map((file) => ({ file, ...tierFor(file, modules) }));
   const tier = Math.max(1, ...rated.map((r) => r.tier));
+  const ui = uiPlan(tier, changed, map);
   return {
     tier,
     reasons: rated.filter((r) => r.tier === tier).map((r) => `${r.file}: ${r.why}`),
-    specs: changed.filter((f) => /^tests\/ui\/.*\.spec\.mjs$/.test(f)),
-    checks: checksFor(tier),
+    specs: ui.specs,
+    checks: checksFor(tier, ui),
   };
 }
 
@@ -60,11 +49,12 @@ function changedFiles() {
 async function main() {
   const { cruise } = await import("dependency-cruiser");
   const { output } = await cruise(["src", "api"], { exclude: { path: "node_modules" } });
-  const r = tierOf(changedFiles(), output.modules);
+  const map = JSON.parse(readFileSync("tests/ui/spec-map.json", "utf8"));
+  const given = process.argv.slice(2);
+  const r = tierOf(given.length ? given : changedFiles(), output.modules, map);
   console.log(`Tier ${r.tier}`);
   r.reasons.forEach((x) => console.log(`  why: ${x}`));
   r.checks.forEach((x) => console.log(`  run: ${x}`));
-  r.specs.forEach((x) => console.log(`  spec: ${x}`));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
