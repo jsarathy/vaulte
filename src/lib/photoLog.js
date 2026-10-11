@@ -1,10 +1,27 @@
 // src/lib/photoLog.js — "Log from Photo": Claude lists the foods in a photo with nutrition.
 import { MACROS } from "../constants/recipeLinks.js";
+import { usageField } from "../api/usageContext.js";
 
 export const PHOTO_PROMPT = `Identify every food item visible in this photo and estimate realistic nutrition values.
 Reply with ONLY a JSON array, no markdown, no explanation:
 [{"name":"...","kcal":0,"fat":0,"sat_fat":0,"carbs":0,"sugar":0,"fibre":0,"net_carbs":0,"protein":0}]
 Be specific with names (e.g. "Grilled chicken breast ~150g"). Round to 1 decimal place.`;
+
+/** The request to /api/claude for one normalised (JPEG, base64) photo. */
+export const photoRequest = (data) => ({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1000,
+  ...usageField("photo"),
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data } },
+        { type: "text", text: PHOTO_PROMPT },
+      ],
+    },
+  ],
+});
 
 export const PHOTO_ERROR = "Could not analyse photo. Try a clearer image or add items manually.";
 
