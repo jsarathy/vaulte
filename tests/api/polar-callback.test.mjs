@@ -112,6 +112,8 @@ const quiet = () => ({
   error: mock.method(console, "error", () => {}),
 });
 const said = (spy) => spy.mock.calls.map((c) => c.arguments);
+// Look a log line up by its label: other code (the Google auth library on CI) logs too.
+const logged = (spy, label) => said(spy).filter((a) => a[0] === label);
 
 test("the requests to Polar are POSTs with their content types and Accept headers", async () => {
   quiet();
@@ -141,10 +143,21 @@ test("a registration that is neither OK nor 'already registered' is warned about
     const spies = quiet();
     stubPolar({ register });
     await call({ code: "c", state });
-    assert.deepEqual(said(spies.log)[0], ["Polar registration status:", register]);
-    assert.equal(spies.warn.mock.callCount(), warned ? 1 : 0, `status ${register}`);
+    assert.deepEqual(logged(spies.log, "Polar registration status:")[0], [
+      "Polar registration status:",
+      register,
+    ]);
+    assert.equal(
+      logged(spies.warn, "Polar registration non-fatal error:").length,
+      warned ? 1 : 0,
+      `status ${register}`,
+    );
     if (warned)
-      assert.deepEqual(said(spies.warn)[0], ["Polar registration non-fatal error:", 500, "body"]);
+      assert.deepEqual(logged(spies.warn, "Polar registration non-fatal error:")[0], [
+        "Polar registration non-fatal error:",
+        500,
+        "body",
+      ]);
     mock.restoreAll();
   }
 });
@@ -153,10 +166,13 @@ test("a refused token and a crash are logged with what Polar or the error said",
   const spies = quiet();
   stubPolar({ token: { ok: false } });
   await call({ code: "c", state });
-  assert.deepEqual(said(spies.error)[0], ["Token exchange failed:", "invalid_grant"]);
+  assert.deepEqual(logged(spies.error, "Token exchange failed:")[0], [
+    "Token exchange failed:",
+    "invalid_grant",
+  ]);
   stubPolar({ fail: true });
   await call({ code: "c", state });
-  const [label, err] = said(spies.error)[1];
+  const [label, err] = logged(spies.error, "Polar callback error:")[0];
   assert.equal(label, "Polar callback error:");
   assert.match(err.message, /network down/);
   mock.restoreAll();

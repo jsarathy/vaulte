@@ -22,6 +22,8 @@ const silence = () => ({
   error: mock.method(console, "error", () => {}),
 });
 const said = (spy) => spy.mock.calls.map((c) => c.arguments);
+// Look a log line up by its label: other code (the Google auth library on CI) logs too.
+const logged = (spy, label) => said(spy).filter((a) => a[0] === label);
 
 // ---- claude.js
 test("claude: refuses other methods and a missing key with their messages", async () => {
@@ -126,7 +128,7 @@ test("polar-sync: refusals, and a failure is logged and returned", async () => {
   await polarSync({ method: "POST", body: { userId: "u-sync" } }, out);
   assert.equal(out.statusCode, 500);
   assert.equal(out.body.error, "polar is down");
-  assert.equal(said(spies.error)[0][0], "Polar sync error:");
+  assert.equal(logged(spies.error, "Polar sync error:").length, 1);
 });
 
 // ---- polar-disconnect.js
@@ -168,7 +170,8 @@ test("polar-disconnect: deletes then re-registers with the right headers, waitin
   assert.equal(reg.opts.method, "POST");
   assert.deepEqual(JSON.parse(reg.opts.body), { "member-id": "u-dc" });
   assert.ok(reg.at - del.at >= 450, "Polar is given time to process the deletion");
-  assert.deepEqual(said(spies.log), [
+  const polarLogs = said(spies.log).filter((a) => String(a[0]).startsWith("Polar "));
+  assert.deepEqual(polarLogs, [
     ["Polar DELETE /v3/users status:", 204],
     ["Polar re-register status:", 200],
   ]);
@@ -187,7 +190,7 @@ test("polar-disconnect: when Polar fails the connection is still cleared and the
   const out = res();
   await polarDisconnect({ method: "POST", body: { userId: "u-dc2" } }, out);
   assert.deepEqual([out.statusCode, out.body], [500, { error: "polar refused" }]);
-  assert.equal(said(spies.error)[0][0], "polar-disconnect error:");
+  assert.equal(logged(spies.error, "polar-disconnect error:").length, 1);
   assert.equal((await read("users/u-dc2/polar/connection")).connected, false);
 });
 
@@ -219,7 +222,7 @@ test("apple-sync: a write that fails is logged and answered with a 500", async (
   try {
     const out = await apple({ date: "2026-10-01", steps: 5 });
     assert.deepEqual([out.statusCode, out.body], [500, { error: "Firestore write failed" }]);
-    assert.equal(said(spies.error)[0][0], "apple-sync write failed:");
+    assert.equal(logged(spies.error, "apple-sync write failed:").length, 1);
   } finally {
     process.env.APPLE_SYNC_USER_ID = "user-1";
   }
