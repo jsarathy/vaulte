@@ -4,63 +4,9 @@
 // FIREBASE_SERVICE_ACCOUNT (the same JSON the API functions use) in the environment, or
 // FIRESTORE_EMULATOR_HOST for a local emulator. Records hold sizes and costs only, never prompts.
 import { fileURLToPath } from "node:url";
+import { summarise, usd } from "../src/lib/aiUsage.js";
 
-const r2 = (n) => Math.round(n * 100) / 100;
-const usd = (n) => `$${n.toFixed(4)}`;
-
-function group(records, keyOf) {
-  const out = new Map();
-  for (const rec of records) {
-    const key = keyOf(rec);
-    const g = out.get(key) || {
-      key,
-      calls: 0,
-      input: 0,
-      output: 0,
-      searches: 0,
-      cost: 0,
-      unpriced: 0,
-    };
-    g.calls += 1;
-    g.input += rec.input_tokens || 0;
-    g.output += rec.output_tokens || 0;
-    g.searches += rec.web_searches || 0;
-    if (rec.cost_usd == null) g.unpriced += 1;
-    else g.cost += rec.cost_usd;
-    out.set(key, g);
-  }
-  return [...out.values()];
-}
-
-/** The records summed up: totals, and per feature, user and day (most expensive first). */
-export function summarise(records) {
-  const rows = (keyOf, sort) =>
-    group(records, keyOf)
-      .map((g) => ({
-        ...g,
-        avgInput: r2(g.input / g.calls),
-        avgOutput: r2(g.output / g.calls),
-        avgCost: g.cost / g.calls,
-      }))
-      .sort(sort);
-  const byCost = (a, b) => b.cost - a.cost;
-  return {
-    total: group(records, () => "all")[0] || {
-      calls: 0,
-      input: 0,
-      output: 0,
-      searches: 0,
-      cost: 0,
-      unpriced: 0,
-    },
-    byFeature: rows((r) => r.feature || "unknown", byCost),
-    byUser: rows((r) => r.user_id || r.uid || "(unattributed)", byCost),
-    byDay: rows(
-      (r) => String(r.at || "").slice(0, 10),
-      (a, b) => (a.key < b.key ? -1 : 1),
-    ),
-  };
-}
+export { summarise };
 
 const pad = (v, n) => String(v).padEnd(n);
 const num = (v, n) => String(v).padStart(n);

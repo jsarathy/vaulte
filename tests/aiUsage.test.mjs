@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { PRICES, WEB_SEARCH_USD, costOf } from "../api/_usage/pricing.js";
 import { cleanMeta, usageRecord } from "../api/_usage/record.js";
 import { format, summarise } from "../scripts/ai-usage.mjs";
+import { periodCosts, usd } from "../src/lib/aiUsage.js";
 import { setUsageUser, usageField } from "../src/api/usageContext.js";
 
 const MODEL = "claude-sonnet-4-6";
@@ -195,4 +196,28 @@ test("format: plain text tables with the totals first", () => {
   assert.match(text, /chat +1 +4000 +300 +\$0\.0165 +\$0\.0165/);
   assert.match(text, /user +calls +total/);
   assert.match(text, /day +calls +total/);
+});
+
+test("periodCosts: what the last day, 7 days and 30 days cost; an unpriced call adds nothing", () => {
+  const now = Date.parse("2026-10-11T12:00:00.000Z");
+  const at = (d, h = 0) => new Date(now - d * 86400000 - h * 3600000).toISOString();
+  const c = periodCosts(
+    [
+      { at: at(0, 1), cost_usd: 1 }, // 1 hour ago
+      { at: at(2), cost_usd: 10 },
+      { at: at(20), cost_usd: 100 },
+      { at: at(40), cost_usd: 1000 }, // too old for any period
+      { at: at(0, 2), cost_usd: null },
+      { cost_usd: 5 }, // no time recorded
+    ],
+    now,
+  );
+  assert.deepEqual(c, { day: 1, week: 11, month: 111 });
+  assert.deepEqual(periodCosts([], now), { day: 0, week: 0, month: 0 });
+  assert.ok(periodCosts([{ at: new Date().toISOString(), cost_usd: 2 }]).day === 2);
+});
+
+test("usd: dollars to four places", () => {
+  assert.equal(usd(0.0165), "$0.0165");
+  assert.equal(usd(0), "$0.0000");
 });
