@@ -251,7 +251,20 @@ export const claudeEstimatePortionWeight = async (r) => {
 // [code, message]). window.__magicLink: the page opened from a sign-in link.
 window.__authCalls = [];
 // window.__authDelays = { fn: ms } slows that call
-const authWait = (fn) => new Promise((res) => setTimeout(res, window.__authDelays?.[fn] || 0));
+// window.__authHold = ["start", "signIn", …] makes those calls wait ("start" is the first sign-in
+// check when the page opens) until the test lets them go with window.__authRelease("signIn"), or
+// __authRelease() for all: a state the test must see (a spinner, a disabled button) lasts as long
+// as the test needs instead of a number of milliseconds (Fix 83).
+const heldCalls = {};
+const authHold = (fn) =>
+  window.__authHold?.includes(fn) ? new Promise((res) => (heldCalls[fn] ||= []).push(res)) : null;
+window.__authRelease = (fn) => {
+  const names = fn ? [fn] : [...(window.__authHold ?? [])];
+  window.__authHold = (window.__authHold ?? []).filter((n) => !names.includes(n));
+  for (const n of names) (heldCalls[n] ?? []).splice(0).forEach((res) => res());
+};
+const authWait = (fn) =>
+  authHold(fn) ?? new Promise((res) => setTimeout(res, window.__authDelays?.[fn] || 0));
 const authCall = (fn, args) => {
   window.__authCalls.push({ fn, ...args });
   const fail = window.__authFail?.[fn];
@@ -271,7 +284,8 @@ const userFor = (uid, email, extra = {}) => ({
   ...extra,
 });
 export const onAuthStateChanged = (_a, cb) => {
-  setTimeout(() => {
+  setTimeout(async () => {
+    await authHold("start");
     auth.currentUser = window.__authUser ?? null;
     cb(auth.currentUser);
   }, window.__authDelay || 0);

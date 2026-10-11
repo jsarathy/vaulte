@@ -284,7 +284,7 @@ test("Edit Profile: a failed save shows the error and stays open; Cancel and the
 });
 
 test("Edit Profile: the Save button is busy while saving", async ({ page }) => {
-  await start(page, { ...signedIn(), __authDelays: { updatePassword: 1200 } });
+  await start(page, { ...signedIn(), __authHold: ["updatePassword"] }); // busy until released
   await nav(page, "My Account").click();
   await button(page, "Edit Profile").click();
   await input(page, "New Password").fill("newpass1");
@@ -292,6 +292,7 @@ test("Edit Profile: the Save button is busy while saving", async ({ page }) => {
   await save.click();
   await expect(save).toBeDisabled();
   await expect(save.locator(".spinner")).toBeVisible();
+  await page.evaluate(() => window.__authRelease("updatePassword"));
   await expect(page.locator("text=PROFILE UPDATED")).toBeVisible({ timeout: 5000 });
 });
 
