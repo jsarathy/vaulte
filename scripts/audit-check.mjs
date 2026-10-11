@@ -2,18 +2,12 @@
 // Fails on: any critical advisory; any high advisory in runtime dependencies
 // unless listed in security/audit-allowlist.json (and not past its review date).
 // Dev-only dependencies (build tools) are reported but don't fail.
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { npm } from "./npm.mjs";
 
 const run = (args) => {
   try {
-    return JSON.parse(
-      execFileSync("npm", args, {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-        maxBuffer: 64 << 20,
-      }),
-    );
+    return JSON.parse(npm(args, { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }));
   } catch (e) {
     if (e.stdout) return JSON.parse(e.stdout);
     throw e;
