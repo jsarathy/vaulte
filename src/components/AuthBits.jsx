@@ -1,7 +1,7 @@
 // src/components/AuthBits.jsx — small pieces shared by the sign-in and account pages: the
 // labelled input (with the password eye), a two-column row, the card's gold lines, the error
 // box and the toast.
-import { useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { inp, lbl } from "../styles/authStyles.js";
 
 export const EyeIcon = ({ show }) => (
@@ -116,4 +116,19 @@ export const ErrorBox = ({ msg }) =>
     </div>
   ) : null;
 
-export const Toast = ({ msg }) => (msg ? <div className="toast">* {msg}</div> : null);
+export const TOAST_MS = 3000;
+
+/** The toast's clock from useToast: `id` is new for every toast, `expire` clears the current one. */
+export const ToastClock = createContext({ id: 0, expire: () => {} });
+
+/** The toast. Its time runs from when it is on screen, not from when it was set: the signed-in
+ *  page that shows the first one is downloaded after sign-in (Fix 65). */
+export function Toast({ msg }) {
+  const { id, expire } = useContext(ToastClock);
+  useEffect(() => {
+    if (!msg) return;
+    const timer = setTimeout(expire, TOAST_MS);
+    return () => clearTimeout(timer); // a newer toast starts its own time
+  }, [msg, id, expire]);
+  return msg ? <div className="toast">* {msg}</div> : null;
+}

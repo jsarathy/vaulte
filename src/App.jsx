@@ -6,6 +6,7 @@ import { bg, globalStyle } from "./styles/authStyles.js";
 import LandingPage from "./components/LandingPage.jsx";
 import SignupPage from "./components/SignupPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
+import { ToastClock } from "./components/AuthBits.jsx";
 // The signed-in app is its own download, fetched only after sign-in (Fix 43.2.2).
 const AccountPage = lazy(() => import("./components/AccountPage.jsx"));
 
@@ -30,6 +31,14 @@ function LoadingPage() {
 // useAccountPage.
 export default function App() {
   const pages = useAuthPages();
+  return (
+    <ToastClock.Provider value={pages.toastClock}>
+      <Pages pages={pages} />
+    </ToastClock.Provider>
+  );
+}
+
+function Pages({ pages }) {
   const account = useAccountPage(pages);
   const { page, profile, toast, error, go, loading, handleGoogleSignIn } = pages;
   if (page === "loading") return <LoadingPage />;
