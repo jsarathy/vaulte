@@ -63,3 +63,29 @@ test("latest readings", () => {
   assert.equal(cmText(100.26), "100.3 cm");
   assert.equal(cmText("99"), "99.0 cm");
 });
+
+// Fix 77: the exact outlines and tape rings, for the male and female figures, are pinned in
+// tests/fixtures/anatomy-figures.json (the numbers are the drawing; the UI golden shows the same).
+// To change the drawing on purpose: UPDATE_GOLDEN=1 node --test tests/anatomy.test.mjs, npx prettier --write tests/fixtures, review the diff.
+test("outlines and rings of both figures match the pinned drawing", async () => {
+  const { readFileSync, writeFileSync } = await import("node:fs");
+  const file = new URL("./fixtures/anatomy-figures.json", import.meta.url);
+  const now = { male: figureShape("m"), female: figureShape("f") };
+  if (process.env.UPDATE_GOLDEN) writeFileSync(file, `${JSON.stringify(now, null, 2)}\n`);
+  assert.deepEqual(JSON.parse(JSON.stringify(now)), JSON.parse(readFileSync(file, "utf8")));
+});
+
+test("the two sexes differ, a ring is left/right mirrored about the centre line", () => {
+  const m = figureShape("m");
+  const f = figureShape("f");
+  assert.notDeepEqual(m.parts, f.parts);
+  assert.equal(f.isF, true);
+  for (const site of ["bicep", "thigh", "calf"]) {
+    const r = m.rings[site + "R"];
+    const l = m.rings[site + "L"];
+    assert.equal(l.cx, 2 * X - r.cx);
+    assert.equal(l.y, r.y);
+    assert.equal(l.hw, r.hw);
+    assert.ok(r.cx < X && l.cx > X, site);
+  }
+});
