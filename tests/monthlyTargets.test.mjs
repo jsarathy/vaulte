@@ -8,6 +8,8 @@ import {
   monthKeyOf,
   fromTargetDoc,
   toTargetDoc,
+  TARGET_FIELDS,
+  monthLabelOf,
 } from "../src/lib/monthlyTargets.js";
 
 test("month key is YYYY-MM from a 0-based month", () => {
@@ -82,4 +84,29 @@ test("status: blank until both target and actual are set", () => {
   assert.equal(actualStatus("gym", "", "3"), "");
   assert.equal(actualStatus("gym", "12", ""), "");
   assert.equal(actualStatus("weightKg", "x", "80"), "");
+});
+
+test("the five form fields: key, label, unit, step and tolerance note (Fix 77)", () => {
+  assert.deepEqual(TARGET_FIELDS, [
+    { key: "weightKg", label: "Weight", unit: "kg", step: "0.1", tol: "± 0.2 kg" },
+    { key: "waistCm", label: "Waist", unit: "cm", step: "0.5", tol: "± 1 cm" },
+    { key: "gym", label: "Gym sessions", unit: "", step: "1" },
+    { key: "golf", label: "Golf sessions", unit: "", step: "1" },
+    { key: "sleepHrs", label: "Sleep (avg)", unit: "hrs", step: "0.25" },
+  ]);
+});
+
+test("monthLabelOf: short month and year, month counted from 0 (Fix 77)", () => {
+  assert.equal(monthLabelOf(2026, 9), "Oct 2026");
+  assert.equal(monthLabelOf(2027, 0), "Jan 2027");
+  assert.equal(monthLabelOf(2026, 11), "Dec 2026");
+});
+
+test("actualStatus: a difference of exactly the tolerance still counts, despite float error (Fix 77)", () => {
+  assert.equal(actualStatus("weightKg", "80.4", "80.6"), "ok"); // 80.6 - 80.4 is 0.2000000000000028
+  assert.equal(actualStatus("waistCm", "90", "91"), "ok");
+  assert.equal(actualStatus("waistCm", "90", "89"), "ok");
+  assert.equal(actualStatus("waistCm", "90", "91.1"), "off");
+  assert.equal(actualStatus("gym", "8", "8"), "ok"); // sessions: reaching the target is enough
+  assert.equal(actualStatus("gym", "8", "7"), "off");
 });
