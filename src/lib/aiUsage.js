@@ -68,3 +68,13 @@ export function periodCosts(records, now = Date.now()) {
       .reduce((sum, r) => sum + (r.cost_usd || 0), 0);
   return { day: within(1), week: within(7), month: within(30) };
 }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const two = (v) => String(v).padStart(2, "0");
+
+/** A record's time for the usage table, in the viewer's time zone: "11 Oct 14:32" ("" if unknown). */
+export function whenText(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${two(d.getHours())}:${two(d.getMinutes())}`;
+}

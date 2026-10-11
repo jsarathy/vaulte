@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { PRICES, WEB_SEARCH_USD, costOf } from "../api/_usage/pricing.js";
 import { cleanMeta, usageRecord } from "../api/_usage/record.js";
 import { format, summarise } from "../scripts/ai-usage.mjs";
-import { periodCosts, usd } from "../src/lib/aiUsage.js";
+import { periodCosts, usd, whenText } from "../src/lib/aiUsage.js";
 import { setUsageUser, usageField } from "../src/api/usageContext.js";
 
 const MODEL = "claude-sonnet-4-6";
@@ -220,4 +220,22 @@ test("periodCosts: what the last day, 7 days and 30 days cost; an unpriced call 
 test("usd: dollars to four places", () => {
   assert.equal(usd(0.0165), "$0.0165");
   assert.equal(usd(0), "$0.0000");
+});
+
+test("whenText: day, month and time in the viewer's time zone; blank when unknown", () => {
+  process.env.TZ = "UTC";
+  assert.equal(whenText("2026-10-11T14:32:00.000Z"), "11 Oct 14:32");
+  assert.equal(whenText("2026-01-02T03:04:00.000Z"), "2 Jan 03:04");
+  assert.equal(whenText("2026-12-31T23:59:00.000Z"), "31 Dec 23:59");
+  const names = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
+  names.forEach((m, i) => {
+    const iso = `2026-${String(i + 1).padStart(2, "0")}-15T09:05:00.000Z`;
+    assert.equal(whenText(iso), `15 ${m} 09:05`);
+  });
+  process.env.TZ = "Asia/Kolkata";
+  assert.equal(whenText("2026-10-11T22:00:00.000Z"), "12 Oct 03:30");
+  process.env.TZ = "UTC";
+  assert.equal(whenText(""), "");
+  assert.equal(whenText(undefined), "");
+  assert.equal(whenText("not a date"), "");
 });
