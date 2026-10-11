@@ -8,7 +8,7 @@
   "reporters": ["clear-text", "html", "json"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },
   "jsonReporter": { "fileName": "reports/mutation/mutation.json" },
-  "thresholds": { "high": 97, "low": 95, "break": 95 },
+  "thresholds": { "high": 98, "low": 96, "break": 96 },
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true
 }

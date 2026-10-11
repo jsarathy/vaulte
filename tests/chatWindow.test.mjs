@@ -7,6 +7,7 @@ import {
   HANDLES,
   MARGIN,
   MIN,
+  STORAGE_KEY,
   clampPos,
   clampSize,
   openingPos,
@@ -165,4 +166,70 @@ test("preview table: columns, a row's values, totals, cell text", () => {
   assert.equal(cellText(70, 0), "70");
   assert.equal(cellText(5, 1), "5g");
   assert.equal(cellText(0.4, 2), "0.4g");
+});
+
+// Fix 78 ---------------------------------------------------------------------------------
+
+test("the remembered size is stored under vaulte_chat_size", () => {
+  assert.equal(STORAGE_KEY, "vaulte_chat_size");
+});
+
+test("resizedBox: a drag on one axis leaves the other axis alone, even for a window already past a limit", () => {
+  const view = VIEW; // 1400 x 900
+  const go = (dir, from, x, y) => resizedBox(dir, from, { delta: { x, y }, view });
+  // partly off the right edge (pos.x 1000 + 540 > 1400 - 8): a vertical drag keeps the width
+  let from = { size: { w: 540, h: 500 }, pos: { x: 1000, y: 100 } };
+  assert.deepEqual(go({ dx: 0, dy: 1 }, from, 50, 40), {
+    size: { w: 540, h: 540 },
+    pos: { x: 1000, y: 100 },
+  });
+  // starting left of the left margin (pos.x 0): a vertical drag keeps the width and the left side
+  from = { size: { w: 540, h: 500 }, pos: { x: 0, y: 100 } };
+  assert.deepEqual(go({ dx: 0, dy: -1 }, from, 30, -40), {
+    size: { w: 540, h: 540 },
+    pos: { x: 0, y: 60 },
+  });
+  // partly off the bottom edge (pos.y 600 + 500 > 900 - 8): a horizontal drag keeps the height
+  from = { size: { w: 540, h: 500 }, pos: { x: 100, y: 600 } };
+  assert.deepEqual(go({ dx: 1, dy: 0 }, from, 40, 50), {
+    size: { w: 580, h: 500 },
+    pos: { x: 100, y: 600 },
+  });
+  // starting above the top margin (pos.y 0): a horizontal drag keeps the height and the top
+  from = { size: { w: 540, h: 500 }, pos: { x: 100, y: 0 } };
+  assert.deepEqual(go({ dx: -1, dy: 0 }, from, -40, 30), {
+    size: { w: 580, h: 500 },
+    pos: { x: 60, y: 0 },
+  });
+});
+
+test("resizedBox: a window smaller than the minimum is raised to it on the other axis without moving", () => {
+  const view = VIEW;
+  const small = { size: { w: 300, h: 380 }, pos: { x: 200, y: 100 } };
+  // dragging only the height: the width is lifted to 340 and the left side stays at 200
+  assert.deepEqual(resizedBox({ dx: 0, dy: 1 }, small, { delta: { x: 0, y: 100 }, view }), {
+    size: { w: 340, h: 480 },
+    pos: { x: 200, y: 100 },
+  });
+  // dragging only the width: the height is lifted to 420 and the top stays at 100
+  assert.deepEqual(resizedBox({ dx: 1, dy: 0 }, small, { delta: { x: 100, y: 0 }, view }), {
+    size: { w: 400, h: 420 },
+    pos: { x: 200, y: 100 },
+  });
+});
+
+test("HANDLES: the box of every handle", () => {
+  assert.deepEqual(
+    HANDLES.map((h) => h[2]),
+    [
+      { top: 0, left: 14, right: 14, height: 6 },
+      { bottom: 0, left: 14, right: 14, height: 6 },
+      { left: 0, top: 14, bottom: 14, width: 6 },
+      { right: 0, top: 14, bottom: 14, width: 6 },
+      { top: 0, left: 0, width: 14, height: 14 },
+      { bottom: 0, right: 0, width: 14, height: 14 },
+      { top: 0, right: 0, width: 14, height: 14 },
+      { bottom: 0, left: 0, width: 14, height: 14 },
+    ],
+  );
 });
