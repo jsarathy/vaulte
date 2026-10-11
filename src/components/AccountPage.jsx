@@ -31,7 +31,7 @@ function Panel({ activePanel, profile, userId, account }) {
         <NutritionTracker userId={userId} />
       </div>
     );
-  return <AccountPanel profile={profile} {...account} />;
+  return <AccountPanel profile={profile} userId={userId} {...account} />;
 }
 
 export default function AccountPage({ profile, toast, userId, page, nav, edit }) {

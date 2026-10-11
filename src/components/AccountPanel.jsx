@@ -4,6 +4,7 @@ import { useState } from "react";
 import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import ProfileCard from "./ProfileCard.jsx";
+import AiUsageCard from "./AiUsageCard.jsx";
 import { EditIcon } from "./NavIcons.jsx";
 
 const headerStyle = { marginBottom: "32px" };
@@ -151,25 +152,31 @@ function LinkedAccounts({ phone }) {
   );
 }
 
-export default function AccountPanel({ profile, photo, openEdit }) {
+function PanelHeader({ openEdit }) {
+  return (
+    <div style={headerStyle} className="fade-up">
+      <div style={eyebrowStyle}>PROFILE</div>
+      <div style={titleRowStyle}>
+        <h2 style={{ ...hdg, fontSize: "26px", marginBottom: 0 }}>My Account</h2>
+        <button
+          className="btn-ghost"
+          style={editButtonStyle}
+          aria-label="Edit Profile"
+          title="Edit Profile"
+          onClick={openEdit}
+        >
+          <EditIcon />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function AccountPanel({ profile, photo, openEdit, userId }) {
   const phone = useIsPhone();
   return (
     <div>
-      <div style={headerStyle} className="fade-up">
-        <div style={eyebrowStyle}>PROFILE</div>
-        <div style={titleRowStyle}>
-          <h2 style={{ ...hdg, fontSize: "26px", marginBottom: 0 }}>My Account</h2>
-          <button
-            className="btn-ghost"
-            style={editButtonStyle}
-            aria-label="Edit Profile"
-            title="Edit Profile"
-            onClick={openEdit}
-          >
-            <EditIcon />
-          </button>
-        </div>
-      </div>
+      <PanelHeader openEdit={openEdit} />
       <ProfileCard profile={profile} photo={photo} />
       {phone ? (
         <>
@@ -179,11 +186,15 @@ export default function AccountPanel({ profile, photo, openEdit }) {
           <Collapsible title="CONNECTED SERVICES">
             <LinkedAccounts phone />
           </Collapsible>
+          <Collapsible title="CLAUDE USAGE">
+            <AiUsageCard userId={userId} phone />
+          </Collapsible>
         </>
       ) : (
         <>
           <ContactCards profile={profile} />
           <LinkedAccounts />
+          <AiUsageCard userId={userId} />
         </>
       )}
     </div>
