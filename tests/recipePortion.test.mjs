@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  PORTION_UNITS,
   parseQty,
   portionWeight,
   localFactor,
@@ -102,4 +103,19 @@ test("form item: name + amount; missing macros blank, zero kept", () => {
     net_carbs: "",
     protein: "",
   });
+});
+
+test("PORTION_UNITS: the four choices in the box, each with its label (Fix 78)", () => {
+  assert.deepEqual(PORTION_UNITS, [
+    ["portion", "portion(s)"],
+    ["g", "grams (g)"],
+    ["ml", "millilitres (ml)"],
+    ["oz", "ounces (oz)"],
+  ]);
+  // every unit but ml can be scaled on the device when the recipe has a Wt/portion
+  const recipe = { portion_g: "200", nutrition: {} };
+  assert.deepEqual(
+    PORTION_UNITS.map(([unit]) => localFactor(recipe, 1, unit) !== null),
+    [true, true, false, true],
+  );
 });
