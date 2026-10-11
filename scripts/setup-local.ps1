@@ -43,6 +43,20 @@ if ($installed -contains $true) {
 git config core.autocrlf true
 Write-Host "ok       git core.autocrlf = true"
 
+# The Firestore emulator (Java 21) opens a Unix-domain socket in the temp folder and fails with
+# "Unable to establish loopback connection" when that path has a space (C:\Users\First Last\...).
+# Point it at a space-free folder for the user, so npm run test:api works in any new window.
+$sockets = "$env:SystemRoot\Temp"
+$opt = "-Djdk.net.unixdomain.tmpdir=$sockets"
+$current = [Environment]::GetEnvironmentVariable("JAVA_TOOL_OPTIONS", "User")
+if ($current -notlike "*jdk.net.unixdomain.tmpdir*") {
+  [Environment]::SetEnvironmentVariable("JAVA_TOOL_OPTIONS", (("$current $opt").Trim()), "User")
+  Write-Host "set      JAVA_TOOL_OPTIONS $opt (open a NEW PowerShell for it to apply)"
+} else {
+  Write-Host "ok       JAVA_TOOL_OPTIONS already sets jdk.net.unixdomain.tmpdir"
+}
+$env:JAVA_TOOL_OPTIONS = [Environment]::GetEnvironmentVariable("JAVA_TOOL_OPTIONS", "User")
+
 npm ci
 if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
 npx playwright install chromium
