@@ -5,6 +5,7 @@
 // Re-record only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test
 // body-trajectory --workers=1 (then review the JSON diff).
 import { test, expect } from "./cover.mjs";
+import { pinFont } from "./pinFont.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/body-trajectory.json", import.meta.url);
@@ -47,6 +48,7 @@ const start = async (p, rows, size) => {
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
   if (size) await p.setViewportSize(size);
+  await pinFont(p);
   await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
   await p.addInitScript((i) => Object.assign(window, i), {
     __collections: { [P("body_log")]: rows },
