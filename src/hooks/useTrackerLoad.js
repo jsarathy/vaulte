@@ -11,7 +11,12 @@ import { genId, ensureMealSlots } from "../constants/helpers";
 import { loadAllRecipes } from "../api/firestore";
 import { backfillPortionWeights } from "../api/recipeWeights";
 import * as data from "../api/trackerData";
-import { POLAR_RETURN, chatMessagesFrom, compareStart } from "../lib/trackerStart.js";
+import {
+  POLAR_RETURN,
+  POLAR_RETURN_MS,
+  chatMessagesFrom,
+  compareStart,
+} from "../lib/trackerStart.js";
 import { mergeDays, mergeRows, keepIfTouched } from "../lib/trackerStart.js";
 
 async function loadRecipes(userId, set) {
@@ -131,14 +136,14 @@ async function loadTracker(userId, set) {
   loadRest(userId, days, set);
 }
 
-// The message shows for 6 s; the query string is removed
+// The message lasts 6 s from when the Polar card shows it (PolarCard times it: the Add entry tab
+// loads after this runs, Fix 76); the query string is removed
 function showPolarReturn(userId, set) {
   const status = new URLSearchParams(window.location.search).get("polar");
   if (!POLAR_RETURN.has(status)) return;
   if (status === "connected") loadPolarConnection(userId, set);
   window.history.replaceState({}, "", window.location.pathname);
-  set.polarSyncMsg(POLAR_RETURN.get(status));
-  setTimeout(() => set.polarSyncMsg(null), 6000);
+  set.polarSyncMsg({ ...POLAR_RETURN.get(status), showFor: POLAR_RETURN_MS });
 }
 
 export function useTrackerLoad(userId, set) {

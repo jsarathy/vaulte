@@ -301,7 +301,7 @@ test("start-up: not signed in", async ({ page: p }) => {
   expect(await openDay(p)).toBe(null);
 });
 
-// The message lasts 6 s from page load; on a slow CI shard the lazy Add entry tab can arrive late.
+// The message lasts 6 s from when the Polar card shows it (Fix 76), not from page load.
 test("returning from Polar sign-in", async ({ page: p }) => {
   await start(p, FULL, "/tracker.html?polar=connected&x=1", false);
   await p.getByText("October 2026").waitFor();
@@ -330,4 +330,21 @@ test("returning from Polar sign-in", async ({ page: p }) => {
   await start(p, { __docs: {} }, "/tracker.html?polar=other", false);
   await p.getByText("October 2026").waitFor();
   expect(new URL(p.url()).search).toBe("?polar=other");
+});
+
+test("returning from Polar sign-in: the message still shows when the Add entry tab loads slower than 6 s", async ({
+  page: p,
+}) => {
+  // Fix 76: its 6 s used to run from page load, so a tab that took longer never showed it
+  await p.route(/AddEntry\.jsx/, async (route) => {
+    await new Promise((done) => setTimeout(done, 6500));
+    await route.continue();
+  });
+  await start(p, FULL, "/tracker.html?polar=connected", false);
+  await p.getByText("October 2026").waitFor();
+  await p.getByRole("button", { name: "Add entry", exact: true }).click();
+  await p.getByTestId("tab-loading").waitFor({ state: "detached", timeout: 20_000 });
+  const ok = p.getByText("Polar connected — click Sync to pull sessions.");
+  await expect(ok).toBeVisible();
+  await expect(ok).toHaveCount(0, { timeout: 8000 }); // and goes 6 s after it appeared
 });

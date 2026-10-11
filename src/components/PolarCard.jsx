@@ -1,5 +1,6 @@
 // src/components/PolarCard.jsx — the Polar Sessions card on Add Entry: header with Sync and
 // Reconnect, the last sync message, and the sessions list.
+import { useEffect } from "react";
 import PolarSessionsPanel from "./PolarSessionsPanel";
 import { reconnectPolar } from "../api/polarReconnect";
 import { usePhoneFold } from "../hooks/usePhoneFold.js";
@@ -92,7 +93,18 @@ function ConnectedControls({ userId, polar }) {
   );
 }
 
-/** polar: { connected, sessions, lastSync, syncing, syncMsg, sync }. Folded shut on a phone. */
+/** The sync / return message. One with `showFor` (the message after Polar's sign-in) goes that
+ *  many ms after it is on screen, not after it was set: this tab loads after the page does. */
+function SyncMsg({ msg, clear }) {
+  useEffect(() => {
+    if (!msg.showFor) return;
+    const timer = setTimeout(clear, msg.showFor);
+    return () => clearTimeout(timer);
+  }, [msg, clear]);
+  return <div style={S.msg(msg.ok)}>{msg.text}</div>;
+}
+
+/** polar: { connected, sessions, lastSync, syncing, syncMsg, clearMsg, sync }. Folded shut on a phone. */
 export default function PolarCard({ userId, polar, browse, onLog }) {
   const fold = usePhoneFold();
   return (
@@ -103,9 +115,7 @@ export default function PolarCard({ userId, polar, browse, onLog }) {
         </FoldTitle>
         {polar.connected && fold.open && <ConnectedControls userId={userId} polar={polar} />}
       </div>
-      {fold.open && polar.syncMsg && (
-        <div style={S.msg(polar.syncMsg.ok)}>{polar.syncMsg.text}</div>
-      )}
+      {fold.open && polar.syncMsg && <SyncMsg msg={polar.syncMsg} clear={polar.clearMsg} />}
       {fold.open && (
         <div style={{ padding: "12px" }}>
           <PolarSessionsPanel userId={userId} polar={polar} browse={browse} onLog={onLog} />

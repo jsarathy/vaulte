@@ -70,6 +70,7 @@ const polarOf = (p) => ({
   lastSync: p.polarLastSync,
   syncing: p.polarSyncing,
   syncMsg: p.polarSyncMsg,
+  clearMsg: () => p.setPolarSyncMsg(null),
   sync: p.syncPolar,
 });
 
