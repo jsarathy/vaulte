@@ -3,7 +3,9 @@
 import { test, expect } from "./cover.mjs";
 import path from "node:path";
 
-const moduleUrl = "/@fs" + path.resolve("src/api/recipeWeights.js").replaceAll("\\", "/");
+// Vite serves files outside its root at /@fs/<absolute path>; a Windows path (C:/...) has no leading slash.
+const moduleUrl =
+  "/@fs/" + path.resolve("src/api/recipeWeights.js").replaceAll("\\", "/").replace(/^\//, "");
 
 test("recipeWeights — backfill and propagation guards", async ({ page: p }) => {
   const errs = [];
