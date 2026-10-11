@@ -1,8 +1,9 @@
-// tests/ui/pinFont.mjs — one font for specs whose golden numbers depend on text height (Fix 71).
-// The harness pages set no font, so each OS used its own default and the expanded Trajectory chart
-// (its height is what is left under the heading) came out 1 px different on Windows. Arial and
-// Liberation Sans (what Linux CI substitutes for Arial) have identical metrics.
-const CSS = `* { font-family: Arial, "Liberation Sans", sans-serif !important; }`;
+// tests/ui/pinFont.mjs — fixed text height for specs whose golden numbers depend on it (Fix 71).
+// The expanded Trajectory chart is as tall as what is left under its heading, so its drawing
+// follows the heading's line height. The harness pages set no font and every OS rounds a font's
+// line height differently (Windows 706, Linux default 707, Linux Liberation Sans 708), so a font
+// alone does not make it repeatable. An explicit line-height does: it no longer depends on the font.
+const CSS = `* { font-family: Arial, "Liberation Sans", sans-serif !important; line-height: 1.25 !important; }`;
 
 export const pinFont = (page) =>
   page.addInitScript((css) => {
