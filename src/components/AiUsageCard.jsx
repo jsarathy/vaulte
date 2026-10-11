@@ -1,8 +1,10 @@
 // src/components/AiUsageCard.jsx — what the signed-in user's Claude calls used and cost (Fix 84):
-// cost for today, 7 and 30 days, and the last 30 days by feature. Sizes and costs only.
+// cost for today, 7 and 30 days; a double click opens every call as a table (Fix 85). Sizes and
+// costs only.
 import { useEffect, useState } from "react";
 import { loadMyUsage } from "../api/aiUsage.js";
-import { periodCosts, summarise, usd } from "../lib/aiUsage.js";
+import { periodCosts, usd } from "../lib/aiUsage.js";
+import AiUsageModal from "./AiUsageModal.jsx";
 
 const titleStyle = {
   color: "rgba(212,175,55,0.6)",
@@ -13,41 +15,10 @@ const titleStyle = {
 };
 const textStyle = { color: "#f0ead6", fontSize: "14px" };
 const mutedStyle = { color: "rgba(240,234,214,0.5)", fontSize: "13px" };
-const cell = { padding: "4px 10px 4px 0", textAlign: "right", whiteSpace: "nowrap" };
-const DAY = 86400000;
-
-function Table({ rows }) {
-  return (
-    <div style={{ overflowX: "auto", marginTop: "12px" }}>
-      <table style={{ ...textStyle, borderCollapse: "collapse", width: "100%" }}>
-        <thead>
-          <tr style={mutedStyle}>
-            {["Feature", "Calls", "Avg in", "Avg out", "Avg cost", "Total"].map((h, i) => (
-              <th key={h} style={{ ...cell, textAlign: i ? "right" : "left", fontWeight: 400 }}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((g) => (
-            <tr key={g.key}>
-              <td style={{ ...cell, textAlign: "left" }}>{g.key}</td>
-              <td style={cell}>{g.calls}</td>
-              <td style={cell}>{g.avgInput}</td>
-              <td style={cell}>{g.avgOutput}</td>
-              <td style={cell}>{usd(g.avgCost)}</td>
-              <td style={cell}>{usd(g.cost)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 export default function AiUsageCard({ userId, phone }) {
   const [state, setState] = useState({ status: "loading" });
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     let live = true;
     loadMyUsage(userId)
@@ -62,19 +33,16 @@ export default function AiUsageCard({ userId, phone }) {
   if (state.status === "loading") body = <div style={mutedStyle}>Loading…</div>;
   else if (state.status === "error") body = <div style={mutedStyle}>Could not load usage.</div>;
   else {
-    const month = state.rows.filter((r) => r.at >= new Date(Date.now() - 30 * DAY).toISOString());
-    const sum = summarise(month);
-    const cost = periodCosts(state.rows);
-    body = month.length ? (
+    const rows = state.rows;
+    const cost = periodCosts(rows);
+    body = rows.length ? (
       <>
         <div style={textStyle}>
           Today {usd(cost.day)} · 7 days {usd(cost.week)} · 30 days {usd(cost.month)}
         </div>
         <div style={mutedStyle}>
-          {sum.total.calls} calls, {sum.total.input} tokens in, {sum.total.output} out in the last
-          30 days
+          {rows.length} calls · {phone ? "double-tap" : "double-click"} for every call
         </div>
-        <Table rows={sum.byFeature} />
       </>
     ) : (
       <div style={mutedStyle}>No Claude calls recorded yet.</div>
@@ -83,9 +51,14 @@ export default function AiUsageCard({ userId, phone }) {
   return (
     <div style={{ marginTop: phone ? 0 : "28px" }} className="fade-up-3">
       {!phone && <div style={titleStyle}>CLAUDE USAGE (YOUR ACCOUNT)</div>}
-      <div className="info-card" style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div
+        className="info-card"
+        style={{ flexDirection: "column", alignItems: "stretch", touchAction: "manipulation" }}
+        onDoubleClick={() => state.status === "ok" && state.rows.length && setOpen(true)}
+      >
         {body}
       </div>
+      {open && <AiUsageModal rows={state.rows} onClose={() => setOpen(false)} />}
     </div>
   );
 }
