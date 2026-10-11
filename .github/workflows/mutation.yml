@@ -1,20 +1,21 @@
-# Fix 67 — mutation testing of the unit-tested logic (src/lib), weekly. StrykerJS makes small
-# deliberate breaks in the code and runs the unit tests against each; a break no test catches
-# (a "survivor") is code the tests do not really guard. Not a required check: it fails below the
-# score in stryker.config.json (thresholds.break) so a drop is noticed, and uploads the report.
-# Run it by hand with "Run workflow", or locally: npm run mutation
+# Fix 67 / Fix 81 - mutation testing, weekly. StrykerJS makes small deliberate breaks in the code
+# and runs the tests against each; a break no test catches (a "survivor") is code the tests do not
+# really guard. Two jobs: the unit-tested logic (src/lib and the logic files in src/constants) and
+# api/ (the unit tests plus the API tests, in the Firestore emulator). Not required checks: each
+# fails below the score in its config (thresholds.break) so a drop is noticed, and uploads its report.
+# Run it by hand with "Run workflow", or locally: npm run mutation / npm run mutation:api
 name: mutation
 on:
   schedule:
     - cron: "43 5 * * 1"
   workflow_dispatch:
   pull_request:
-    paths: [.github/workflows/mutation.yml, stryker.config.json]
+    paths: [.github/workflows/mutation.yml, stryker.config.json, stryker.api.config.json]
 permissions:
   contents: read
 jobs:
   mutation:
-    name: Mutation testing (src/lib)
+    name: Mutation testing (src/lib and constants)
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -28,16 +29,42 @@ jobs:
         run: npm run mutation
       - name: Score in the run summary
         if: always()
-        run: |
-          node -e '
-            const r = require("./reports/mutation/mutation.json"), c = {};
-            for (const f of Object.values(r.files)) for (const m of f.mutants) c[m.status] = (c[m.status] || 0) + 1;
-            const k = c.Killed || 0, t = c.Timeout || 0, s = c.Survived || 0, n = c.NoCoverage || 0;
-            const score = (100 * (k + t) / (k + t + s + n)).toFixed(2);
-            console.log(`## Mutation score ${score}%\n\nKilled ${k}, timeout ${t}, survived ${s}, no coverage ${n}. Report: the mutation-report artifact.`);
-          ' >> "$GITHUB_STEP_SUMMARY"
+        run: node scripts/mutation-summary.mjs reports/mutation/mutation.json "src/lib and constants" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mutation-report
           path: reports/mutation
+  mutation-api:
+    name: Mutation testing (api)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-15.32.1
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-firebase-tools-15.32.1
+      - run: npm ci
+      - name: Mutation testing
+        run: npm run mutation:api
+      - name: Score in the run summary
+        if: always()
+        run: node scripts/mutation-summary.mjs reports/mutation-api/mutation.json "api" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report-api
+          path: reports/mutation-api

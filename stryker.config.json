@@ -3,7 +3,13 @@
   "testRunner": "tap",
   "plugins": ["@stryker-mutator/tap-runner"],
   "tap": { "testFiles": ["tests/*.test.mjs"] },
-  "mutate": ["src/lib/**/*.js"],
+  "mutate": [
+    "src/lib/**/*.js",
+    "src/constants/helpers.js",
+    "src/constants/meds.js",
+    "src/constants/recipeLinks.js",
+    "src/constants/weightPlan.js"
+  ],
   "coverageAnalysis": "perTest",
   "reporters": ["clear-text", "html", "json"],
   "htmlReporter": { "fileName": "reports/mutation/index.html" },

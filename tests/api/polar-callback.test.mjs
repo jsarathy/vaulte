@@ -1,6 +1,6 @@
 // tests/api/polar-callback.test.mjs — GET /api/polar-callback against the Firestore emulator.
 // Polar's token and AccessLink endpoints are stubbed — no network.
-import { test, beforeEach, afterEach } from "node:test";
+import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read } from "./setup.mjs";
 import handler from "../../api/polar-callback.js";
@@ -102,4 +102,75 @@ test("failed token exchange or network error: error redirect, nothing saved", as
     `${APP}/?polar=error&reason=server_error`,
   );
   assert.equal(await read(PATH), undefined);
+});
+
+// Fix 81 ---------------------------------------------------------------------------------
+
+const quiet = () => ({
+  log: mock.method(console, "log", () => {}),
+  warn: mock.method(console, "warn", () => {}),
+  error: mock.method(console, "error", () => {}),
+});
+const said = (spy) => spy.mock.calls.map((c) => c.arguments);
+
+test("the requests to Polar are POSTs with their content types and Accept headers", async () => {
+  quiet();
+  stubPolar();
+  await call({ code: "c", state });
+  const [tokenCall, regCall] = calls;
+  assert.equal(tokenCall.opts.method, "POST");
+  assert.equal(tokenCall.opts.headers["Content-Type"], "application/x-www-form-urlencoded");
+  assert.equal(tokenCall.opts.headers.Accept, "application/json");
+  assert.equal(
+    new URLSearchParams(tokenCall.opts.body).get("redirect_uri"),
+    `${APP}/api/polar-callback`,
+  );
+  assert.equal(regCall.opts.method, "POST");
+  assert.equal(regCall.opts.headers["Content-Type"], "application/json");
+  assert.equal(regCall.opts.headers.Accept, "application/json");
+  mock.restoreAll();
+});
+
+test("a registration that is neither OK nor 'already registered' is warned about; the others are not", async () => {
+  for (const [register, warned] of [
+    [200, false],
+    [409, false],
+    [500, true],
+  ]) {
+    await clearFirestore();
+    const spies = quiet();
+    stubPolar({ register });
+    await call({ code: "c", state });
+    assert.deepEqual(said(spies.log)[0], ["Polar registration status:", register]);
+    assert.equal(spies.warn.mock.callCount(), warned ? 1 : 0, `status ${register}`);
+    if (warned)
+      assert.deepEqual(said(spies.warn)[0], ["Polar registration non-fatal error:", 500, "body"]);
+    mock.restoreAll();
+  }
+});
+
+test("a refused token and a crash are logged with what Polar or the error said", async () => {
+  const spies = quiet();
+  stubPolar({ token: { ok: false } });
+  await call({ code: "c", state });
+  assert.deepEqual(said(spies.error)[0], ["Token exchange failed:", "invalid_grant"]);
+  stubPolar({ fail: true });
+  await call({ code: "c", state });
+  const [label, err] = said(spies.error)[1];
+  assert.equal(label, "Polar callback error:");
+  assert.match(err.message, /network down/);
+  mock.restoreAll();
+});
+
+test("without VAULTE_APP_URL the redirect goes to the live app", async () => {
+  delete process.env.VAULTE_APP_URL;
+  try {
+    stubPolar();
+    assert.equal(
+      (await call({ error: "access_denied" })).location,
+      "https://vaulte-roan.vercel.app/?polar=denied",
+    );
+  } finally {
+    process.env.VAULTE_APP_URL = APP;
+  }
 });

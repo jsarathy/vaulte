@@ -226,7 +226,14 @@ test("cutoff: only a YYYY-MM-DD date; none → nothing rejected", async () => {
     [DEVICES]: devices([{ tableName: "t", userIds: ["77"] }]),
     [BODY]: pages(recs),
   });
-  for (const fromDate of [undefined, "1 Sep 2026", 20260901, "2026-9-01", "2026-09-01T00:00"]) {
+  for (const fromDate of [
+    undefined,
+    "1 Sep 2026",
+    20260901,
+    "2026-9-01",
+    "2026-09-01T00:00",
+    "on 2026-09-01",
+  ]) {
     const b = (await call(fromDate === undefined ? {} : { fromDate })).body;
     assert.equal(b.fromDate, null);
     assert.equal(b.rejected, 0);

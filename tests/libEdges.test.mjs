@@ -1,7 +1,6 @@
 // tests/libEdges.test.mjs — edge cases in src/lib that the first mutation runs showed no test
 // guarded (Fix 79): a missing field, a boundary, an exact text. One section per module.
 import { test } from "node:test";
-import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { chatMealName, mealNotFound } from "../src/lib/chatLog.js";
 import { fmtDate, frameSize, niceAxis, todayISO } from "../src/lib/hourlySteps.js";
@@ -10,6 +9,18 @@ import { compareStart, datedRows, mergeDays, mergeRows } from "../src/lib/tracke
 import { withWeightRow } from "../src/lib/weightEntry.js";
 import { findSavedRecipe } from "../src/lib/addFood.js";
 import { mealsForDate } from "../src/lib/chatMessages.js";
+
+// Runs fn with the process in another time zone (Node re-reads TZ when it is assigned).
+const inTimeZone = (zone, fn) => {
+  const before = process.env.TZ;
+  process.env.TZ = zone;
+  try {
+    return fn();
+  } finally {
+    if (before === undefined) delete process.env.TZ;
+    else process.env.TZ = before;
+  }
+};
 
 // ---- chatLog.js
 test("chatLog: the 'meal not found' text names the date", () => {
@@ -44,13 +55,10 @@ test("hourlySteps: fmtDate is weekday, day, month and year in British order; bla
 });
 
 test("hourlySteps: fmtDate shows the same day in a time zone behind UTC", () => {
-  const script =
-    'import { fmtDate } from "./src/lib/hourlySteps.js"; console.log(fmtDate("2026-10-04"));';
-  const out = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
-    encoding: "utf8",
-    env: { ...process.env, TZ: "America/Los_Angeles" },
-  });
-  assert.match(out.trim(), /^Sun,? 4 Oct 2026$/);
+  assert.match(
+    inTimeZone("America/Los_Angeles", () => fmtDate("2026-10-04")),
+    /^Sun,? 4 Oct 2026$/,
+  );
 });
 
 test("hourlySteps: todayISO is today's local date as YYYY-MM-DD", () => {
