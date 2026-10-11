@@ -62,7 +62,8 @@ const ADD_ENTRY_PROPS = [
   ...["userRecipes", "setUserRecipes", "addDate", "setAddDate", "addMealId", "setAddMealId"],
   ...["addMealName", "setAddMealName", "addItem", "setAddItem", "addMsg", "setAddMsg"],
   ...["polarConnected", "polarSessions", "setPolarSessions", "polarSyncing", "polarLastSync"],
-  ...["polarSyncMsg", "syncPolar", "setPolarLogModal", "persistDay", "setRecipeModal"],
+  ...["polarSyncMsg", "setPolarSyncMsg", "syncPolar", "setPolarLogModal", "persistDay"],
+  "setRecipeModal",
 ];
 const pick = (t, keys) => Object.fromEntries(keys.map((k) => [k, t[k]]));
 

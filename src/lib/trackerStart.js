@@ -66,6 +66,9 @@ export const POLAR_RETURN = new Map([
   ["error", { ok: false, text: "Polar connection failed." }],
 ]);
 
+/** How long a Polar return message stays once the Polar card shows it. */
+export const POLAR_RETURN_MS = 6000;
+
 /** How many of the newest days the first screen waits for; the rest load afterwards. */
 export const RECENT_DAYS = 5;
 
