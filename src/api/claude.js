@@ -19,7 +19,7 @@ const WEB_SEARCH = [{ type: "web_search_20250305", name: "web_search", max_uses:
 /** The food items (name + nutrition) in a description of what was eaten. */
 export async function claudeParseFood(text) {
   const body = { max_tokens: 1000, system: prompt.PARSE_FOOD, messages: user(text) };
-  const result = await requestStructured(body, FOOD_ITEMS_SCHEMA);
+  const result = await requestStructured(body, FOOD_ITEMS_SCHEMA, "parse_food");
   return result.items;
 }
 
@@ -27,7 +27,7 @@ export async function claudeParseFood(text) {
 export async function claudeCreateRecipe(description, savedRecipeNames = []) {
   const system = prompt.createRecipe(savedRecipeNames);
   const body = { max_tokens: 2000, tools: WEB_SEARCH, system, messages: user(description) };
-  return requestStructured(body, RECIPE_SCHEMA);
+  return requestStructured(body, RECIPE_SCHEMA, "create_recipe");
 }
 
 /** Nutrition per serving recalculated from the recipe's ingredients and servings. */
@@ -37,6 +37,7 @@ export async function claudeRecalculateNutrition(recipe) {
   return requestStructured(
     { ...body, messages: user({ servings, ingredients }) },
     NUTRITION_SCHEMA,
+    "recalc_nutrition",
   );
 }
 
@@ -54,7 +55,7 @@ export async function claudeScaleRecipeNutrition(recipe, qty, unit) {
     unit,
   };
   const body = { max_tokens: 600, system: prompt.SCALE_RECIPE, messages: user(content) };
-  return requestStructured(body, NUTRITION_SCHEMA);
+  return requestStructured(body, NUTRITION_SCHEMA, "scale_recipe");
 }
 
 // Estimated Wt/portion: the total weight of all the ingredients as listed, divided by servings — convert volumes and counts to grams with typical weights (e.g. 1 medium onion, 1 tbsp oil) and do not adjust for water lost or absorbed in cooking.
@@ -64,6 +65,7 @@ export async function claudeEstimatePortionWeight(recipe) {
   return requestStructured(
     { ...body, messages: user({ name, servings, ingredients }) },
     PORTION_SCHEMA,
+    "estimate_portion",
   );
 }
 
@@ -82,10 +84,10 @@ export async function claudeRegenerateRecipe(recipe) {
     portion_g: recipe.portion_g ?? null,
   };
   const body = { max_tokens: 2000, system: prompt.REGENERATE_RECIPE, messages: user(content) };
-  return requestStructured(body, RECIPE_SCHEMA);
+  return requestStructured(body, RECIPE_SCHEMA, "regenerate_recipe");
 }
 
 /** The chat reply as text; the user's saved recipes are in the assistant's context. */
 export async function claudeChat(messages, userRecipes = []) {
-  return requestText({ max_tokens: 1000, system: prompt.chat(userRecipes), messages });
+  return requestText({ max_tokens: 1000, system: prompt.chat(userRecipes), messages }, "chat");
 }

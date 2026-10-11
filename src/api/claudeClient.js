@@ -1,6 +1,8 @@
 // src/api/claudeClient.js — talking to /api/claude (the serverless proxy): the request, the
 // body as JSON (with a readable error when the platform itself failed), the API's own errors,
 // and the model's final text — parsed against a schema with Structured Outputs, or as is.
+// Every request names its feature, so the server can keep a record of what each call costs (Fix 41).
+import { usageField } from "./usageContext.js";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -41,8 +43,9 @@ function assertOk(res, data) {
 // (Structured Outputs) — no reliance on Claude following "return only JSON"
 // instructions, no prefill needed, and it still works fine alongside tools
 // like web_search since the grammar only constrains Claude's final text output.
-export async function requestStructured(body, schema) {
-  const data = await post({ ...body, output_config: { format: { type: "json_schema", schema } } });
+export async function requestStructured(body, schema, feature) {
+  const output_config = { format: { type: "json_schema", schema } };
+  const data = await post({ ...body, output_config }, feature);
   if (data.stop_reason === "refusal") {
     throw new Error("Claude declined to generate this — try rephrasing your request.");
   }
@@ -63,16 +66,16 @@ function parseReply(raw) {
 }
 
 /** The model's final text, unconstrained. */
-export async function requestText(body) {
-  return extractFinalText(await post(body));
+export async function requestText(body, feature) {
+  return extractFinalText(await post(body, feature));
 }
 
 /** POST the request (the model filled in) and give back the reply's body, checked. */
-async function post(body) {
+async function post(body, feature) {
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, ...body }),
+    body: JSON.stringify({ model: MODEL, ...body, ...usageField(feature) }),
   });
   const data = await safeJson(res);
   assertOk(res, data);

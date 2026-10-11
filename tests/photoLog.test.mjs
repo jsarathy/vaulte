@@ -8,6 +8,7 @@ import {
   itemSummary,
   formItemFromPhoto,
   photoRecipe,
+  photoRequest,
 } from "../src/lib/photoLog.js";
 
 const reply = (text) => ({ content: [{ text }] });
@@ -86,5 +87,21 @@ test("recipe: one food gives its name; totals to 1 dp, missing as 0", () => {
   assert.deepEqual(two.ingredients, [
     { amount: "", item: "Toast" },
     { amount: "", item: "Egg" },
+  ]);
+});
+
+test("photoRequest: the picture and the prompt, one Sonnet 4.6 call with a 1000-token limit (Fix 41)", () => {
+  const req = photoRequest("QUJD");
+  assert.equal(req.model, "claude-sonnet-4-6");
+  assert.equal(req.max_tokens, 1000);
+  assert.equal(req._usage.feature, "photo");
+  assert.deepEqual(req.messages, [
+    {
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "QUJD" } },
+        { type: "text", text: PHOTO_PROMPT },
+      ],
+    },
   ]);
 });

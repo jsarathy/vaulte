@@ -12,6 +12,9 @@ import {
   claudeRegenerateRecipe,
   claudeScaleRecipeNutrition,
 } from "../src/api/claude.js";
+import { claudeLookupFood } from "../src/api/foodLookup.js";
+import { photoRequest } from "../src/lib/photoLog.js";
+import { setUsageUser } from "../src/api/usageContext.js";
 
 let calls, reply;
 const text = (t) => ({ content: [{ type: "text", text: t }] });
@@ -299,4 +302,33 @@ test("a non-JSON body (the platform failing before the function ran) is explaine
   await assert.rejects(claudeChat([]), {
     message: "Server returned a non-JSON response (status 200): empty body",
   });
+});
+
+// Fix 41: every call names its feature and carries the signed-in user, so the server can keep a
+// record of what each feature costs.
+test("every Claude call carries its feature name and the user", async () => {
+  setUsageUser("user-7");
+  const recipe = { name: "Soup", servings: 2, ingredients: [{ amount: "1", item: "onion" }] };
+  const features = [];
+  const run = async (feature, fn) => {
+    calls = [];
+    reply = { status: 200, body: json({ items: [], reply: "x" }) };
+    await fn().catch(() => {}); // the reply need not be valid for the request to be checked
+    features.push([feature, calls[0].body._usage]);
+  };
+  await run("parse_food", () => claudeParseFood("an apple"));
+  await run("create_recipe", () => claudeCreateRecipe("a soup"));
+  await run("recalc_nutrition", () => claudeRecalculateNutrition(recipe));
+  await run("scale_recipe", () => claudeScaleRecipeNutrition(recipe, 100, "ml"));
+  await run("estimate_portion", () => claudeEstimatePortionWeight(recipe));
+  await run("regenerate_recipe", () => claudeRegenerateRecipe(recipe));
+  await run("chat", () => claudeChat([{ role: "user", content: "hi" }]));
+  await run("lookup_food", () => claudeLookupFood({ name: "apple", qty: 1, unit: "portion" }));
+  features.push(["photo", photoRequest("abc")._usage]);
+  assert.deepEqual(
+    features,
+    features.map(([feature]) => [feature, { feature, userId: "user-7" }]),
+  );
+  assert.equal(features.length, 9);
+  setUsageUser(null);
 });

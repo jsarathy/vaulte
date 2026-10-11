@@ -1,5 +1,7 @@
 // src/hooks/useTracker.js — everything NutritionTracker shows and does, wired together: state,
 // start-up loading, calculator, days, weight / body actions, Polar sync, weight box, chat.
+import { useEffect } from "react";
+import { setUsageUser } from "../api/usageContext.js";
 import * as state from "./useTrackerState";
 import { useCalculatorSettings } from "./useCalculatorSettings";
 import { useTrackerLoad } from "./useTrackerLoad";
@@ -42,6 +44,7 @@ const calcProps = ({ values: v, setters }) => ({
 });
 
 export function useTracker(userId) {
+  useEffect(() => setUsageUser(userId), [userId]); // who the Claude calls are for (Fix 41)
   const s = { userId, ...useAllState() };
   const calc = useCalculatorSettings(userId);
   useTrackerLoad(userId, loadSetters(s, calc));
