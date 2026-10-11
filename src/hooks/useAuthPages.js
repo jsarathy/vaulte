@@ -1,6 +1,6 @@
 // src/hooks/useAuthPages.js — the state behind the sign-in pages: which page is open, the
 // signed-in profile, the toast, and the Create Account / Sign In / Magic Link / Google flows.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   completeMagicLink,
   createAccount,
@@ -22,18 +22,13 @@ import {
 } from "../lib/authProfile.js";
 import { useAuthHistory } from "./useAuthHistory.js";
 
-const TOAST_MS = 3000;
-
+/** The toast message and its clock. The Toast component times it once it is on screen. */
 export function useToast() {
-  const [toast, setToast] = useState("");
-  const timer = useRef(null);
-  const showToast = (msg) => {
-    clearTimeout(timer.current); // an older toast's timer must not clear this one early
-    setToast(msg);
-    timer.current = setTimeout(() => setToast(""), TOAST_MS);
-  };
-  useEffect(() => () => clearTimeout(timer.current), []);
-  return { toast, showToast };
+  const [toast, setToast] = useState({ msg: "", id: 0 });
+  const showToast = (msg) => setToast((t) => ({ msg, id: t.id + 1 }));
+  const expire = useCallback(() => setToast((t) => ({ msg: "", id: t.id })), []);
+  const toastClock = useMemo(() => ({ id: toast.id, expire }), [toast.id, expire]);
+  return { toast: toast.msg, showToast, toastClock };
 }
 
 /** Runs `work`, showing its failure (via `describe`) and the busy state while it runs. */
@@ -169,7 +164,7 @@ function useOtherSignIns(session, run, setLoginData) {
 
 /** Everything the sign-in pages and the signed-in page need. */
 export function useAuthPages() {
-  const { toast, showToast } = useToast();
+  const { toast, showToast, toastClock } = useToast();
   const session = useSession(showToast);
   useAuthHistory(session.page, session.go);
   const { loading, run } = useBusy(session.setError);
@@ -180,5 +175,5 @@ export function useAuthPages() {
     signup.setSignupData((s) => ({ ...s, email }));
     session.setPage("signup");
   });
-  return { ...session, toast, showToast, loading, ...signup, login, ...others };
+  return { ...session, toast, showToast, toastClock, loading, ...signup, login, ...others };
 }

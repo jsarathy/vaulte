@@ -250,6 +250,22 @@ test("opened from a sign-in link: the stored email signs in; a new user goes to 
   expect(await page.evaluate(() => location.pathname)).toBe("/");
 });
 
+test("the welcome toast is timed from when it is on screen, however slowly the account page loads", async ({
+  page,
+}) => {
+  // Fix 65: the toast's 3 s used to run from sign-in, so a page that took longer never showed it
+  await page.route(/AccountPage\.jsx/, async (route) => {
+    await new Promise((done) => setTimeout(done, 4500));
+    await route.continue();
+  });
+  await start(page, { __magicLink: true, __docs: { "users/magic-u": PROFILE } });
+  await page.evaluate(() => localStorage.setItem("vaulte:magicEmail", "jane@example.com"));
+  await page.goto("/app.html");
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("text=WELCOME BACK")).toBeVisible();
+  await expect(page.locator("text=WELCOME BACK")).toBeHidden({ timeout: 6000 });
+});
+
 test("opened from a sign-in link with no stored email: asks; a cancelled prompt stays loading", async ({
   page,
 }) => {
