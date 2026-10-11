@@ -22,8 +22,9 @@ export const isSunday = (dateStr) => new Date(dateStr + "T12:00:00").getDay() ==
 export const hasText = (e) => !!(e && ((typeof e.text === "string" && e.text.trim()) || e.done));
 
 // Meds that apply on a given date: within from/to (ISO strings compare correctly), Sunday-only where flagged.
-export const medsForDate = (dateStr) =>
-  MEDS_TASKS.filter(
+// `tasks` is the schedule (the real one unless a test passes its own).
+export const medsForDate = (dateStr, tasks = MEDS_TASKS) =>
+  tasks.filter(
     (t) =>
       (!t.sunday || isSunday(dateStr)) &&
       (!t.from || dateStr >= t.from) &&

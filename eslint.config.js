@@ -286,6 +286,7 @@ export default [
       "docs/**",
       "reports/**",
       ".stryker-tmp/**",
+      ".stryker-tmp-api/**",
     ],
   },
   js.configs.recommended,
