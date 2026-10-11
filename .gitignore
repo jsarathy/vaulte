@@ -18,3 +18,7 @@ playwright-report/
 
 # per-test coverage for the spec map (Fix 40)
 .ui-coverage/
+
+# mutation testing output (Fix 67)
+reports/
+.stryker-tmp/
