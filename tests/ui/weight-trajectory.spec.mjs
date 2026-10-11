@@ -5,6 +5,7 @@
 // Re-record the drawings only for a deliberate visual change: UPDATE_GOLDEN=1 npx playwright test
 // weight-trajectory (then review the JSON diff).
 import { test, expect } from "./cover.mjs";
+import { pinFont } from "./pinFont.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const GOLDEN_FILE = new URL("./fixtures/weight-trajectory.json", import.meta.url);
@@ -49,6 +50,7 @@ const start = async (p, init = {}) => {
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
+  await pinFont(p);
   await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
   await p.addInitScript((i) => Object.assign(window, i), init);
   await p.goto("/tracker.html");
