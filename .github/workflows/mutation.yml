@@ -1,0 +1,43 @@
+# Fix 67 — mutation testing of the unit-tested logic (src/lib), weekly. StrykerJS makes small
+# deliberate breaks in the code and runs the unit tests against each; a break no test catches
+# (a "survivor") is code the tests do not really guard. Not a required check: it fails below the
+# score in stryker.config.json (thresholds.break) so a drop is noticed, and uploads the report.
+# Run it by hand with "Run workflow", or locally: npm run mutation
+name: mutation
+on:
+  schedule:
+    - cron: "43 5 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/mutation.yml, stryker.config.json]
+permissions:
+  contents: read
+jobs:
+  mutation:
+    name: Mutation testing (src/lib)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Mutation testing
+        run: npm run mutation
+      - name: Score in the run summary
+        if: always()
+        run: |
+          node -e '
+            const r = require("./reports/mutation/mutation.json"), c = {};
+            for (const f of Object.values(r.files)) for (const m of f.mutants) c[m.status] = (c[m.status] || 0) + 1;
+            const k = c.Killed || 0, t = c.Timeout || 0, s = c.Survived || 0, n = c.NoCoverage || 0;
+            const score = (100 * (k + t) / (k + t + s + n)).toFixed(2);
+            console.log(`## Mutation score ${score}%\n\nKilled ${k}, timeout ${t}, survived ${s}, no coverage ${n}. Report: the mutation-report artifact.`);
+          ' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation

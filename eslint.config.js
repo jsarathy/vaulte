@@ -278,7 +278,16 @@ const unused = [
 ];
 
 export default [
-  { ignores: ["dist/**", "node_modules/**", "Claude outputs/**", "docs/**"] },
+  {
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "Claude outputs/**",
+      "docs/**",
+      "reports/**",
+      ".stryker-tmp/**",
+    ],
+  },
   js.configs.recommended,
   {
     files: ["src/**/*.{js,jsx}"],
