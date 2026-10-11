@@ -35,9 +35,10 @@ const input = (p, label) => p.locator("label", { hasText: label }).locator("..")
 const button = (p, name) => p.getByRole("button", { name, exact: true });
 
 test("loading, then the landing page; its two buttons lead to the two forms", async ({ page }) => {
-  await start(page, { __authDelay: 1500 });
+  await start(page, { __authHold: ["start"] }); // the sign-in check waits until it is released
   await expect(page.locator("text=VAULTE")).toBeVisible();
   await expect(page.locator(".spinner-gold")).toBeVisible();
+  await page.evaluate(() => window.__authRelease("start"));
   await expect(page.locator("text=WELCOME TO")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("h1")).toHaveText("VAULTE");
   await expect(page.locator("text=Your personal account, secured.")).toBeVisible();
@@ -114,7 +115,7 @@ test("Create Account: required fields, password length, duplicate email, success
 
 test("while a sign-up or sign-in runs the button is disabled with a spinner", async ({ page }) => {
   await start(page, {
-    __authDelays: { createUser: 1200, signIn: 1200 },
+    __authHold: ["createUser", "signIn"], // each call waits until the test releases it
     __docs: { "users/u": PROFILE },
   });
   await page.click("text=Create Account");
@@ -127,6 +128,7 @@ test("while a sign-up or sign-in runs the button is disabled with a spinner", as
   await expect(create).toBeDisabled();
   await expect(create.locator(".spinner")).toBeVisible();
   await expect(button(page, "Continue with Google")).toBeDisabled();
+  await page.evaluate(() => window.__authRelease("createUser"));
   await expect(page.locator("text=Welcome, J.")).toBeVisible({ timeout: 15_000 });
   await page.click("text=Sign Out");
   await page.click("text=Sign In");
@@ -136,6 +138,7 @@ test("while a sign-up or sign-in runs the button is disabled with a spinner", as
   await signIn.click();
   await expect(signIn).toBeDisabled();
   await expect(signIn.locator(".spinner")).toBeVisible();
+  await page.evaluate(() => window.__authRelease("signIn"));
   await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
 });
 
