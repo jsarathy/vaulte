@@ -41,6 +41,15 @@ test("linkInfo: portions of a recipe with a weight give grams; kg works", () => 
   assert.equal(linkInfo({ amount: "1", item: "Stew" }, null, "x"), null);
 });
 
+test("linkInfo: a recipe whose Wt/portion is 0 has no grams (null, not 0)", () => {
+  const zero = [{ id: "z", name: "Zero", portion_g: 0, nutrition: { kcal: 100 } }];
+  assert.equal(linkInfo({ amount: "2", item: "Zero" }, zero, "x").grams, null);
+  assert.equal(
+    linkInfo({ amount: "2", item: "Zero" }, [{ ...zero[0], portion_g: "150" }], "x").grams,
+    300,
+  );
+});
+
 test("linkInfo: recipe with no nutrition scales to zeros", () => {
   const li = linkInfo({ amount: "1", item: "Bare" }, [{ id: "z", name: "Bare" }], "x");
   assert.equal(li.ok, true);
@@ -75,13 +84,13 @@ const B = (over = {}) => ({
   name: "Bowl",
   servings: 2,
   portion_g: 400,
-  portion_g_source: "estimated",
+  portion_g_source: "weighed",
   nutrition: { kcal: 500 },
   ingredients: [{ amount: "300g", item: "Stew" }],
   ...over,
 });
 
-test("applyLinkDelta: weight null when B has no weight or grams unknown", () => {
+test("applyLinkDelta: weight {} when B keeps its weight, null when it needs one", () => {
   const A2 = { ...A, nutrition: { kcal: 330 } };
   const { rows } = relinkDependent(B(), {
     oldA: A,
@@ -89,7 +98,9 @@ test("applyLinkDelta: weight null when B has no weight or grams unknown", () => 
     recipesOld: recipes,
     recipesNew: [A2, NOWT],
   });
+  assert.deepEqual(applyLinkDelta(B(), rows, { keepWeight: true }).weight, {});
   assert.equal(applyLinkDelta(B({ portion_g: null }), rows).weight, null);
+  assert.equal(applyLinkDelta(B(), rows).weight, null); // keepWeight is the caller's decision
   const S2 = { ...NOWT, nutrition: { kcal: 120 } };
   const Bs = B({ ingredients: [{ amount: "1", item: "Soup" }] });
   const r2 = relinkDependent(Bs, {
@@ -98,31 +109,45 @@ test("applyLinkDelta: weight null when B has no weight or grams unknown", () => 
     recipesOld: recipes,
     recipesNew: [A, S2],
   }).rows;
-  assert.equal(applyLinkDelta(Bs, r2).weight, null); // Soup has no Wt/portion → grams unknown
   assert.equal(applyLinkDelta(Bs, r2).nutrition.kcal, 510);
 });
 
-test("applyLinkDelta: servings 0 → 1; weight falling to ≤ 0 → null", () => {
-  const A2 = { ...A, portion_g: 10 };
-  const Bp = B({ servings: 0, portion_g: 100, ingredients: [{ amount: "1", item: "Stew" }] });
-  const { rows } = relinkDependent(Bp, {
+test("applyLinkDelta: servings 0 counts as 1", () => {
+  const A2 = { ...A, nutrition: { kcal: 330 } };
+  const kcal = (servings) => {
+    const Bp = B({ servings, ingredients: [{ amount: "1", item: "Stew" }] });
+    const { rows } = relinkDependent(Bp, {
+      oldA: A,
+      newA: A2,
+      recipesOld: recipes,
+      recipesNew: [A2, NOWT],
+    });
+    return applyLinkDelta(Bp, rows).nutrition.kcal;
+  };
+  assert.equal(kcal(0), kcal(1));
+  assert.notEqual(kcal(1), kcal(2));
+});
+
+test("relinkDependent: a new recipe (no old version) links B's ingredient of that name, text untouched", () => {
+  const Bx = B({ ingredients: [{ amount: "300g", item: "STEW" }] });
+  const out = relinkDependent(Bx, { oldA: null, newA: A, recipesOld: [], recipesNew: [A] });
+  assert.equal(out.rows.length, 1);
+  assert.deepEqual(out.ingredients, [{ amount: "300g", item: "STEW" }]);
+  // renamed: B follows; same name in a different case: B's own text is kept
+  const renamed = relinkDependent(B(), {
     oldA: A,
-    newA: A2,
-    recipesOld: recipes,
-    recipesNew: [A2, NOWT],
+    newA: { ...A, name: "Stew v2" },
+    recipesOld: [A],
+    recipesNew: [{ ...A, name: "Stew v2" }],
   });
-  assert.equal(applyLinkDelta(Bp, rows).weight, null); // 100 + (10 − 300)
-  const A3 = { ...A, portion_g: 350 };
-  const r3 = relinkDependent(Bp, {
+  assert.equal(renamed.ingredients[0].item, "Stew v2");
+  const recased = relinkDependent(B(), {
     oldA: A,
-    newA: A3,
-    recipesOld: recipes,
-    recipesNew: [A3, NOWT],
-  }).rows;
-  assert.deepEqual(applyLinkDelta(Bp, r3).weight, {
-    portion_g: 150,
-    portion_g_source: "estimated",
+    newA: { ...A, name: "STEW" },
+    recipesOld: [A],
+    recipesNew: [{ ...A, name: "STEW" }],
   });
+  assert.equal(recased.ingredients[0].item, "Stew");
 });
 
 test("relinkDependent: unchanged name keeps the row as is; blank rows ignored", () => {

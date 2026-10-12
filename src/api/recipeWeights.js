@@ -1,8 +1,8 @@
 // src/api/recipeWeights.js — estimated Wt/portion for saved recipes
 //
 // portion_g          weight of one portion in grams
-// portion_g_source   Claude's weights are now saved as "weighed" too (Fix 92); "estimated" is only on
-//                    recipes saved before, settled to "weighed" on the next load. It meant: sum of ingredient weights ÷ servings (from
+// portion_g_source   "weighed" — Claude's weights are the recipe's own, like typed ones (Fix 92). An old
+//                    "estimated" is treated the same. It meant: sum of ingredient weights ÷ servings (from
 //                    Claude, no allowance for cooking losses); anything else
 //                    with a portion_g (typed in / weighed) is the user's value
 //                    and is never overwritten.
@@ -24,7 +24,6 @@ import {
 } from "../constants/recipeLinks";
 
 export const hasPortionWeight = (r) => Number(r?.portion_g) > 0;
-export const isEstimatedWeight = (r) => hasPortionWeight(r) && r.portion_g_source === "estimated";
 const replaceById = (list, recipe) => list.map((r) => (r.id === recipe.id ? recipe : r));
 
 const estimatedWeight = (grams) => {
@@ -97,7 +96,7 @@ const recipesBefore = ({ oldA, newA, list }) =>
 // Exact difference where both of A's links are usable (no Claude call), else a
 // full recalculation. A weighed Wt/portion is kept.
 async function dependentFields(B1, relink, list) {
-  const keepWeight = hasPortionWeight(B1) && !isEstimatedWeight(B1);
+  const keepWeight = hasPortionWeight(B1);
   if (!relink.deltaOk) return computeRecipeFields(B1, list, { keepWeight });
   const { nutrition, weight } = applyLinkDelta(B1, relink.rows, { keepWeight });
   return { nutrition, ...(weight ?? ((await estimatePortionWeight(B1, list)) || {})) };
@@ -144,18 +143,6 @@ export async function propagateRecipeChange({ uid, oldA, newA, recipes, setUserR
 }
 
 // ── Wt/portion backfill ─────────────────────────────────────────────
-// Weights Claude estimated before are kept as the recipe's weight from now on ("weighed"): they
-// are not re-estimated when the recipe changes, and typing a new weight replaces them.
-async function settleEstimates(ctx) {
-  for (const r of ctx.getRecipes().filter(isEstimatedWeight)) {
-    const settled = { ...r, portion_g_source: "weighed" };
-    await saveRecipe(ctx.uid, settled);
-    ctx.setUserRecipes((prev) =>
-      prev.map((x) => (x.id === settled.id && isEstimatedWeight(x) ? settled : x)),
-    );
-  }
-}
-
 // The recipe as it is now, unless it was edited (or given a weight) meanwhile
 function unchangedSince(getRecipes, r) {
   const latest = getRecipes().find((x) => x.id === r.id);
@@ -201,7 +188,6 @@ export async function backfillPortionWeights(uid, getRecipes, setUserRecipes) {
   running = true;
   const ctx = { uid, getRecipes, setUserRecipes };
   try {
-    await settleEstimates(ctx);
     for (const r of getRecipes().filter((x) => needsFill(x) && attemptsLeft(x)))
       await backfillOne(ctx, r);
   } catch (e) {

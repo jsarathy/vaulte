@@ -9,7 +9,7 @@ const DAL = {
   name: "Test Dal",
   servings: 4,
   portion_g: 300,
-  portion_g_source: "estimated",
+  portion_g_source: "weighed",
   nutrition: {
     kcal: 333,
     fat: 10.04,
@@ -56,7 +56,7 @@ test("recipe portion box", async ({ page: p }) => {
   // Header, base line and base grid
   await openFromList("Test Dal");
   await expect(p.getByText("Recipe makes 4 servings")).toBeVisible();
-  await expect(p.getByText("Per serving (base) · 300 g (est.)")).toBeVisible();
+  await expect(p.getByText("Per serving (base) · 300 g")).toBeVisible();
   expect(await body()).toContain("10.04");
 
   // Portions scale live (1 dp); empty or zero quantity counts as 1

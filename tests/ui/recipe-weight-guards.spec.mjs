@@ -52,7 +52,7 @@ test("recipeWeights — backfill and propagation guards", async ({ page: p }) =>
   expect(edited.recipe.servings).toBe(3);
   expect(edited.saved, "edited while pending: nothing saved").toEqual([]);
 
-  // 2. Propagation, exact delta but B's weight can't be shifted (A has no Wt/portion) → re-estimated
+  // 2. Propagation, exact delta; B has no Wt/portion, so it is estimated (a weight B has is kept)
   const out = await run(
     async ({ url }) => {
       const { propagateRecipeChange } = await import(url);
@@ -61,8 +61,6 @@ test("recipeWeights — backfill and propagation guards", async ({ page: p }) =>
         id: "gb",
         name: "Guard Bowl",
         servings: 2,
-        portion_g: 250,
-        portion_g_source: "estimated",
         nutrition: { kcal: 300 },
         ingredients: [
           { amount: "1 portion", item: "Guard Stew" },
@@ -99,48 +97,4 @@ test("recipeWeights — backfill and propagation guards", async ({ page: p }) =>
   expect(out.B.portion_g_source).toBe("weighed");
   expect(out.saved).toEqual(["gb"]);
   expect(errs).toEqual([]);
-});
-
-test("recipeWeights — a weight estimated before becomes the recipe's own, with no Claude call", async ({
-  page: p,
-}) => {
-  await p.addInitScript(() => (window.__noBackfill = true));
-  await p.goto("/addentry.html");
-  await p.waitForFunction(() => window.__setRecipes);
-  const out = await p.evaluate(async (url) => {
-    const { backfillPortionWeights } = await import(url);
-    const mk = (id, extra) => ({
-      id,
-      name: id,
-      servings: 2,
-      nutrition: { kcal: 1 },
-      ingredients: [{ amount: "100g", item: "x" }],
-      form: "solid",
-      ...extra,
-    });
-    const ref = {
-      current: [
-        mk("est", { portion_g: 120, portion_g_source: "estimated" }),
-        mk("own", { portion_g: 90, portion_g_source: "weighed" }),
-      ],
-    };
-    window.__saved.length = 0;
-    window.__est.length = 0;
-    await backfillPortionWeights(
-      "u",
-      () => ref.current,
-      (f) => (ref.current = f(ref.current)),
-    );
-    return {
-      recipes: ref.current.map((r) => [r.id, r.portion_g, r.portion_g_source]),
-      saved: window.__saved.map((s) => s.id),
-      est: [...window.__est],
-    };
-  }, moduleUrl);
-  expect(out.recipes).toEqual([
-    ["est", 120, "weighed"],
-    ["own", 90, "weighed"],
-  ]);
-  expect(out.saved, "only the estimated one is saved").toEqual(["est"]);
-  expect(out.est, "no estimate call").toEqual([]);
 });

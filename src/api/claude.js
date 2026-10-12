@@ -1,5 +1,5 @@
 // src/api/claude.js — the Claude calls the app makes: parsing food, creating / recalculating /
-// scaling / regenerating recipes, estimating a portion weight, and the chat. Each sends a system
+// scaling recipes, estimating a portion weight, and the chat. Each sends a system
 // prompt (claudePrompts.js) and the user's content, and gets a reply constrained to a schema
 // (claudeSchemas.js) via claudeClient.js.
 import { finalText, requestMessage, requestStructured } from "./claudeClient.js";
@@ -68,24 +68,6 @@ export async function claudeEstimatePortionWeight(recipe) {
     PORTION_SCHEMA,
     "estimate_portion",
   );
-}
-
-/** The hand-edited draft refined: steps matched to the ingredients, nutrition recalculated. */
-export async function claudeRegenerateRecipe(recipe) {
-  const content = {
-    name: recipe.name,
-    description: recipe.description,
-    source: recipe.source,
-    servings: recipe.servings,
-    prep_time: recipe.prep_time,
-    cook_time: recipe.cook_time,
-    ingredients: recipe.ingredients,
-    steps: recipe.steps,
-    notes: recipe.notes,
-    portion_g: recipe.portion_g ?? null,
-  };
-  const body = { max_tokens: 2000, system: prompt.REGENERATE_RECIPE, messages: user(content) };
-  return requestStructured(body, RECIPE_SCHEMA, "regenerate_recipe");
 }
 
 const MAX_LOOKUPS = 3;

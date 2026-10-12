@@ -83,9 +83,8 @@ test("portionView: local scaling, or Claude's result when not local", () => {
 });
 
 test("base heading, Claude hint and error text", () => {
-  assert.equal(baseHeading(null, true), "Per serving (base)");
-  assert.equal(baseHeading(225, false), "Per serving (base) · 225 g");
-  assert.equal(baseHeading(225, true), "Per serving (base) · 225 g (est.)");
+  assert.equal(baseHeading(null), "Per serving (base)");
+  assert.equal(baseHeading(225), "Per serving (base) · 225 g");
   assert.equal(claudeHint("ml"), "Millilitres are worked out by Claude.");
   assert.match(claudeHint("g"), /no Wt\/portion/);
   assert.match(calcErrorText(new Error("boom")), /^Could not calculate \(boom\) — try portions/);

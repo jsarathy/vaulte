@@ -71,11 +71,6 @@ export const requestMessage = (body, feature) => post(body, feature);
 /** The reply's last text block ("" if none). */
 export const finalText = extractFinalText;
 
-/** The model's final text, unconstrained. */
-export async function requestText(body, feature) {
-  return extractFinalText(await post(body, feature));
-}
-
 /** POST the request (the model filled in) and give back the reply's body, checked. */
 async function post(body, feature) {
   const res = await fetch("/api/claude", {

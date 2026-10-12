@@ -35,11 +35,6 @@ export const card = {
   borderRadius: "8px",
 };
 
-export const metricCard = {
-  ...card,
-  padding: "10px 12px",
-};
-
 export const label = {
   fontSize: "10px",
   fontWeight: "500",
@@ -47,12 +42,6 @@ export const label = {
   letterSpacing: "0.5px",
   color: C.hint,
   fontFamily: FONT.sans,
-};
-
-export const monoVal = {
-  fontFamily: FONT.mono,
-  fontWeight: "500",
-  letterSpacing: "-0.5px",
 };
 
 export const pill = (variant = "blue") => {
@@ -73,19 +62,6 @@ export const pill = (variant = "blue") => {
   };
 };
 
-export const svgBtn = {
-  background: "transparent",
-  border: "none",
-  cursor: "pointer",
-  padding: "2px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: C.hint,
-  borderRadius: "3px",
-};
-
-// SVG icon helpers (stroke-only, 14px, 1.5 stroke-width)
 export const IconX = ({ size = 11, color }) => (
   <svg
     width={size}
@@ -127,20 +103,6 @@ export const IconChevronRight = ({ size = 12 }) => (
     strokeLinejoin="round"
   >
     <path d="M6 4l4 4-4 4" />
-  </svg>
-);
-
-export const IconPlus = ({ size = 12 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <path d="M8 3v10M3 8h10" />
   </svg>
 );
 
@@ -187,37 +149,5 @@ export const IconTrash = ({ size = 12 }) => (
     strokeLinejoin="round"
   >
     <path d="M3 4h10M6 4V3h4v1M5 4v8h6V4" />
-  </svg>
-);
-
-export const IconBike = ({ size = 14 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="5.5" cy="17.5" r="3.5" />
-    <circle cx="18.5" cy="17.5" r="3.5" />
-    <path d="M15 6a1 1 0 0 0-1-1h-1l-3 9h6.5M5.5 17.5l4.5-11" />
-  </svg>
-);
-
-export const IconClock = ({ size = 14 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <circle cx="8" cy="8" r="6" />
-    <path d="M8 5v3l2 1.5" />
   </svg>
 );

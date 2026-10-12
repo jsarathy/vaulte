@@ -9,7 +9,6 @@ import {
   claudeEstimatePortionWeight,
   claudeParseFood,
   claudeRecalculateNutrition,
-  claudeRegenerateRecipe,
   claudeScaleRecipeNutrition,
 } from "../src/api/claude.js";
 import { claudeLookupFood } from "../src/api/foodLookup.js";
@@ -181,33 +180,6 @@ test("claudeEstimatePortionWeight: name, servings, ingredients; the portion sche
   assert.deepEqual(schema.properties.form.enum, ["liquid", "solid"]);
   assert.match(sent().system, /form is "liquid" if the dish is a drink/);
   assert.equal(schema.additionalProperties, false);
-});
-
-test("claudeRegenerateRecipe: the draft's own fields (portion_g null if missing), recipe schema", async () => {
-  reply.body = json(RECIPE);
-  assert.deepEqual(await claudeRegenerateRecipe(RECIPE), RECIPE);
-  assert.equal(sent().max_tokens, 2000);
-  assert.equal(sent().tools, undefined);
-  assert.match(
-    sent().system,
-    /treat their name, servings, ingredients, steps, and notes as the source of truth/,
-  );
-  assert.deepEqual(JSON.parse(sent().messages[0].content), {
-    name: "Soup",
-    description: "d",
-    source: "Home recipe",
-    servings: 4,
-    prep_time: "5 min",
-    cook_time: "20 min",
-    ingredients: [{ amount: "1", item: "onion" }],
-    steps: ["cook"],
-    notes: "n",
-    portion_g: 250,
-  });
-  assert.deepEqual(schemaOf().schema.required.at(-1), "nutrition");
-  calls = [];
-  await claudeRegenerateRecipe({ ...RECIPE, portion_g: undefined });
-  assert.equal(JSON.parse(sent().messages[0].content).portion_g, null);
 });
 
 test("claudeChat: plain text back, no schema; with no saved recipes there is no tool", async () => {
@@ -410,7 +382,6 @@ test("every Claude call carries its feature name and the user", async () => {
   await run("recalc_nutrition", () => claudeRecalculateNutrition(recipe));
   await run("scale_recipe", () => claudeScaleRecipeNutrition(recipe, 100, "ml"));
   await run("estimate_portion", () => claudeEstimatePortionWeight(recipe));
-  await run("regenerate_recipe", () => claudeRegenerateRecipe(recipe));
   await run("chat", () => claudeChat([{ role: "user", content: "hi" }]));
   await run("lookup_food", () => claudeLookupFood({ name: "apple", qty: 1, unit: "portion" }));
   features.push(["photo", photoRequest("abc")._usage]);
@@ -418,6 +389,6 @@ test("every Claude call carries its feature name and the user", async () => {
     features,
     features.map(([feature]) => [feature, { feature, userId: "user-7" }]),
   );
-  assert.equal(features.length, 9);
+  assert.equal(features.length, 8);
   setUsageUser(null);
 });

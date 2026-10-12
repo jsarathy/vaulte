@@ -1,7 +1,6 @@
 // src/components/SavedRecipesModal.jsx — the Saved Recipes list. Render only; state and
 // deleting in useSavedRecipes. onPick (row) adds it, onEdit ✏️, onView 👁.
 import { useState } from "react";
-import { isEstimatedWeight } from "../api/recipeWeights";
 import { filterRecipes, volumeLabel, weightLabel } from "../lib/savedRecipes.js";
 
 const S = {
@@ -116,9 +115,7 @@ function RowActions({ recipe, saved, on }) {
 }
 
 function RecipeRow({ recipe, saved, on }) {
-  const weight = [weightLabel(recipe, isEstimatedWeight(recipe)), volumeLabel(recipe)]
-    .filter(Boolean)
-    .join(" · ");
+  const weight = [weightLabel(recipe), volumeLabel(recipe)].filter(Boolean).join(" · ");
   return (
     <div
       style={S.row}
