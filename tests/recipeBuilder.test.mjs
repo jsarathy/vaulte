@@ -68,6 +68,45 @@ test("prepareGenerated: id; weight rounded + estimated, or null", () => {
   assert.equal(prepareGenerated({ name: "S" }, "id3").portion_g, null);
 });
 
+test("prepareGenerated: a usable form and volume are kept, the rest dropped", () => {
+  assert.deepEqual(
+    prepareGenerated({ name: "S", portion_g: 250, form: "liquid", portion_ml: 249.6 }, "i"),
+    {
+      name: "S",
+      id: "i",
+      portion_g: 250,
+      portion_g_source: "estimated",
+      form: "liquid",
+      portion_ml: 250,
+    },
+  );
+  assert.deepEqual(
+    prepareGenerated({ name: "S", portion_g: 90, form: "solid", portion_ml: 0 }, "i"),
+    {
+      name: "S",
+      id: "i",
+      portion_g: 90,
+      portion_g_source: "estimated",
+      form: "solid",
+    },
+  );
+  // no usable weight: still keeps the form
+  assert.deepEqual(
+    prepareGenerated({ name: "S", portion_g: 0, form: "liquid", portion_ml: 200 }, "i"),
+    {
+      name: "S",
+      id: "i",
+      portion_g: null,
+      form: "liquid",
+      portion_ml: 200,
+    },
+  );
+  // not a form: no form and no volume
+  const odd = prepareGenerated({ name: "S", portion_g: 90, form: "gas", portion_ml: 50 }, "i");
+  assert.equal("form" in odd, false);
+  assert.equal("portion_ml" in odd, false);
+});
+
 test("upsertSorted: replaces by id, sorted by name, input untouched", () => {
   const list = [
     { id: "1", name: "Soup" },

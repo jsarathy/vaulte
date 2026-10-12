@@ -186,26 +186,14 @@ test("Fix 19 — Wt/portion field and nutrition by weight", async ({ page: p }) 
     ),
   );
 
-  // 4. ml on a recipe with weight → Claude
+  // 4. ml is not offered for a recipe that is not a liquid (Pinto has no form yet)
   await openList();
   await row("Pinto Bean Stew").getByText("Pinto Bean Stew", { exact: true }).click();
   await p.waitForTimeout(200);
-  await sel.selectOption("ml");
-  await qtyIn.fill("100");
-  await p.waitForTimeout(100);
   ok(
-    "ml: hint + Calculate",
-    (await p.getByText("Millilitres are worked out by Claude.", { exact: false }).count()) === 1 &&
-      (await p.getByRole("button", { name: "Calculate" }).count()) === 1,
-  );
-  await p.getByRole("button", { name: "Calculate" }).click();
-  await p.waitForTimeout(400);
-  ok(
-    "ml: Claude gets portion_g 225",
-    await ev(() => {
-      const c = window.__scale.at(-1);
-      return c.unit === "ml" && c.portion_g === 225;
-    }),
+    "no ml for a recipe that is not known to be a liquid",
+    JSON.stringify(await sel.locator("option").evaluateAll((os) => os.map((o) => o.value))) ===
+      '["portion","g","oz"]',
   );
   await sel.selectOption("portion");
   await qtyIn.fill("2");

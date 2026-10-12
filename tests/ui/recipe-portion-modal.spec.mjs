@@ -4,6 +4,7 @@
 import { test, expect } from "./cover.mjs";
 
 const DAL = {
+  form: "liquid",
   id: "p1",
   name: "Test Dal",
   servings: 4,
@@ -21,7 +22,13 @@ const DAL = {
   },
   ingredients: [{ amount: "500g", item: "lentils" }],
 };
-const SOUP = { id: "q1", name: "Test Soup", nutrition: { kcal: 100, protein: 5 }, ingredients: [] };
+const SOUP = {
+  id: "q1",
+  name: "Test Soup",
+  form: "liquid",
+  nutrition: { kcal: 100, protein: 5 },
+  ingredients: [],
+};
 
 test("recipe portion box", async ({ page: p }) => {
   const errs = [];
@@ -126,8 +133,16 @@ test("recipe portion box", async ({ page: p }) => {
   expect((await state()).name).toBe("Test Soup (200g)");
   expect((await state()).kcal).toBe(123.5);
 
-  // ml always goes to Claude, even with a Wt/portion
+  // ml for a liquid is scaled on the device (here from its Wt/portion, 1 g ≈ 1 ml); with neither a
+  // volume nor a weight it goes to Claude
   await openFromList("Test Dal");
+  await unit.selectOption("ml");
+  await qty.fill("150");
+  await expect(p.getByText("✓ 150 ml of Test Dal")).toBeVisible();
+  expect(await body()).toContain("166.5");
+  expect(await calc.count()).toBe(0);
+  await p.getByRole("button", { name: "Cancel" }).last().click();
+  await openFromList("Test Soup");
   await unit.selectOption("ml");
   await expect(
     p.getByText("Millilitres are worked out by Claude.", { exact: false }),
@@ -154,4 +169,57 @@ test("recipe portion box", async ({ page: p }) => {
   expect((await state()).name).toBe("Test Dal (1 portion)");
 
   expect(errs.filter((e) => !e.includes("Mock scale failure"))).toEqual([]);
+});
+
+test("the units offered: ml only for a recipe known to be a liquid; a stored volume is used", async ({
+  page: p,
+}) => {
+  await p.addInitScript(() => (window.__noBackfill = true));
+  await p.goto("/addentry.html");
+  await p.waitForFunction(() => window.__setRecipes);
+  const nutrition = { kcal: 100, protein: 5 };
+  const RECIPES = [
+    { id: "a", name: "Bread", form: "solid", portion_g: 50, nutrition, ingredients: [] },
+    { id: "b", name: "Mystery", nutrition, ingredients: [] }, // form not known yet
+    {
+      id: "c",
+      name: "Broth",
+      form: "liquid",
+      portion_g: 300,
+      portion_ml: 250,
+      nutrition,
+      ingredients: [],
+    },
+  ];
+  await p.evaluate((rs) => window.__setRecipes(rs), RECIPES);
+  const units = () =>
+    p
+      .locator("select")
+      .filter({ has: p.locator('option[value="portion"]') })
+      .last()
+      .locator("option")
+      .evaluateAll((os) => os.map((o) => o.value));
+  const open = async (name) => {
+    if (!(await p.getByText("📖 Saved Recipes").count()))
+      await p.getByText("📖 Browse Saved Recipes").click();
+    await p.getByText(name, { exact: true }).last().click();
+  };
+  await open("Bread");
+  expect(await units()).toEqual(["portion", "g", "oz"]);
+  await p.getByRole("button", { name: "Cancel" }).last().click();
+  await open("Mystery");
+  expect(await units()).toEqual(["portion", "g", "oz"]);
+  await p.getByRole("button", { name: "Cancel" }).last().click();
+  await open("Broth");
+  expect(await units()).toEqual(["portion", "g", "ml", "oz"]);
+  // 125 ml of a broth with 250 ml per portion is half a portion: from the stored volume, not its weight
+  await p
+    .locator("select")
+    .filter({ has: p.locator('option[value="ml"]') })
+    .last()
+    .selectOption("ml");
+  await p.locator('input[type="number"][min="0.1"]').fill("125");
+  await expect(p.getByText("✓ 125 ml of Broth")).toBeVisible();
+  expect(await p.locator("body").textContent()).toContain("50"); // half of 100 kcal
+  await expect(p.getByRole("button", { name: "Calculate" })).toHaveCount(0);
 });

@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  unitsFor,
   PORTION_UNITS,
   parseQty,
   portionWeight,
@@ -118,4 +119,24 @@ test("PORTION_UNITS: the four choices in the box, each with its label (Fix 78)",
     PORTION_UNITS.map(([unit]) => localFactor(recipe, 1, unit) !== null),
     [true, true, false, true],
   );
+});
+
+test("localFactor: ml for a liquid is its quantity over the portion's volume; never for a solid", () => {
+  assert.equal(localFactor({ form: "liquid", portion_ml: 250 }, 125, "ml"), 0.5);
+  assert.equal(localFactor({ form: "liquid", portion_ml: 250, portion_g: 300 }, 500, "ml"), 2);
+  assert.equal(localFactor({ form: "liquid", portion_g: 200 }, 100, "ml"), 0.5); // 1 g ≈ 1 ml
+  assert.equal(localFactor({ form: "liquid" }, 100, "ml"), null); // no volume, no weight: Claude
+  assert.equal(localFactor({ form: "solid", portion_ml: 250, portion_g: 300 }, 100, "ml"), null);
+  assert.equal(localFactor({ portion_ml: 250, portion_g: 300 }, 100, "ml"), null);
+  assert.equal(localFactor({ form: "liquid", portion_ml: 250, portion_g: 300 }, 150, "g"), 0.5);
+});
+
+test("unitsFor: millilitres only for a recipe known to be a liquid", () => {
+  const values = (r) => unitsFor(r).map(([v]) => v);
+  assert.deepEqual(values({ form: "liquid" }), ["portion", "g", "ml", "oz"]);
+  assert.deepEqual(values({ form: "solid" }), ["portion", "g", "oz"]);
+  assert.deepEqual(values({}), ["portion", "g", "oz"]);
+  assert.deepEqual(values(undefined), ["portion", "g", "oz"]);
+  assert.deepEqual(unitsFor({ form: "liquid" }), PORTION_UNITS);
+  assert.deepEqual(unitsFor({ form: "liquid" })[2], ["ml", "millilitres (ml)"]);
 });

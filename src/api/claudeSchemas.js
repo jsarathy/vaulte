@@ -19,8 +19,13 @@ export const NUTRITION_SCHEMA = {
 
 export const PORTION_SCHEMA = {
   type: "object",
-  properties: { total_g: { type: "number" }, portion_g: { type: "number" } },
-  required: ["total_g", "portion_g"],
+  properties: {
+    total_g: { type: "number" },
+    portion_g: { type: "number" },
+    form: { type: "string", enum: ["liquid", "solid"] },
+    portion_ml: { type: "number" },
+  },
+  required: ["total_g", "portion_g", "form", "portion_ml"],
   additionalProperties: false,
 };
 
@@ -45,6 +50,8 @@ export const RECIPE_SCHEMA = {
     steps: { type: "array", items: { type: "string" } },
     notes: { type: "string" },
     portion_g: { type: "number" },
+    form: { type: "string", enum: ["liquid", "solid"] },
+    portion_ml: { type: "number" },
     nutrition: NUTRITION_SCHEMA,
   },
   required: [
@@ -58,6 +65,8 @@ export const RECIPE_SCHEMA = {
     "steps",
     "notes",
     "portion_g",
+    "form",
+    "portion_ml",
     "nutrition",
   ],
   additionalProperties: false,

@@ -111,8 +111,14 @@ test("claudeCreateRecipe: web search, the recipe schema, saved recipe names when
     "steps",
     "notes",
     "portion_g",
+    "form",
+    "portion_ml",
     "nutrition",
   ]);
+  assert.deepEqual(schema.properties.form, { type: "string", enum: ["liquid", "solid"] });
+  assert.deepEqual(schema.properties.portion_ml, { type: "number" });
+  assert.match(sent().system, /form is "liquid" if the dish is a drink/);
+  assert.match(sent().system, /portion_ml is the volume of one serving in millilitres/);
   assert.deepEqual(schema.properties.nutrition.required, NUTRITION_KEYS);
   assert.deepEqual(schema.properties.ingredients.items.required, ["amount", "item"]);
   assert.equal(schema.properties.ingredients.items.additionalProperties, false);
@@ -160,8 +166,9 @@ test("claudeScaleRecipeNutrition: the cooked recipe, its per-serving nutrition, 
 });
 
 test("claudeEstimatePortionWeight: name, servings, ingredients; the portion schema", async () => {
-  reply.body = json({ total_g: 1000, portion_g: 250 });
-  assert.deepEqual(await claudeEstimatePortionWeight(RECIPE), { total_g: 1000, portion_g: 250 });
+  const answer = { total_g: 1000, portion_g: 250, form: "solid", portion_ml: 0 };
+  reply.body = json(answer);
+  assert.deepEqual(await claudeEstimatePortionWeight(RECIPE), answer);
   assert.equal(sent().max_tokens, 600);
   assert.match(sent().system, /portion_g = total_g ÷ servings/);
   assert.deepEqual(JSON.parse(sent().messages[0].content), {
@@ -170,7 +177,9 @@ test("claudeEstimatePortionWeight: name, servings, ingredients; the portion sche
     ingredients: [{ amount: "1", item: "onion" }],
   });
   const { schema } = schemaOf();
-  assert.deepEqual(schema.required, ["total_g", "portion_g"]);
+  assert.deepEqual(schema.required, ["total_g", "portion_g", "form", "portion_ml"]);
+  assert.deepEqual(schema.properties.form.enum, ["liquid", "solid"]);
+  assert.match(sent().system, /form is "liquid" if the dish is a drink/);
   assert.equal(schema.additionalProperties, false);
 });
 
