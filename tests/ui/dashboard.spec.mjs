@@ -268,3 +268,24 @@ test("the usage table's type is larger on a monitor too", async ({ page: p }) =>
   expect(await size(dialog)).toBeGreaterThanOrEqual(16);
   expect(await size(dialog.getByLabel("Period"))).toBeGreaterThanOrEqual(15);
 });
+
+test("the CLAUDE USAGE entry has the same size, colour and font as the Anthropic Console link", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  const style = (loc) =>
+    loc.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return [c.fontSize, c.color, c.fontFamily, c.letterSpacing];
+    });
+  const claude = p.getByRole("region", { name: "CLAUDE" });
+  const usage = await style(claude.getByRole("button", { name: "CLAUDE USAGE" }));
+  expect(usage).toEqual(await style(claude.getByRole("link", { name: "Anthropic Console" })));
+  expect(usage[0]).toBe("22px");
+});
