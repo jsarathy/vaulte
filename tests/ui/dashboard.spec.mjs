@@ -122,3 +122,74 @@ test("the Dashboard is a navigation item: other panels leave it and come back", 
   await p.getByRole("button", { name: "Dashboard" }).click();
   await expect(p.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 });
+
+const box = (p, title) =>
+  p.getByRole("region", { name: title }).evaluate((e) => e.getBoundingClientRect().toJSON());
+
+test("on a monitor: three framed boxes side by side, apps left, Claude in the middle, links right", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  const [apps, claude, infra] = [
+    await box(p, "YOUR APPS"),
+    await box(p, "CLAUDE"),
+    await box(p, "INFRASTRUCTURE"),
+  ];
+  // in order, on one row, each about a third of the width of the three together
+  expect(apps.right).toBeLessThanOrEqual(claude.left);
+  expect(claude.right).toBeLessThanOrEqual(infra.left);
+  expect(Math.abs(apps.top - claude.top)).toBeLessThan(2);
+  expect(Math.abs(claude.top - infra.top)).toBeLessThan(2);
+  const total = infra.right - apps.left;
+  for (const b of [apps, claude, infra]) {
+    expect(b.width).toBeGreaterThan(total * 0.28);
+    expect(b.width).toBeLessThan(total * 0.38);
+  }
+  // framed
+  const frame = await p
+    .getByRole("region", { name: "CLAUDE" })
+    .evaluate((e) => getComputedStyle(e).borderTopWidth + " " + getComputedStyle(e).borderTopStyle);
+  expect(frame).toBe("1px solid");
+  // the apps are inside the left box, Claude's heading in the middle one
+  await expect(p.getByRole("region", { name: "YOUR APPS" }).locator("[data-app]")).toHaveCount(4);
+  await expect(
+    p.getByRole("region", { name: "CLAUDE" }).getByRole("button", { name: "CLAUDE USAGE" }),
+  ).toBeVisible();
+});
+
+test("the infrastructure box links to Vercel, Firebase and GitHub, each in a new tab", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  const links = p.getByRole("region", { name: "INFRASTRUCTURE" }).getByRole("link");
+  await expect(links).toHaveText([
+    "Vercel",
+    "Firebase",
+    "GitHub",
+    "GitHub Actions",
+    "GitHub issues",
+    "Anthropic Console",
+  ]);
+  const hrefs = await links.evaluateAll((as) => as.map((a) => [a.href, a.target, a.rel]));
+  expect(hrefs[0]).toEqual([
+    "https://vercel.com/jsarathys-projects/vaulte",
+    "_blank",
+    "noopener noreferrer",
+  ]);
+  expect(hrefs.every(([href, target]) => href.startsWith("https://") && target === "_blank")).toBe(
+    true,
+  );
+  await expect(p.getByText("Hosting, deployments and function logs")).toBeVisible();
+});
