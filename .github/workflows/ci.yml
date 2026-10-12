@@ -106,12 +106,12 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-15.32.1
+          key: firebase-emulators-15.33.0
       # npx re-downloads and installs firebase-tools (~37 s cold, ~2 s with this cache; Fix 38).
       # A dev dependency was measured instead: it adds ~10 s to `npm ci` in every job.
       - uses: actions/cache@v6
         with:
           path: ~/.npm/_npx
-          key: npx-firebase-tools-15.32.1
+          key: npx-firebase-tools-15.33.0
       - run: npm ci
       - run: npm run test:api

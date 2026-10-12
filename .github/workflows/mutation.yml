@@ -52,11 +52,11 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-15.32.1
+          key: firebase-emulators-15.33.0
       - uses: actions/cache@v6
         with:
           path: ~/.npm/_npx
-          key: npx-firebase-tools-15.32.1
+          key: npx-firebase-tools-15.33.0
       - run: npm ci
       - name: Mutation testing
         run: npm run mutation:api
