@@ -45,6 +45,21 @@ test("the Dashboard fits the phone; one tap on CLAUDE USAGE opens the table", as
   }
   await expect(p.locator('[data-app="weight"]')).toContainText("Last reading yesterday");
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  // the three boxes are stacked, in order, each inside the screen
+  const boxes = [];
+  for (const title of ["YOUR APPS", "CLAUDE", "INFRASTRUCTURE"])
+    boxes.push(
+      await p
+        .getByRole("region", { name: title })
+        .evaluate((e) => e.getBoundingClientRect().toJSON()),
+    );
+  boxes.forEach((b) => {
+    expect(b.left).toBeGreaterThanOrEqual(0);
+    expect(b.right).toBeLessThanOrEqual(390);
+  });
+  expect(boxes[0].bottom).toBeLessThanOrEqual(boxes[1].top);
+  expect(boxes[1].bottom).toBeLessThanOrEqual(boxes[2].top);
+  await expect(p.getByRole("link", { name: "Vercel" })).toBeVisible();
   await p.getByRole("button", { name: /CLAUDE USAGE/ }).click();
   await expect(p.getByRole("dialog", { name: "Claude usage" })).toContainText("1.65¢");
 });
