@@ -3,7 +3,7 @@
 // Takes most of the screen, scrolls both ways; Esc, ✕ or a tap outside closes it.
 import { useEffect, useState } from "react";
 import { loadMyUsage } from "../api/aiUsage.js";
-import { PERIODS, periodStart, summarise, usd, whenText } from "../lib/aiUsage.js";
+import { PERIODS, periodStart, summarise, cents, whenText } from "../lib/aiUsage.js";
 
 const gold = "rgba(212,175,55,0.8)";
 const S = {
@@ -107,7 +107,7 @@ function Rows({ rows }) {
             <td style={{ ...S.td, textAlign: "right" }}>{r.input_tokens || 0}</td>
             <td style={{ ...S.td, textAlign: "right" }}>{r.output_tokens || 0}</td>
             <td style={{ ...S.td, textAlign: "right" }}>
-              {r.cost_usd == null ? "n/a" : usd(r.cost_usd)}
+              {r.cost_usd == null ? "n/a" : cents(r.cost_usd)}
             </td>
           </tr>
         ))}
@@ -127,7 +127,7 @@ function Total({ shown }) {
   const t = summarise(shown).total;
   return (
     <div style={S.total}>
-      {t.calls} calls · {t.input} in · {t.output} out · {usd(t.cost)}
+      {t.calls} calls · {t.input} in · {t.output} out · {cents(t.cost)}
     </div>
   );
 }

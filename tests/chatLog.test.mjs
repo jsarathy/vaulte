@@ -75,9 +75,9 @@ test("the chat's size: bytes of the messages, a warning at 15 KB, full at 20 KB"
   assert.equal(chatSize(20_000), "full");
 });
 
-test("chatCostText: input cost per message, 4 bytes a token at $3 per million", () => {
-  assert.equal(chatCostText(0), "$0.000");
-  assert.equal(chatCostText(15_000), "$0.011");
-  assert.equal(chatCostText(20_000), "$0.015");
-  assert.equal(chatCostText(1_000_000), "$0.750");
+test("chatCostText: input cost per message in cents, 4 bytes a token at $3 per million", () => {
+  assert.equal(chatCostText(0), "0.00¢");
+  assert.equal(chatCostText(15_000), "1.13¢");
+  assert.equal(chatCostText(20_000), "1.50¢");
+  assert.equal(chatCostText(1_000_000), "75.00¢");
 });

@@ -16,8 +16,8 @@ export const historyBytes = (history) =>
 export const chatSize = (bytes) =>
   bytes >= CHAT_MAX_BYTES ? "full" : bytes >= CHAT_WARN_BYTES ? "warn" : "ok";
 
-/** Roughly what sending that much costs per message, input only: 4 bytes a token at $3 per million. */
-export const chatCostText = (bytes) => `$${(((bytes / 4) * 3) / 1e6).toFixed(3)}`;
+/** Roughly what sending that much costs per message, input only, in cents: 4 bytes a token at $3 per million. */
+export const chatCostText = (bytes) => `${((bytes * 300) / 4e6).toFixed(2)}¢`;
 
 /** The message list with one message changed. */
 export const withMessage = (messages, id, changes) =>

@@ -4,6 +4,9 @@
 const r2 = (n) => Math.round(n * 100) / 100;
 export const usd = (n) => `$${n.toFixed(4)}`;
 
+/** Dollars as cents with two places: 0.0165 -> "1.65¢". */
+export const cents = (dollars) => `${(dollars * 100).toFixed(2)}¢`;
+
 function group(records, keyOf) {
   const out = new Map();
   for (const rec of records) {

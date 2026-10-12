@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { PRICES, WEB_SEARCH_USD, costOf } from "../api/_usage/pricing.js";
 import { cleanMeta, usageRecord } from "../api/_usage/record.js";
 import { format, summarise } from "../scripts/ai-usage.mjs";
-import { PERIODS, periodStart, usd, whenText } from "../src/lib/aiUsage.js";
+import { PERIODS, cents, periodStart, usd, whenText } from "../src/lib/aiUsage.js";
 import { setUsageUser, usageField } from "../src/api/usageContext.js";
 
 const MODEL = "claude-sonnet-4-6";
@@ -251,4 +251,13 @@ test("whenText: day, month and time in the viewer's time zone; blank when unknow
   assert.equal(whenText(""), "");
   assert.equal(whenText(undefined), "");
   assert.equal(whenText("not a date"), "");
+});
+
+test("cents: dollars as cents with two places", () => {
+  assert.equal(cents(0.0165), "1.65¢");
+  assert.equal(cents(0), "0.00¢");
+  assert.equal(cents(0.5), "50.00¢");
+  assert.equal(cents(0.0075), "0.75¢");
+  assert.equal(cents(1.2345), "123.45¢");
+  assert.equal(cents(0.000018), "0.00¢"); // a hundredth of a cent and less rounds away
 });
