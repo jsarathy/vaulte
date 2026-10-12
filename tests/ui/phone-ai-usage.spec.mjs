@@ -58,8 +58,8 @@ test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters
   }
   // every column is on screen: the table is not wider than the scroll area
   const fit = await dialog
-    .locator("div")
-    .nth(1)
+    .locator("table")
+    .locator("xpath=..")
     .evaluate((e) => ({
       scroll: e.scrollWidth,
       client: e.clientWidth,

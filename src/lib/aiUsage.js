@@ -89,9 +89,9 @@ export function periodStart(key, now = new Date()) {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const two = (v) => String(v).padStart(2, "0");
 
-/** A record's time for the usage table, in the viewer's time zone: "11 Oct 14:32" ("" if unknown). */
+/** A record's time for the usage table, in the viewer's time zone: "11-Oct-2026 14:32" ("" if unknown). */
 export function whenText(iso) {
   const d = new Date(iso);
   if (!iso || Number.isNaN(d.getTime())) return "";
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${two(d.getHours())}:${two(d.getMinutes())}`;
+  return `${two(d.getDate())}-${MONTHS[d.getMonth()]}-${d.getFullYear()} ${two(d.getHours())}:${two(d.getMinutes())}`;
 }

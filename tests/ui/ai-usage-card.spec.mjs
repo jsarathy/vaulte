@@ -63,8 +63,10 @@ test("the CLAUDE USAGE heading has no box or summary; a double click on it opens
   await expect(rows).toHaveCount(4); // header + 3 calls in the last 30 days
   for (const h of ["Date", "Feature", "In", "Out", "Cost"])
     await expect(rows.first()).toContainText(h);
-  await expect(rows.nth(1)).toContainText(/11 Oct \d\d:\d\d\s*chat\s*4000\s*300\s*1\.65¢/);
-  await expect(rows.nth(3)).toContainText(/1 Oct \d\d:\d\d\s*create_recipe\s*6000\s*1200\s*3\.60¢/);
+  await expect(rows.nth(1)).toContainText(/11-Oct-2026 \d\d:\d\d\s*chat\s*4000\s*300\s*1\.65¢/);
+  await expect(rows.nth(3)).toContainText(
+    /01-Oct-2026 \d\d:\d\d\s*create_recipe\s*6000\s*1200\s*3\.60¢/,
+  );
   await expect(dialog).toContainText("3 calls · 15000 in · 1900 out · 7.35¢");
 });
 
@@ -164,7 +166,7 @@ test("records that cannot be read", async ({ page: p }) => {
   await expect(dialog).toContainText("Could not load usage.");
 });
 
-test("it takes most of the screen, capped by 1200px wide, and scrolls down for many calls", async ({
+test("it takes the screen height, is only as wide as its table, and scrolls down for many calls", async ({
   page: p,
 }) => {
   const at = (i) =>
@@ -173,13 +175,12 @@ test("it takes most of the screen, capped by 1200px wide, and scrolls down for m
   await start(p, withRows(many));
   const dialog = await open(p);
   const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());
-  expect(box.width).toBeGreaterThan(1100);
-  expect(box.width).toBeLessThanOrEqual(1200);
+  expect(box.width).toBeLessThan(700); // as wide as its table, not the screen
   expect(box.height).toBeGreaterThan(900 * 0.9); // 94% of the screen height
   expect(box.bottom).toBeLessThanOrEqual(900);
   const size = await dialog
-    .locator("div")
-    .nth(1)
+    .locator("table")
+    .locator("xpath=..")
     .evaluate((e) => ({ scrollH: e.scrollHeight, clientH: e.clientHeight }));
   expect(size.scrollH).toBeGreaterThan(size.clientH); // more rows than fit: it scrolls
 });
@@ -213,4 +214,38 @@ test("on a monitor the table's records are large and bordered, the headings cent
   expect(await heads.first().evaluate((h) => getComputedStyle(h).borderTopWidth)).toBe("1px");
   expect(await size(dialog.getByText("CLAUDE USAGE", { exact: true }))).toBeGreaterThanOrEqual(20); // the title
   expect(await size(dialog.getByText(/^\d+ calls · /))).toBeGreaterThanOrEqual(21); // the summary
+});
+
+test("on a monitor the dialog is only as wide as its table; dates read dd-MMM-yyyy hh:mm", async ({
+  page: p,
+}) => {
+  await start(p, withRows());
+  const dialog = await open(p);
+  await expect(dialog.getByRole("row")).toHaveCount(4);
+  const widths = await dialog.evaluate((d) => {
+    const table = d.querySelector("table").getBoundingClientRect();
+    const box = d.getBoundingClientRect();
+    return {
+      box: box.width,
+      table: table.width,
+      left: table.left - box.left,
+      right: box.right - table.right,
+    };
+  });
+  expect(widths.box).toBeLessThan(700); // not the old 1200 px
+  expect(widths.table).toBeGreaterThan(widths.box - 4); // no white space beside the table
+  expect(widths.left).toBeLessThan(4);
+  expect(widths.right).toBeLessThan(4);
+  // title and close on one row, the filters on the next; both still visible
+  await expect(dialog.getByLabel("Period")).toBeVisible();
+  await expect(dialog.getByLabel("Feature")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
+  const [pt, ft] = await Promise.all(
+    ["Period", "Feature"].map((l) =>
+      dialog.getByLabel(l).evaluate((e) => e.getBoundingClientRect().top),
+    ),
+  );
+  expect(Math.abs(pt - ft)).toBeLessThan(3); // the two filters share a row
+  const cells = await dialog.getByRole("row").nth(1).getByRole("cell").allTextContents();
+  expect(cells[0]).toMatch(/^11-Oct-2026 \d\d:\d\d$/);
 });

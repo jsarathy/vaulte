@@ -173,6 +173,20 @@ test("summarise: totals, and by feature, user and day with averages, most expens
   );
 });
 
+test("summarise: the days come out oldest first, whatever order the records arrive in", () => {
+  const day = (d) => REC("chat", "u1", 1, 1, 0.001, `2026-10-${d}T08:00:00.000Z`);
+  const s = summarise([day("12"), day("10"), day("11"), day("10")]);
+  assert.deepEqual(
+    s.byDay.map((g) => [g.key, g.calls]),
+    [
+      ["2026-10-10", 2],
+      ["2026-10-11", 1],
+      ["2026-10-12", 1],
+    ],
+  );
+  assert.equal(summarise([{ cost_usd: 1 }]).byDay[0].key, ""); // a record with no time
+});
+
 test("summarise: a call with no known price counts, but adds no cost; nothing at all is zeros", () => {
   const s = summarise([REC("chat", "u1", 100, 10, null), REC("chat", "u1", 100, 10, 0.5)]);
   assert.equal(s.total.calls, 2);
@@ -235,18 +249,18 @@ test("usd: dollars to four places", () => {
   assert.equal(usd(0), "$0.0000");
 });
 
-test("whenText: day, month and time in the viewer's time zone; blank when unknown", () => {
+test("whenText: dd-MMM-yyyy hh:mm in the viewer's time zone; blank when unknown", () => {
   process.env.TZ = "UTC";
-  assert.equal(whenText("2026-10-11T14:32:00.000Z"), "11 Oct 14:32");
-  assert.equal(whenText("2026-01-02T03:04:00.000Z"), "2 Jan 03:04");
-  assert.equal(whenText("2026-12-31T23:59:00.000Z"), "31 Dec 23:59");
+  assert.equal(whenText("2026-10-11T14:32:00.000Z"), "11-Oct-2026 14:32");
+  assert.equal(whenText("2026-01-02T03:04:00.000Z"), "02-Jan-2026 03:04");
+  assert.equal(whenText("2026-12-31T23:59:00.000Z"), "31-Dec-2026 23:59");
   const names = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
   names.forEach((m, i) => {
     const iso = `2026-${String(i + 1).padStart(2, "0")}-15T09:05:00.000Z`;
-    assert.equal(whenText(iso), `15 ${m} 09:05`);
+    assert.equal(whenText(iso), `15-${m}-2026 09:05`);
   });
   process.env.TZ = "Asia/Kolkata";
-  assert.equal(whenText("2026-10-11T22:00:00.000Z"), "12 Oct 03:30");
+  assert.equal(whenText("2026-10-11T22:00:00.000Z"), "12-Oct-2026 03:30");
   process.env.TZ = "UTC";
   assert.equal(whenText(""), "");
   assert.equal(whenText(undefined), "");
