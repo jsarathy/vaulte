@@ -228,16 +228,12 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await ev(() => window.__backfill());
   await p.waitForTimeout(800);
   const again = await ev((b) => window.__est.slice(b).sort().join("|"), before);
-  // Egg White Omelet (weight cleared) and Nimbu Pani (second try) need a weight; Paneer, weighed by
-  // the user while its estimate was pending, has no form yet, so only its form is asked for
+  // Egg White Omelet (weight cleared) and Nimbu Pani (second try) have no weight; Paneer, weighed by
+  // the user, and the rest are left alone: a recipe with no form simply counts as a solid
   ok(
     "next load only asks for what is missing",
-    again === "Egg White Omelet|Nimbu Pani|Paneer Bhurji",
+    again === "Egg White Omelet|Nimbu Pani",
     `(${again})`,
-  );
-  ok(
-    "Paneer: form filled in, the weighed 300 g kept",
-    (await rec("r2")).form === "solid" && (await rec("r2")).portion_g === 300,
   );
   ok("Nimbu Pani: two tries made", (await rec(nimbu[0])).fill_attempts?.n === 2);
   const third = await ev(async () => {

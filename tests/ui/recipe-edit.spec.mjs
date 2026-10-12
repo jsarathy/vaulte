@@ -204,3 +204,80 @@ test("Fix 18 — edit saved recipes, nutrition recalculated", async ({ page: p }
 
   ok("no console/page errors", errs.length === 0, errs.join(" | "));
 });
+
+test("Edit Recipe: Vol/portion makes a liquid; blank is a solid; weight alone does not recalculate", async ({
+  page: p,
+}) => {
+  await p.addInitScript(() => (window.__noBackfill = true));
+  await p.goto("/addentry.html");
+  await p.waitForFunction(() => window.__setRecipes);
+  await p.evaluate(
+    (rs) => window.__setRecipes(rs),
+    [
+      {
+        id: "s",
+        name: "Test Soup",
+        servings: 2,
+        portion_g: 300,
+        portion_g_source: "weighed",
+        form: "liquid",
+        portion_ml: 250,
+        nutrition: { kcal: 100 },
+        ingredients: [{ amount: "500g", item: "stock" }],
+      },
+      {
+        id: "t",
+        name: "Test Toast",
+        servings: 1,
+        portion_g: 60,
+        portion_g_source: "weighed",
+        nutrition: { kcal: 150 },
+        ingredients: [{ amount: "60g", item: "bread" }],
+      },
+    ],
+  );
+  const vol = p.locator('label:has-text("Vol/portion") input');
+  const wt = p.locator('label:has-text("Wt/portion") input');
+  const saved = () => p.evaluate(() => window.__saved.at(-1));
+  const edit = async (name) => {
+    if (!(await p.getByText("📖 Saved Recipes").count()))
+      await p.getByText("📖 Browse Saved Recipes").click();
+    await p
+      .locator("div", { hasText: name })
+      .filter({ has: p.locator('button[title="Edit recipe"]') })
+      .last()
+      .locator('button[title="Edit recipe"]')
+      .click();
+  };
+  // a liquid shows its ml; changing the ml saves it, and saving does not recalculate nutrition
+  await edit("Test Soup");
+  await expect(vol).toHaveValue("250");
+  await vol.fill("180");
+  await p.getByText("✓ Save Changes").click();
+  await expect(p.getByText("✏️ Edit Recipe")).toHaveCount(0);
+  expect(await saved()).toMatchObject({ id: "s", form: "liquid", portion_ml: 180, portion_g: 300 });
+  // blank makes it a solid
+  await edit("Test Soup");
+  await vol.fill("");
+  await p.getByText("✓ Save Changes").click();
+  await expect(p.getByText("✏️ Edit Recipe")).toHaveCount(0);
+  expect(await saved()).toMatchObject({ id: "s", form: "solid", portion_ml: null });
+  // a recipe with no form shows a blank field; typing a volume makes it a liquid; changing only the
+  // weight leaves the nutrition alone
+  await edit("Test Toast");
+  await expect(vol).toHaveValue("");
+  await expect(vol).toHaveAttribute("placeholder", "solid");
+  await wt.fill("75");
+  await vol.fill("90");
+  await p.getByText("✓ Save Changes").click();
+  await expect(p.getByText("✏️ Edit Recipe")).toHaveCount(0);
+  expect(await saved()).toMatchObject({
+    id: "t",
+    form: "liquid",
+    portion_ml: 90,
+    portion_g: 75,
+    portion_g_source: "weighed",
+    nutrition: { kcal: 150 },
+  });
+  expect(await p.evaluate(() => window.__recalc.length)).toBe(0);
+});

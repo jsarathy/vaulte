@@ -14,6 +14,14 @@ export function withWeighedPortion(recipe, text) {
   return { ...recipe, portion_g: ok ? grams : null, portion_g_source: ok ? "weighed" : null };
 }
 
+/** A typed Vol/portion (ml) makes the recipe a liquid; blank, zero or invalid makes it a solid. */
+export function withPortionVolume(recipe, text) {
+  const ml = parseFloat(text);
+  return Number.isFinite(ml) && ml > 0
+    ? { ...recipe, form: "liquid", portion_ml: ml }
+    : { ...recipe, form: "solid", portion_ml: null };
+}
+
 /** One nutrition value typed in; invalid → 0. */
 export const withMacro = (recipe, key, text) => ({
   ...recipe,
