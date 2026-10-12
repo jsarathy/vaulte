@@ -1,4 +1,4 @@
-// src/components/NavIcons.jsx — the navigation icons: home, person, plate. They take the button's
+// src/components/NavIcons.jsx — the navigation icons: home, person, plate, dashboard. They take the button's
 // colour (currentColor), so the selected item turns gold with its label.
 
 const svg = {
@@ -33,6 +33,12 @@ export const PlateIcon = () => (
     <circle cx="12" cy="12" r="4.5" />
     <path d="M3.5 4v5.5a1.5 1.5 0 0 0 3 0V4M5 4v16" />
     <path d="M20.5 20V4c-1.7 1.4-2.5 3.6-2.5 6.5V14h2.5" />
+  </svg>
+);
+
+export const DashboardIcon = () => (
+  <svg {...svg}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
   </svg>
 );
 

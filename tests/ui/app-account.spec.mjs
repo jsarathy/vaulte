@@ -45,7 +45,7 @@ test("top bar, sidebar navigation and the Home panel", async ({ page }) => {
   await expect(page.locator(".app-topbar-name")).toHaveText("Jane Smith");
   await expect(page.locator(".app-sidebar")).toContainText("NAVIGATION");
   const labels = page.locator(".app-sidebar .sidebar-label");
-  await expect(labels).toHaveText(["Home", "My Account", "Nutrition"]);
+  await expect(labels).toHaveText(["Home", "My Account", "Nutrition", "Dashboard"]);
   const home = page.locator(".app-main .fade-up").first();
   await expect(home).toContainText(/Sunday,? 4 October 2026/); // CI's Chromium adds the comma
   await expect(home).toContainText("Good to have you back.");
