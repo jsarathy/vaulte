@@ -15,6 +15,7 @@ The process and fix docs are not in this repo. They are in the private repo `jsa
 
 - **Spec map (Fix 94):** `tests/ui/spec-map.json` says which UI specs exercise which source files; the tier tool uses it. Before starting each Fix, count the Fix commits on `main` since the map last changed: `git log $(git log -1 --format=%H -- tests/ui/spec-map.json)..main --oneline | grep -cE "^[0-9a-f]+ Fix [0-9]+"`. At 5 or more, rebuild it with `npm run spec-map` as its own Fix, without being asked, straight after the current Fix's cycle is finished. Jiten can also ask for a rebuild at any time.
 - **Mutation survivors (Fix 96):** after every mutation run (full or one file), read `reports/mutation/mutation.json` and list the survivors (`Survived` and `NoCoverage`) as counts per file. For each, read the mutated line and judge whether the change alters behaviour: if not, it is equivalent (or unreachable); if it does and no test covers it, it is a real test gap. Report the real gaps (file:line, and what a test should check) in the summary, and say that the judgement is mine.
+- **CI platform check (Fix 46):** every Sunday a workflow keeps one open GitHub issue, "CI platform check", listing what CI runs on that is behind (actions, Node, Java, Playwright, firebase-tools) and any notices on the latest CI run. At the start of each session, run `gh issue list --state open`; if it is open, tell Jiten what it lists in a line, and raise a Fix for each item he wants done. The workflow closes the issue itself when nothing is left.
 
 ## Working style
 
