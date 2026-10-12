@@ -1,0 +1,44 @@
+# Fix 46: every Sunday at 03:00 UTC (04:00 UK summer time; 03:00 once the clocks go back) look at
+# what CI runs on (actions, Node, Java, Playwright, firebase-tools, runner notices) and keep one
+# open issue, "CI platform check", with what needs updating. No findings closes it. Raise a Fix for
+# each item. Runs on GitHub's servers: no session needs to be open. Also runnable by hand.
+name: ci-check
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Look at the platform
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/ci-platform-check.mjs --out report.md
+      - name: Update the issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          open=$(gh issue list --state open --search '"CI platform check" in:title' --json number,title --jq '[.[] | select(.title == "CI platform check")][0].number // empty')
+          if [ "${{ steps.check.outputs.findings }}" != "0" ]; then
+            if [ -n "$open" ]; then
+              gh issue edit "$open" --body-file report.md
+            else
+              gh issue create --title "CI platform check" --body-file report.md
+            fi
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "Nothing to update this week."
+          fi
