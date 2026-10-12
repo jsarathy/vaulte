@@ -1,6 +1,7 @@
-// tests/ui/ai-usage-card.spec.mjs — the Claude usage card on My Account (Fix 84) and the table that
-// a double click opens (Fix 85): one row per call with its date, newest first, and the empty and
-// failed states. Firebase is mocked.
+// tests/ui/ai-usage-card.spec.mjs — the Claude usage entry on My Account (Fix 84) and the table a
+// double click opens (Fix 85, 86): one row per call with its date, newest first, filtered by period
+// (a query on the records' time) and by feature, with totals. Firebase is mocked; "now" is
+// 11 Oct 2026, 12:00 UTC.
 import { test, expect } from "./cover.mjs";
 
 const rec = (feature, at, input, output, cost) => ({
@@ -12,10 +13,13 @@ const rec = (feature, at, input, output, cost) => ({
   cost_usd: cost,
 });
 const ROWS = [
-  rec("chat", "2026-10-11T08:00:00.000Z", 4000, 300, 0.0165),
-  rec("chat", "2026-10-09T08:00:00.000Z", 5000, 400, 0.021),
-  rec("create_recipe", "2026-10-01T08:00:00.000Z", 6000, 1200, 0.036),
-  rec("chat", "2026-08-01T08:00:00.000Z", 9000, 900, 0.9), // older than 30 days: not in the 30-day cost
+  rec("chat", "2026-10-11T08:00:00.000Z", 4000, 300, 0.0165), // today
+  rec("chat", "2026-10-09T08:00:00.000Z", 5000, 400, 0.021), // 2 days ago
+  rec("create_recipe", "2026-10-01T08:00:00.000Z", 6000, 1200, 0.036), // 10 days ago
+  rec("photo", "2026-08-01T08:00:00.000Z", 2000, 100, 0.0075), // 2 months ago
+  rec("chat", "2026-03-01T08:00:00.000Z", 9000, 900, 0.0405), // 7 months ago, this year
+  rec("chat", "2025-12-01T08:00:00.000Z", 1000, 100, 0.0045), // last year, within 1 year
+  rec("chat", "2025-06-01T08:00:00.000Z", 1000, 100, 0.0045), // more than a year ago
 ];
 
 const start = async (p, init) => {
@@ -34,87 +38,146 @@ const start = async (p, init) => {
   await p.locator(".app-sidebar button").nth(1).click();
   await expect(p.getByRole("heading", { name: "My Account" })).toBeVisible();
 };
+const open = async (p) => {
+  await p.getByText("Double-click here to see every Claude call").dblclick();
+  const dialog = p.getByRole("dialog", { name: "Claude usage" });
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
+const withRows = (rows = ROWS) => ({ __collections: { "users/u/ai_usage": rows } });
 
-test("the card shows costs for today, 7 and 30 days; a double click opens a table of every call", async ({
+test("the card has no summary line; a double click opens the table, last 30 days to start", async ({
   page: p,
 }) => {
-  await start(p, { __collections: { "users/u/ai_usage": ROWS } });
+  await start(p, withRows());
   await expect(p.getByText("CLAUDE USAGE (YOUR ACCOUNT)")).toBeVisible();
-  await expect(p.getByText("Today $0.0165 · 7 days $0.0375 · 30 days $0.0735")).toBeVisible();
-  await expect(p.getByText("4 calls · double-click for every call")).toBeVisible();
+  await expect(p.getByText(/Today \$|7 days \$|calls ·/)).toHaveCount(0);
   await expect(p.getByRole("dialog")).toHaveCount(0);
-  await p.getByText("4 calls").dblclick();
-  const dialog = p.getByRole("dialog", { name: "Claude usage" });
-  await expect(dialog).toContainText("CLAUDE USAGE · 4 CALLS");
+  await p.getByText("Double-click here to see every Claude call").click(); // one click: nothing
+  await expect(p.getByRole("dialog")).toHaveCount(0);
+  const dialog = await open(p);
+  await expect(dialog.getByLabel("Period")).toHaveValue("30d");
+  await expect(dialog.getByLabel("Feature")).toHaveValue("all");
   const rows = dialog.getByRole("row");
-  await expect(rows).toHaveCount(5); // header + 4 calls
+  await expect(rows).toHaveCount(4); // header + 3 calls in the last 30 days
   for (const h of ["Date", "Feature", "In", "Out", "Cost"])
     await expect(rows.first()).toContainText(h);
   await expect(rows.nth(1)).toContainText(/11 Oct \d\d:\d\d\s*chat\s*4000\s*300\s*\$0\.0165/);
   await expect(rows.nth(3)).toContainText(
     /1 Oct \d\d:\d\d\s*create_recipe\s*6000\s*1200\s*\$0\.0360/,
   );
-  await expect(rows.nth(4)).toContainText("1 Aug");
+  await expect(dialog).toContainText("3 calls · 15000 in · 1900 out · $0.0735");
+});
+
+test("each period queries the records from its start", async ({ page: p }) => {
+  await start(p, withRows());
+  const dialog = await open(p);
+  const counts = {
+    today: ["Today", 1, "1 calls · 4000 in · 300 out · $0.0165"],
+    "7d": ["Last 7 days", 2, "2 calls · 9000 in · 700 out · $0.0375"],
+    "30d": ["Last 30 days", 3, "3 calls · 15000 in · 1900 out · $0.0735"],
+    "3m": ["Last 3 months", 4, "4 calls · 17000 in · 2000 out · $0.0810"],
+    ytd: ["Year to date", 5, "5 calls · 26000 in · 2900 out · $0.1215"],
+    "1y": ["Last 1 year", 6, "6 calls · 27000 in · 3000 out · $0.1260"],
+  };
+  for (const [key, [label, n, total]] of Object.entries(counts)) {
+    await dialog.getByLabel("Period").selectOption(key);
+    await expect(dialog.getByLabel("Period")).toHaveValue(key);
+    await expect(dialog.getByRole("row")).toHaveCount(n + 1);
+    await expect(dialog).toContainText(total);
+    expect(label).toBeTruthy();
+  }
+  await expect(dialog.getByLabel("Period").locator("option")).toHaveText([
+    "Today",
+    "Last 7 days",
+    "Last 30 days",
+    "Last 3 months",
+    "Last 1 year",
+    "Year to date",
+  ]);
+});
+
+test("the feature filter lists the features in the period and narrows the rows and the total", async ({
+  page: p,
+}) => {
+  await start(p, withRows());
+  const dialog = await open(p);
+  await dialog.getByLabel("Period").selectOption("1y");
+  const feature = dialog.getByLabel("Feature");
+  await expect(feature.locator("option")).toHaveText([
+    "All features",
+    "chat",
+    "create_recipe",
+    "photo",
+  ]);
+  await feature.selectOption("chat");
+  await expect(dialog.getByRole("row")).toHaveCount(5); // header + the 4 chat calls of the year
+  await expect(dialog).toContainText("4 calls · 19000 in · 1700 out · $0.0825");
+  await dialog.getByLabel("Period").selectOption("today");
+  await expect(feature).toHaveValue("chat"); // the choice is kept
+  await expect(dialog.getByRole("row")).toHaveCount(2);
+  await dialog.getByLabel("Period").selectOption("1y");
+  await feature.selectOption("photo");
+  await expect(dialog.getByRole("row")).toHaveCount(2);
+  await dialog.getByLabel("Period").selectOption("7d"); // no photo calls this week
+  await expect(feature).toHaveValue("photo");
+  await expect(dialog).toContainText("No Claude calls recorded for this filter.");
+  await expect(dialog).toContainText("0 calls · 0 in · 0 out · $0.0000");
 });
 
 test("the table closes with Esc, the ✕ button or a click outside it", async ({ page: p }) => {
-  await start(p, { __collections: { "users/u/ai_usage": ROWS } });
-  const dialog = p.getByRole("dialog");
-  const open = async () => {
-    await p.getByText("4 calls").dblclick();
-    await expect(dialog).toBeVisible();
-  };
-  await open();
+  await start(p, withRows());
+  let dialog = await open(p);
   await p.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await open();
+  dialog = await open(p);
   await p.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
-  await open();
-  await dialog.click(); // inside: stays open
+  dialog = await open(p);
+  await dialog.click({ position: { x: 300, y: 300 } }); // inside: stays open
   await expect(dialog).toBeVisible();
-  await p.mouse.click(5, 5); // on the backdrop
+  await p.mouse.click(2, 2); // on the backdrop
   await expect(dialog).toHaveCount(0);
 });
 
-test("a call with no known price shows n/a; a single click does not open the table", async ({
-  page: p,
-}) => {
-  await start(p, {
-    __collections: { "users/u/ai_usage": [rec("chat", "2026-10-11T08:00:00.000Z", 100, 10, null)] },
-  });
-  await p.getByText("1 calls").click();
-  await expect(p.getByRole("dialog")).toHaveCount(0);
-  await p.getByText("1 calls").dblclick();
-  await expect(p.getByRole("dialog")).toContainText("n/a");
+test("a call with no known price shows n/a and adds nothing to the total", async ({ page: p }) => {
+  await start(
+    p,
+    withRows([
+      rec("chat", "2026-10-11T08:00:00.000Z", 100, 10, null),
+      rec("chat", "2026-10-11T09:00:00.000Z", 100, 10, 0.5),
+    ]),
+  );
+  const dialog = await open(p);
+  await expect(dialog.getByRole("row").nth(2)).toContainText("n/a");
+  await expect(dialog).toContainText("2 calls · 200 in · 20 out · $0.5000");
 });
 
-test("no records yet: nothing to open", async ({ page: p }) => {
-  await start(p, { __collections: { "users/u/ai_usage": [] } });
-  await expect(p.getByText("No Claude calls recorded yet.")).toBeVisible();
-  await p.getByText("No Claude calls recorded yet.").dblclick();
-  await expect(p.getByRole("dialog")).toHaveCount(0);
+test("no records at all", async ({ page: p }) => {
+  await start(p, withRows([]));
+  const dialog = await open(p);
+  await expect(dialog).toContainText("No Claude calls recorded for this filter.");
 });
 
 test("records that cannot be read", async ({ page: p }) => {
   await start(p, { __failGetDocs: true });
-  await expect(p.getByText("Could not load usage.")).toBeVisible();
-  await p.getByText("Could not load usage.").dblclick();
-  await expect(p.getByRole("dialog")).toHaveCount(0);
+  const dialog = await open(p);
+  await expect(dialog).toContainText("Could not load usage.");
 });
 
-test("on a wide screen the table is capped at 720px and scrolls down for many calls", async ({
+test("it takes most of the screen, capped by 1200px wide, and scrolls down for many calls", async ({
   page: p,
 }) => {
   const at = (i) =>
     `2026-10-${String(11 - (i % 9)).padStart(2, "0")}T08:${String(i).padStart(2, "0")}:00.000Z`;
   const many = Array.from({ length: 60 }, (_, i) => rec("chat", at(i), 4000, 300, 0.0165));
-  await start(p, { __collections: { "users/u/ai_usage": many } });
-  await p.getByText("60 calls").dblclick();
-  const dialog = p.getByRole("dialog");
+  await start(p, withRows(many));
+  const dialog = await open(p);
   const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());
-  expect(box.width).toBeLessThanOrEqual(720);
-  expect(box.height).toBeLessThanOrEqual(900 * 0.88 + 1);
+  expect(box.width).toBeGreaterThan(1100);
+  expect(box.width).toBeLessThanOrEqual(1200);
+  expect(box.height).toBeGreaterThan(900 * 0.9); // 94% of the screen height
+  expect(box.bottom).toBeLessThanOrEqual(900);
   const size = await dialog
     .locator("div")
     .nth(1)

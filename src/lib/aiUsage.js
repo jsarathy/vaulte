@@ -58,15 +58,29 @@ export function summarise(records) {
   };
 }
 
-const DAY = 86400000;
+/** The periods the usage table can show. */
+export const PERIODS = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "3m", label: "Last 3 months" },
+  { key: "1y", label: "Last 1 year" },
+  { key: "ytd", label: "Year to date" },
+];
 
-/** Cost of the records from the last 1, 7 and 30 days (a record with no known price adds 0). */
-export function periodCosts(records, now = Date.now()) {
-  const within = (days) =>
-    records
-      .filter((r) => String(r.at || "") >= new Date(now - days * DAY).toISOString())
-      .reduce((sum, r) => sum + (r.cost_usd || 0), 0);
-  return { day: within(1), week: within(7), month: within(30) };
+/** When a period starts, as an ISO time (the viewer's time zone decides what "today" and "this year" are). */
+export function periodStart(key, now = new Date()) {
+  const d = new Date(now);
+  if (key === "today") d.setHours(0, 0, 0, 0);
+  else if (key === "7d") d.setDate(d.getDate() - 7);
+  else if (key === "30d") d.setDate(d.getDate() - 30);
+  else if (key === "3m") d.setMonth(d.getMonth() - 3);
+  else if (key === "1y") d.setFullYear(d.getFullYear() - 1);
+  else if (key === "ytd") {
+    d.setMonth(0, 1);
+    d.setHours(0, 0, 0, 0);
+  } else throw new Error(`Unknown period: ${key}`);
+  return d.toISOString();
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
