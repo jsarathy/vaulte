@@ -63,23 +63,21 @@ test("the CLAUDE USAGE heading has no box or summary; a double click on it opens
   await expect(rows).toHaveCount(4); // header + 3 calls in the last 30 days
   for (const h of ["Date", "Feature", "In", "Out", "Cost"])
     await expect(rows.first()).toContainText(h);
-  await expect(rows.nth(1)).toContainText(/11 Oct \d\d:\d\d\s*chat\s*4000\s*300\s*\$0\.0165/);
-  await expect(rows.nth(3)).toContainText(
-    /1 Oct \d\d:\d\d\s*create_recipe\s*6000\s*1200\s*\$0\.0360/,
-  );
-  await expect(dialog).toContainText("3 calls · 15000 in · 1900 out · $0.0735");
+  await expect(rows.nth(1)).toContainText(/11 Oct \d\d:\d\d\s*chat\s*4000\s*300\s*1\.65¢/);
+  await expect(rows.nth(3)).toContainText(/1 Oct \d\d:\d\d\s*create_recipe\s*6000\s*1200\s*3\.60¢/);
+  await expect(dialog).toContainText("3 calls · 15000 in · 1900 out · 7.35¢");
 });
 
 test("each period queries the records from its start", async ({ page: p }) => {
   await start(p, withRows());
   const dialog = await open(p);
   const counts = {
-    today: ["Today", 1, "1 calls · 4000 in · 300 out · $0.0165"],
-    "7d": ["Last 7 days", 2, "2 calls · 9000 in · 700 out · $0.0375"],
-    "30d": ["Last 30 days", 3, "3 calls · 15000 in · 1900 out · $0.0735"],
-    "3m": ["Last 3 months", 4, "4 calls · 17000 in · 2000 out · $0.0810"],
-    ytd: ["Year to date", 5, "5 calls · 26000 in · 2900 out · $0.1215"],
-    "1y": ["Last 1 year", 6, "6 calls · 27000 in · 3000 out · $0.1260"],
+    today: ["Today", 1, "1 calls · 4000 in · 300 out · 1.65¢"],
+    "7d": ["Last 7 days", 2, "2 calls · 9000 in · 700 out · 3.75¢"],
+    "30d": ["Last 30 days", 3, "3 calls · 15000 in · 1900 out · 7.35¢"],
+    "3m": ["Last 3 months", 4, "4 calls · 17000 in · 2000 out · 8.10¢"],
+    ytd: ["Year to date", 5, "5 calls · 26000 in · 2900 out · 12.15¢"],
+    "1y": ["Last 1 year", 6, "6 calls · 27000 in · 3000 out · 12.60¢"],
   };
   for (const [key, [label, n, total]] of Object.entries(counts)) {
     await dialog.getByLabel("Period").selectOption(key);
@@ -113,7 +111,7 @@ test("the feature filter lists the features in the period and narrows the rows a
   ]);
   await feature.selectOption("chat");
   await expect(dialog.getByRole("row")).toHaveCount(5); // header + the 4 chat calls of the year
-  await expect(dialog).toContainText("4 calls · 19000 in · 1700 out · $0.0825");
+  await expect(dialog).toContainText("4 calls · 19000 in · 1700 out · 8.25¢");
   await dialog.getByLabel("Period").selectOption("today");
   await expect(feature).toHaveValue("chat"); // the choice is kept
   await expect(dialog.getByRole("row")).toHaveCount(2);
@@ -123,7 +121,7 @@ test("the feature filter lists the features in the period and narrows the rows a
   await dialog.getByLabel("Period").selectOption("7d"); // no photo calls this week
   await expect(feature).toHaveValue("photo");
   await expect(dialog).toContainText("No Claude calls recorded for this filter.");
-  await expect(dialog).toContainText("0 calls · 0 in · 0 out · $0.0000");
+  await expect(dialog).toContainText("0 calls · 0 in · 0 out · 0.00¢");
 });
 
 test("the table closes with Esc, the ✕ button or a click outside it", async ({ page: p }) => {
@@ -151,7 +149,7 @@ test("a call with no known price shows n/a and adds nothing to the total", async
   );
   const dialog = await open(p);
   await expect(dialog.getByRole("row").nth(2)).toContainText("n/a");
-  await expect(dialog).toContainText("2 calls · 200 in · 20 out · $0.5000");
+  await expect(dialog).toContainText("2 calls · 200 in · 20 out · 50.00¢");
 });
 
 test("no records at all", async ({ page: p }) => {

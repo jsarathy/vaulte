@@ -236,13 +236,13 @@ test("HANDLES: the box of every handle", () => {
 });
 
 test("sizeNotice: nothing while short; a cost warning at 15 KB; full at 20 KB", () => {
-  assert.equal(sizeNotice(5000, "ok", "$0.004"), "");
+  assert.equal(sizeNotice(5000, "ok", "0.40¢"), "");
   assert.equal(
-    sizeNotice(16_000, "warn", "$0.012"),
-    "This chat is 16 KB, about $0.012 to send each message. Clear the chat soon to keep costs down (it stops at 20 KB).",
+    sizeNotice(16_000, "warn", "1.20¢"),
+    "This chat is 16 KB, about 1.20¢ to send each message. Clear the chat soon to keep costs down (it stops at 20 KB).",
   );
   assert.equal(
-    sizeNotice(20_400, "full", "$0.015"),
-    "This chat is 20 KB, about $0.015 to send each message. It is full: clear the chat to ask more.",
+    sizeNotice(20_400, "full", "1.53¢"),
+    "This chat is 20 KB, about 1.53¢ to send each message. It is full: clear the chat to ask more.",
   );
 });

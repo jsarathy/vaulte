@@ -335,7 +335,7 @@ test("chat: at 15 KB a notice says what each message now costs; the question is 
   await openChat(p);
   await ev(p, () => (window.__chatReply = "fine"));
   await expect(p.getByRole("status")).toHaveText(
-    "This chat is 16 KB, about $0.012 to send each message. Clear the chat soon to keep costs down (it stops at 20 KB).",
+    "This chat is 16 KB, about 1.17¢ to send each message. Clear the chat soon to keep costs down (it stops at 20 KB).",
   );
   await ask(p, "still works");
   await expect(p.getByText("fine", { exact: true })).toBeVisible();
