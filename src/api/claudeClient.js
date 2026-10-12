@@ -65,6 +65,12 @@ function parseReply(raw) {
   }
 }
 
+/** The whole reply, for a call that may end in a tool request (read content and stop_reason). */
+export const requestMessage = (body, feature) => post(body, feature);
+
+/** The reply's last text block ("" if none). */
+export const finalText = extractFinalText;
+
 /** The model's final text, unconstrained. */
 export async function requestText(body, feature) {
   return extractFinalText(await post(body, feature));

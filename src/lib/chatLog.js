@@ -5,6 +5,20 @@ import { mealIdIn } from "./dayMeals.js";
 export const CHAT_CONTEXT_LIMIT = 30;
 export const lastMessages = (history) => history.slice(-CHAT_CONTEXT_LIMIT);
 
+/** Size of the conversation sent with each message: a warning at 15 KB, no more messages at 20 KB. */
+export const CHAT_WARN_BYTES = 15_000;
+export const CHAT_MAX_BYTES = 20_000;
+const encoder = new TextEncoder();
+export const historyBytes = (history) =>
+  history.reduce((n, m) => n + encoder.encode(String(m.content ?? "")).length, 0);
+
+/** "ok", "warn" (15 KB or more) or "full" (20 KB or more). */
+export const chatSize = (bytes) =>
+  bytes >= CHAT_MAX_BYTES ? "full" : bytes >= CHAT_WARN_BYTES ? "warn" : "ok";
+
+/** Roughly what sending that much costs per message, input only: 4 bytes a token at $3 per million. */
+export const chatCostText = (bytes) => `$${(((bytes / 4) * 3) / 1e6).toFixed(3)}`;
+
 /** The message list with one message changed. */
 export const withMessage = (messages, id, changes) =>
   messages.map((m) => (m.id === id ? { ...m, ...changes } : m));

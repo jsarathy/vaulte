@@ -12,7 +12,12 @@ import {
   lastMessages,
   mealNotFound,
   withMessage,
+  CHAT_MAX_BYTES,
+  historyBytes,
 } from "../lib/chatLog.js";
+
+const CHAT_FULL =
+  "This chat is over 20 KB, so each message would cost too much. Clear the chat and ask again.";
 
 async function saveHistory(userId, history) {
   if (!userId) return;
@@ -25,6 +30,7 @@ async function saveHistory(userId, history) {
 
 async function askClaude(ctx, text, thinkId) {
   const asked = [...ctx.justChatHistory, { role: "user", content: text }];
+  if (historyBytes(lastMessages(asked)) > CHAT_MAX_BYTES) throw new Error(CHAT_FULL);
   const reply = await claudeChat(lastMessages(asked), ctx.userRecipes);
   const kept = lastMessages([...asked, { role: "assistant", content: reply }]);
   ctx.setJustChatHistory(kept);

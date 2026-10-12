@@ -25,6 +25,7 @@ import {
   mealsForDate,
   placeholderFor,
   previewTotals,
+  sizeNotice,
 } from "../src/lib/chatMessages.js";
 
 const VIEW = { w: 1400, h: 900 };
@@ -231,5 +232,17 @@ test("HANDLES: the box of every handle", () => {
       { top: 0, right: 0, width: 14, height: 14 },
       { bottom: 0, left: 0, width: 14, height: 14 },
     ],
+  );
+});
+
+test("sizeNotice: nothing while short; a cost warning at 15 KB; full at 20 KB", () => {
+  assert.equal(sizeNotice(5000, "ok", "$0.004"), "");
+  assert.equal(
+    sizeNotice(16_000, "warn", "$0.012"),
+    "This chat is 16 KB, about $0.012 to send each message. Clear the chat soon to keep costs down (it stops at 20 KB).",
+  );
+  assert.equal(
+    sizeNotice(20_400, "full", "$0.015"),
+    "This chat is 20 KB, about $0.015 to send each message. It is full: clear the chat to ask more.",
   );
 });

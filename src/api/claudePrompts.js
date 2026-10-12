@@ -24,18 +24,9 @@ Refine it: rewrite the method steps if needed so they match the current ingredie
 
 const CHAT = `You are a helpful nutrition and health assistant. Answer naturally and conversationally.`;
 
-/** The chat assistant; the user's saved recipes (name, description, servings, ingredients, steps, nutrition) are listed when there are any. */
-export const chat = (userRecipes) =>
+/** The chat assistant. With saved recipes it may look them up with find_recipes (none are sent up front). */
+export const chat = (hasRecipes) =>
   CHAT +
-  (userRecipes.length > 0
-    ? `\n\nThe user has the following saved recipes available. Use this list to answer any questions about their recipes (ingredients, nutrition, steps, etc.) instead of saying you don't have access to them:\n${JSON.stringify(userRecipes.map(recipeForChat))}`
+  (hasRecipes
+    ? "\n\nThe user has saved recipes. When a question could be about one of their recipes (its ingredients, nutrition, steps, etc.), call find_recipes with words from its name or ingredients instead of guessing or saying you don't have access. Don't call it for questions that aren't about their recipes."
     : "");
-
-const recipeForChat = (r) => ({
-  name: r.name,
-  description: r.description,
-  servings: r.servings,
-  ingredients: r.ingredients,
-  steps: r.steps,
-  nutrition: r.nutrition,
-});

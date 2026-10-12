@@ -1,7 +1,8 @@
 // src/components/ChatMessages.jsx — the conversation: the empty-state note, the history count,
 // and each message as the user's, an error, a food preview, a logged note or Claude's reply.
 import { C } from "../constants/design";
-import { asHtml, historyLabel, loggedLabel } from "../lib/chatMessages.js";
+import { asHtml, historyLabel, loggedLabel, sizeNotice } from "../lib/chatMessages.js";
+import { chatCostText, chatSize, historyBytes } from "../lib/chatLog.js";
 import ChatPreview from "./ChatPreview.jsx";
 
 const listStyle = {
@@ -29,6 +30,14 @@ const countStyle = {
   color: C.hint,
   padding: "2px 0 2px",
 };
+const noticeStyle = (state) => ({
+  textAlign: "center",
+  fontSize: "13px",
+  padding: "6px 8px",
+  borderRadius: "6px",
+  background: state === "full" ? "#fdecea" : "#fff6e0",
+  color: state === "full" ? "#a32a1d" : "#7a5b00",
+});
 const userStyle = {
   background: C.blue,
   color: "#fff",
@@ -84,6 +93,17 @@ function EmptyNote() {
   );
 }
 
+function SizeNotice({ history }) {
+  const bytes = historyBytes(history);
+  const state = chatSize(bytes);
+  if (state === "ok") return null;
+  return (
+    <div role="status" style={noticeStyle(state)}>
+      {sizeNotice(bytes, state, chatCostText(bytes))}
+    </div>
+  );
+}
+
 export default function ChatMessages({ chat, bottomRef }) {
   const { chatMessages, setChatMessages, justChatHistory, CHAT_CONTEXT_LIMIT, confirmLog } = chat;
   const discard = (id) => setChatMessages((prev) => prev.filter((m) => m.id !== id));
@@ -93,6 +113,7 @@ export default function ChatMessages({ chat, bottomRef }) {
       {chatMessages.length > 0 && (
         <div style={countStyle}>{historyLabel(justChatHistory.length, CHAT_CONTEXT_LIMIT)}</div>
       )}
+      <SizeNotice history={justChatHistory} />
       {chatMessages.map((msg) => (
         <Message key={msg.id} msg={msg} discard={discard} confirmLog={confirmLog} />
       ))}

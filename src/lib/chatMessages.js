@@ -29,6 +29,15 @@ export function mealsForDate(allDays, date, currentDayData) {
 export const historyLabel = (count, limit) =>
   count >= limit ? `Last ${limit} messages` : `${count} messages`;
 
+/** The notice shown above a long conversation (15 KB or more), or "" while it is short. */
+export const sizeNotice = (bytes, state, cost) =>
+  state === "ok"
+    ? ""
+    : `This chat is ${Math.round(bytes / 1000)} KB, about ${cost} to send each message. ` +
+      (state === "full"
+        ? "It is full: clear the chat to ask more."
+        : "Clear the chat soon to keep costs down (it stops at 20 KB).");
+
 export const placeholderFor = (mealId) =>
   mealId === CHAT_MODE ? "Ask me anything…" : "Describe what you ate…";
 

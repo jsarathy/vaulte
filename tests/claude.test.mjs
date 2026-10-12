@@ -201,7 +201,7 @@ test("claudeRegenerateRecipe: the draft's own fields (portion_g null if missing)
   assert.equal(JSON.parse(sent().messages[0].content).portion_g, null);
 });
 
-test("claudeChat: plain text back, no schema; saved recipes go into the system prompt", async () => {
+test("claudeChat: plain text back, no schema; with no saved recipes there is no tool", async () => {
   reply.body = text("Hello!");
   const messages = [{ role: "user", content: "hi" }];
   assert.equal(await claudeChat(messages), "Hello!");
@@ -212,20 +212,100 @@ test("claudeChat: plain text back, no schema; saved recipes go into the system p
     "You are a helpful nutrition and health assistant. Answer naturally and conversationally.",
   );
   assert.deepEqual(sent().messages, messages);
-  calls = [];
-  await claudeChat(messages, [RECIPE]);
-  assert.match(sent().system, /saved recipes available/);
-  const listed = JSON.parse(sent().system.split("them:\n")[1]);
-  assert.deepEqual(listed, [
-    {
-      name: "Soup",
-      description: "d",
-      servings: 4,
-      ingredients: [{ amount: "1", item: "onion" }],
-      steps: ["cook"],
-      nutrition: { kcal: 100 },
-    },
-  ]);
+  assert.equal(sent().tools, undefined);
+  assert.equal(sent().tool_choice, undefined);
+  assert.equal(calls.length, 1);
+});
+
+const toolUse = (id, query) => ({
+  stop_reason: "tool_use",
+  content: [
+    { type: "text", text: "Let me look." },
+    { type: "tool_use", id, name: "find_recipes", input: { query } },
+  ],
+});
+
+test("claudeChat: with saved recipes none are sent; Claude gets a find_recipes tool", async () => {
+  reply.body = text("Hello!");
+  const messages = [{ role: "user", content: "hi" }];
+  assert.equal(await claudeChat(messages, [RECIPE]), "Hello!");
+  assert.match(sent().system, /call find_recipes/);
+  assert.doesNotMatch(JSON.stringify(sent()), /onion|Soup|cook/); // no recipe content up front
+  assert.equal(sent().tools.length, 1);
+  assert.equal(sent().tools[0].name, "find_recipes");
+  assert.equal(sent().tool_choice, undefined);
+  assert.equal(calls.length, 1); // an ordinary question: one call
+});
+
+test("claudeChat: a tool request is answered from the recipes and sent back for the final reply", async () => {
+  const replies = [toolUse("t1", "soup"), text("Soup has 100 kcal.")];
+  reply = () => ({ status: 200, body: replies.shift() });
+  const messages = [{ role: "user", content: "kcal in my soup?" }];
+  assert.equal(await claudeChat(messages, [RECIPE]), "Soup has 100 kcal.");
+  assert.equal(calls.length, 2);
+  const second = calls[1].body.messages;
+  assert.deepEqual(second.slice(0, 1), messages);
+  assert.deepEqual(second[1], { role: "assistant", content: toolUse("t1", "soup").content });
+  assert.equal(second[2].role, "user");
+  assert.equal(second[2].content[0].type, "tool_result");
+  assert.equal(second[2].content[0].tool_use_id, "t1");
+  const found = JSON.parse(second[2].content[0].content);
+  assert.equal(found.matches[0].name, "Soup");
+  assert.deepEqual(found.matches[0].nutrition, { kcal: 100 });
+  assert.equal(calls[1].body.tools.length, 1); // the tool stays defined
+  assert.equal(calls[1].body.tool_choice, undefined);
+  assert.deepEqual(
+    calls.map((c) => c.body._usage.feature),
+    ["chat", "chat"], // each round is recorded as a chat call
+  );
+});
+
+test("claudeChat: several tool requests in one reply are all answered", async () => {
+  const two = {
+    stop_reason: "tool_use",
+    content: [
+      { type: "tool_use", id: "a", name: "find_recipes", input: { query: "soup" } },
+      { type: "tool_use", id: "b", name: "find_recipes", input: { query: "nothing here" } },
+    ],
+  };
+  const replies = [two, text("done")];
+  reply = () => ({ status: 200, body: replies.shift() });
+  await claudeChat([{ role: "user", content: "x" }], [RECIPE]);
+  const answers = calls[1].body.messages[2].content;
+  assert.deepEqual(
+    answers.map((r) => r.tool_use_id),
+    ["a", "b"],
+  );
+  assert.deepEqual(JSON.parse(answers[1].content), { matches: [], saved_recipe_names: ["Soup"] });
+});
+
+test("claudeChat: after 3 lookups the tool is switched off so Claude has to answer", async () => {
+  let n = 0;
+  reply = () => ({ status: 200, body: n++ < 3 ? toolUse("t" + n, "soup") : text("Final.") });
+  assert.equal(await claudeChat([{ role: "user", content: "x" }], [RECIPE]), "Final.");
+  assert.equal(calls.length, 4);
+  assert.deepEqual(
+    calls.map((c) => c.body.tool_choice),
+    [undefined, undefined, undefined, { type: "none" }],
+  );
+  assert.equal(calls[3].body.tools.length, 1); // still defined: the history holds tool blocks
+});
+
+test("claudeChat: if Claude still asks on the last round, its text so far is the answer", async () => {
+  reply = () => ({ status: 200, body: toolUse("t", "soup") });
+  assert.equal(await claudeChat([{ role: "user", content: "x" }], [RECIPE]), "Let me look.");
+  assert.equal(calls.length, 4);
+});
+
+test("claudeChat: a tool request without a query still gets an answer", async () => {
+  const replies = [
+    { stop_reason: "tool_use", content: [{ type: "tool_use", id: "z", name: "find_recipes" }] },
+    text("ok"),
+  ];
+  reply = () => ({ status: 200, body: replies.shift() });
+  await claudeChat([{ role: "user", content: "x" }], [RECIPE]);
+  const answer = JSON.parse(calls[1].body.messages[2].content[0].content);
+  assert.deepEqual(answer, { matches: [], saved_recipe_names: ["Soup"] });
 });
 
 test("the reply's last text block is used (tool blocks are skipped); none → an error", async () => {
