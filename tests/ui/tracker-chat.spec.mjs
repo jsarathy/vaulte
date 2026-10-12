@@ -313,3 +313,49 @@ test("page frame: header and tabs", async ({ page: p }) => {
   await expect(p.getByText("Meds", { exact: true })).toBeVisible();
   await expect(p.getByText("Targets · Oct 2026")).toBeVisible();
 });
+
+// a conversation of `count` messages of 1,300 bytes each
+const longHistory = (count) =>
+  Array.from({ length: count }, (_, i) => ({
+    role: i % 2 ? "assistant" : "user",
+    content: "x".repeat(1300),
+  }));
+
+test("chat: a short conversation shows no size notice", async ({ page: p }) => {
+  await start(p, { __docs: { [P("claude_chat/conversation")]: { history: longHistory(10) } } });
+  await openChat(p);
+  await expect(p.getByText("10 messages")).toBeVisible();
+  await expect(p.getByRole("status")).toHaveCount(0);
+});
+
+test("chat: at 15 KB a notice says what each message now costs; the question is still sent", async ({
+  page: p,
+}) => {
+  await start(p, { __docs: { [P("claude_chat/conversation")]: { history: longHistory(12) } } });
+  await openChat(p);
+  await ev(p, () => (window.__chatReply = "fine"));
+  await expect(p.getByRole("status")).toHaveText(
+    "This chat is 16 KB, about $0.012 to send each message. Clear the chat soon to keep costs down (it stops at 20 KB).",
+  );
+  await ask(p, "still works");
+  await expect(p.getByText("fine", { exact: true })).toBeVisible();
+  expect(await ev(p, () => window.__chatCalls.length)).toBe(1);
+});
+
+test("chat: at 20 KB the question is not sent; clearing the chat starts again", async ({
+  page: p,
+}) => {
+  await start(p, { __docs: { [P("claude_chat/conversation")]: { history: longHistory(16) } } });
+  await openChat(p);
+  await ev(p, () => (window.__chatReply = "fresh"));
+  await expect(p.getByRole("status")).toContainText("It is full: clear the chat to ask more.");
+  await ask(p, "one more");
+  await expect(
+    p.getByText("This chat is over 20 KB, so each message would cost too much."),
+  ).toBeVisible();
+  expect(await ev(p, () => window.__chatCalls || [])).toEqual([]); // nothing went to Claude
+  await p.getByTitle("Clear history").click();
+  await expect(p.getByRole("status")).toHaveCount(0);
+  await ask(p, "hello again");
+  await expect(p.getByText("fresh", { exact: true })).toBeVisible();
+});

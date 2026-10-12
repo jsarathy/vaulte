@@ -2,7 +2,8 @@
 // scaling / regenerating recipes, estimating a portion weight, and the chat. Each sends a system
 // prompt (claudePrompts.js) and the user's content, and gets a reply constrained to a schema
 // (claudeSchemas.js) via claudeClient.js.
-import { requestStructured, requestText } from "./claudeClient.js";
+import { finalText, requestMessage, requestStructured } from "./claudeClient.js";
+import { FIND_RECIPES_TOOL, findRecipes } from "../lib/chatRecipes.js";
 import * as prompt from "./claudePrompts.js";
 import {
   FOOD_ITEMS_SCHEMA,
@@ -87,7 +88,39 @@ export async function claudeRegenerateRecipe(recipe) {
   return requestStructured(body, RECIPE_SCHEMA, "regenerate_recipe");
 }
 
-/** The chat reply as text; the user's saved recipes are in the assistant's context. */
+const MAX_LOOKUPS = 3;
+
+/** The tool requests in a reply, answered from the saved recipes, as the next user message. */
+const toolAnswers = (content, recipes) => ({
+  role: "user",
+  content: content
+    .filter((b) => b.type === "tool_use")
+    .map((b) => ({
+      type: "tool_result",
+      tool_use_id: b.id,
+      content: JSON.stringify(findRecipes(recipes, b.input?.query)),
+    })),
+});
+
+/** One chat request; with recipes it carries the lookup tool, which is switched off in the last round. */
+function chatRequest(messages, hasRecipes, round) {
+  const body = { max_tokens: 1000, system: prompt.chat(hasRecipes), messages };
+  if (!hasRecipes) return body;
+  const tool_choice = round >= MAX_LOOKUPS ? { type: "none" } : undefined;
+  return { ...body, tools: [FIND_RECIPES_TOOL], ...(tool_choice && { tool_choice }) };
+}
+
+/**
+ * The chat reply as text. The saved recipes are not sent: with any, Claude may ask for them with
+ * find_recipes (up to 3 rounds, then it must answer), and each round is another call.
+ */
 export async function claudeChat(messages, userRecipes = []) {
-  return requestText({ max_tokens: 1000, system: prompt.chat(userRecipes), messages }, "chat");
+  const hasRecipes = userRecipes.length > 0;
+  let convo = messages;
+  for (let round = 0; ; round++) {
+    const data = await requestMessage(chatRequest(convo, hasRecipes, round), "chat");
+    if (data.stop_reason !== "tool_use" || round >= MAX_LOOKUPS) return finalText(data);
+    const asked = { role: "assistant", content: data.content };
+    convo = [...convo, asked, toolAnswers(data.content, userRecipes)];
+  }
 }
