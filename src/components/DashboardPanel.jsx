@@ -8,7 +8,9 @@ import { useIsPhone } from "../hooks/useIsPhone.js";
 import { loadDashboard } from "../api/dashboard.js";
 import { dashboardRows } from "../lib/dashboard.js";
 import { CLAUDE_LINK, INFRA_LINKS } from "../constants/infraLinks.js";
+import { checkAdmin } from "../api/adminUsers.js";
 import AiUsageCard from "./AiUsageCard.jsx";
+import UsersModal from "./UsersModal.jsx";
 
 const gold = "rgba(212,175,55,0.6)";
 const eyebrow = {
@@ -146,6 +148,50 @@ function LinkList({ links, size }) {
   );
 }
 
+/** True once the server says the signed-in user is an admin (the Users card is only for admins). */
+function useIsAdmin(userId) {
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    let live = true;
+    checkAdmin()
+      .then((a) => live && setAdmin(a))
+      .catch(() => live && setAdmin(false));
+    return () => {
+      live = false;
+    };
+  }, [userId]);
+  return admin;
+}
+
+/** The entry that opens the Users table. */
+function UsersEntry({ size }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        style={{
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          textAlign: "left",
+          color: "rgba(212,175,55,0.95)",
+          fontSize: size.name,
+          fontFamily: "inherit",
+        }}
+      >
+        User accounts
+      </button>
+      <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>
+        Who has an account, with their ids
+      </div>
+      {open && <UsersModal onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 /** The usage table entry, then the link to the Anthropic Console. */
 function ClaudeCard({ userId, phone, size }) {
   return (
@@ -201,7 +247,7 @@ function Header() {
 }
 
 /** A phone: three rubrics; the one tapped opens as a popup that fills the window. */
-function PhoneDashboard({ userId, rows }) {
+function PhoneDashboard({ userId, rows, admin }) {
   const [open, setOpen] = useState(null);
   const close = () => setOpen(null);
   return (
@@ -212,6 +258,7 @@ function PhoneDashboard({ userId, rows }) {
           ["apps", "YOUR APPS"],
           ["claude", "CLAUDE"],
           ["infra", "INFRASTRUCTURE"],
+          ...(admin ? [["users", "USERS"]] : []),
         ].map(([id, title]) => (
           <button key={id} aria-haspopup="dialog" style={rubricStyle} onClick={() => setOpen(id)}>
             <span>{title}</span>
@@ -229,6 +276,7 @@ function PhoneDashboard({ userId, rows }) {
           <LinkList links={INFRA_LINKS} size={SIZE.popup} />
         </Popup>
       )}
+      {open === "users" && <UsersModal onClose={close} />}
       {open === "claude" && (
         <Popup title="CLAUDE" onClose={close}>
           <ClaudeCard userId={userId} phone size={SIZE.popup} />
@@ -241,6 +289,7 @@ function PhoneDashboard({ userId, rows }) {
 export default function DashboardPanel({ userId }) {
   const phone = useIsPhone();
   const [rows, setRows] = useState(null);
+  const admin = useIsAdmin(userId);
   useEffect(() => {
     let live = true;
     loadDashboard(userId).then((data) => live && setRows(dashboardRows(data)));
@@ -248,7 +297,7 @@ export default function DashboardPanel({ userId }) {
       live = false;
     };
   }, [userId]);
-  if (phone) return <PhoneDashboard userId={userId} rows={rows} />;
+  if (phone) return <PhoneDashboard userId={userId} rows={rows} admin={admin} />;
   return (
     <div>
       <Header />
@@ -256,9 +305,16 @@ export default function DashboardPanel({ userId }) {
         <Frame title="YOUR APPS">
           <AppRows rows={rows} size={SIZE.box} />
         </Frame>
-        <Frame title="CLAUDE">
-          <ClaudeCard userId={userId} phone={false} size={SIZE.box} />
-        </Frame>
+        <div style={{ display: "grid", gap: "24px", minWidth: 0 }}>
+          <Frame title="CLAUDE">
+            <ClaudeCard userId={userId} phone={false} size={SIZE.box} />
+          </Frame>
+          {admin && (
+            <Frame title="USERS">
+              <UsersEntry size={SIZE.box} />
+            </Frame>
+          )}
+        </div>
         <Frame title="INFRASTRUCTURE">
           <LinkList links={INFRA_LINKS} size={SIZE.box} />
         </Frame>
