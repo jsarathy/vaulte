@@ -1,6 +1,6 @@
 // src/components/AiUsageCard.jsx — the CLAUDE USAGE heading in the Dashboard's Claude card (Fix 84–87, 98). On a
 // computer a double click on it opens the table of calls; on a phone one tap does. The table loads
-// its own data. `flush` removes the top margin (inside a box); `fontSize` sets the heading size.
+// its own data. `flush` removes the top margin (inside a box); `fontSize` sets the heading size; `asLink` gives it a link's colour and font.
 import { useState } from "react";
 import AiUsageModal from "./AiUsageModal.jsx";
 
@@ -34,7 +34,10 @@ const phoneStyle = {
   fontFamily: "'Cinzel',serif",
 };
 
-export default function AiUsageCard({ userId, phone, flush = false, fontSize }) {
+/** Looks like a link beside it: the same colour and the page's own font, no capitals styling. */
+const AS_LINK = { color: "rgba(212,175,55,0.95)", fontFamily: "inherit", letterSpacing: "normal" };
+
+export default function AiUsageCard({ userId, phone, flush = false, fontSize, asLink = false }) {
   const [open, setOpen] = useState(false);
   const show = () => setOpen(true);
   return (
@@ -42,7 +45,12 @@ export default function AiUsageCard({ userId, phone, flush = false, fontSize }) 
       {phone ? (
         <button
           aria-haspopup="dialog"
-          style={{ ...phoneStyle, ...(flush && { marginTop: 0 }), ...(fontSize && { fontSize }) }}
+          style={{
+            ...phoneStyle,
+            ...(flush && { marginTop: 0 }),
+            ...(asLink && AS_LINK),
+            ...(fontSize && { fontSize }),
+          }}
           onClick={show}
         >
           <span>CLAUDE USAGE</span>
@@ -54,7 +62,12 @@ export default function AiUsageCard({ userId, phone, flush = false, fontSize }) 
           tabIndex={0}
           aria-haspopup="dialog"
           title="Double-click to open"
-          style={{ ...headingStyle, ...(flush && { marginTop: 0 }), ...(fontSize && { fontSize }) }}
+          style={{
+            ...headingStyle,
+            ...(flush && { marginTop: 0 }),
+            ...(asLink && AS_LINK),
+            ...(fontSize && { fontSize }),
+          }}
           onDoubleClick={show}
           onKeyDown={(e) => e.key === "Enter" && show()}
         >

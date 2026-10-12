@@ -150,7 +150,7 @@ function LinkList({ links, size }) {
 function ClaudeCard({ userId, phone, size }) {
   return (
     <div style={{ display: "grid", gap: "26px" }}>
-      <AiUsageCard userId={userId} phone={phone} flush fontSize={size.name} />
+      <AiUsageCard userId={userId} phone={phone} flush asLink fontSize={size.name} />
       <LinkList links={[CLAUDE_LINK]} size={size} />
     </div>
   );

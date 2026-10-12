@@ -141,6 +141,12 @@ test("CLAUDE opens a popup with the usage entry and the Anthropic Console link; 
   expect(await size(dialog.getByText("Claude API usage and spend limits"))).toBeGreaterThanOrEqual(
     20,
   );
+  const style = (loc) =>
+    loc.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return [c.fontSize, c.color, c.fontFamily, c.letterSpacing];
+    });
+  expect(await style(usage)).toEqual(await style(link)); // the same size, colour and font as the link
   await usage.click();
   const table = p.getByRole("dialog", { name: "Claude usage" });
   await expect(table).toContainText("1.65¢");
