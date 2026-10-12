@@ -42,7 +42,7 @@ export default function AiUsageCard({ userId, phone, flush = false, fontSize }) 
       {phone ? (
         <button
           aria-haspopup="dialog"
-          style={flush ? { ...phoneStyle, marginTop: 0 } : phoneStyle}
+          style={{ ...phoneStyle, ...(flush && { marginTop: 0 }), ...(fontSize && { fontSize }) }}
           onClick={show}
         >
           <span>CLAUDE USAGE</span>

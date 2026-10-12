@@ -1,5 +1,6 @@
 // src/constants/infraLinks.js — where the infrastructure behind Vaulte is looked after (Fix 99):
-// the links in the Dashboard's INFRASTRUCTURE box. Addresses only; nothing secret.
+// the links in the Dashboard's INFRASTRUCTURE box, and the Anthropic Console link in its CLAUDE box.
+// Addresses only; nothing secret.
 export const INFRA_LINKS = [
   {
     name: "Vercel",
@@ -22,9 +23,10 @@ export const INFRA_LINKS = [
     note: "CI platform check",
     url: "https://github.com/jsarathy/vaulte/issues",
   },
-  {
-    name: "Anthropic Console",
-    note: "Claude API usage and spend limits",
-    url: "https://console.anthropic.com",
-  },
 ];
+
+export const CLAUDE_LINK = {
+  name: "Anthropic Console",
+  note: "Claude API usage and spend limits",
+  url: "https://console.anthropic.com",
+};

@@ -180,7 +180,6 @@ test("the infrastructure box links to Vercel, Firebase and GitHub, each in a new
     "GitHub",
     "GitHub Actions",
     "GitHub issues",
-    "Anthropic Console",
   ]);
   const hrefs = await links.evaluateAll((as) => as.map((a) => [a.href, a.target, a.rel]));
   expect(hrefs[0]).toEqual([
@@ -194,7 +193,29 @@ test("the infrastructure box links to Vercel, Firebase and GitHub, each in a new
   await expect(p.getByText("Hosting, deployments and function logs")).toBeVisible();
 });
 
-test("on a monitor the type is large: box titles, app names and notes, links, the Claude heading", async ({
+test("the Claude box has the usage heading and the Anthropic Console link, which is not under infrastructure", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  const claude = p.getByRole("region", { name: "CLAUDE" });
+  const link = claude.getByRole("link", { name: "Anthropic Console" });
+  await expect(link).toHaveAttribute("href", "https://console.anthropic.com");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(claude.getByText("Claude API usage and spend limits")).toBeVisible();
+  await expect(
+    p
+      .getByRole("region", { name: "INFRASTRUCTURE" })
+      .getByRole("link", { name: "Anthropic Console" }),
+  ).toHaveCount(0);
+});
+
+test("on a monitor the type is large in every box: titles, names, notes, links, the Claude heading", async ({
   page: p,
 }) => {
   await start(p, {
@@ -205,18 +226,45 @@ test("on a monitor the type is large: box titles, app names and notes, links, th
     },
   });
   const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  for (const title of ["YOUR APPS", "CLAUDE", "INFRASTRUCTURE"])
+    expect(
+      await size(p.getByRole("region", { name: title }).getByText(title, { exact: true })),
+      title,
+    ).toBeGreaterThanOrEqual(16);
   const apps = p.getByRole("region", { name: "YOUR APPS" });
-  expect(await size(apps.getByText("YOUR APPS", { exact: true }))).toBeGreaterThanOrEqual(14);
-  expect(await size(apps.locator('[data-app="polar"] div div').first())).toBeGreaterThanOrEqual(21);
-  expect(await size(apps.locator('[data-app="polar"] div div').nth(1))).toBeGreaterThanOrEqual(17);
+  expect(await size(apps.locator('[data-app="polar"] div div').first())).toBeGreaterThanOrEqual(22);
+  expect(await size(apps.locator('[data-app="polar"] div div').nth(1))).toBeGreaterThanOrEqual(18);
   const infra = p.getByRole("region", { name: "INFRASTRUCTURE" });
-  expect(await size(infra.getByRole("link").first())).toBeGreaterThanOrEqual(21);
+  expect(await size(infra.getByRole("link").first())).toBeGreaterThanOrEqual(22);
   expect(
     await size(infra.getByText("Hosting, deployments and function logs")),
-  ).toBeGreaterThanOrEqual(17);
-  const claude = p
-    .getByRole("region", { name: "CLAUDE" })
-    .getByRole("button", { name: "CLAUDE USAGE" });
-  expect(await size(claude)).toBeGreaterThanOrEqual(16);
+  ).toBeGreaterThanOrEqual(18);
+  const claude = p.getByRole("region", { name: "CLAUDE" });
+  expect(await size(claude.getByRole("button", { name: "CLAUDE USAGE" }))).toBeGreaterThanOrEqual(
+    22,
+  );
+  expect(
+    await size(claude.getByRole("link", { name: "Anthropic Console" })),
+  ).toBeGreaterThanOrEqual(22);
+  expect(await size(claude.getByText("Claude API usage and spend limits"))).toBeGreaterThanOrEqual(
+    18,
+  );
   expect(await size(p.getByRole("heading", { name: "Dashboard" }))).toBeGreaterThanOrEqual(34);
+});
+
+test("the usage table's type is larger on a monitor too", async ({ page: p }) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+      "users/u/ai_usage": [],
+    },
+  });
+  await p.getByRole("button", { name: "CLAUDE USAGE" }).dblclick();
+  const dialog = p.getByRole("dialog", { name: "Claude usage" });
+  await expect(dialog).toBeVisible();
+  const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  expect(await size(dialog)).toBeGreaterThanOrEqual(16);
+  expect(await size(dialog.getByLabel("Period"))).toBeGreaterThanOrEqual(15);
 });

@@ -2,6 +2,7 @@
 // its date, feature, tokens and cost, filtered by period (a query on Firestore) and by feature.
 // Takes most of the screen, scrolls both ways; Esc, ✕ or a tap outside closes it.
 import { useEffect, useState } from "react";
+import { useIsPhone } from "../hooks/useIsPhone.js";
 import { loadMyUsage } from "../api/aiUsage.js";
 import { PERIODS, periodStart, summarise, cents, whenText } from "../lib/aiUsage.js";
 
@@ -76,24 +77,29 @@ const S = {
 };
 const COLUMNS = ["Date", "Feature", "In", "Out", "Cost"];
 
-function Select({ label, value, onChange, children }) {
+function Select({ label, value, onChange, size, children }) {
   return (
     <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
       {label}
-      <select aria-label={label} style={S.select} value={value} onChange={onChange}>
+      <select
+        aria-label={label}
+        style={{ ...S.select, fontSize: size }}
+        value={value}
+        onChange={onChange}
+      >
         {children}
       </select>
     </label>
   );
 }
 
-function Rows({ rows }) {
+function Rows({ rows, pad }) {
   return (
     <table style={{ borderCollapse: "collapse", width: "100%" }}>
       <thead>
         <tr>
           {COLUMNS.map((h, i) => (
-            <th key={h} style={{ ...S.th, textAlign: i > 1 ? "right" : "left" }}>
+            <th key={h} style={{ ...S.th, padding: pad, textAlign: i > 1 ? "right" : "left" }}>
               {h}
             </th>
           ))}
@@ -102,11 +108,11 @@ function Rows({ rows }) {
       <tbody>
         {rows.map((r, i) => (
           <tr key={i}>
-            <td style={S.td}>{whenText(r.at)}</td>
-            <td style={S.td}>{r.feature || "unknown"}</td>
-            <td style={{ ...S.td, textAlign: "right" }}>{r.input_tokens || 0}</td>
-            <td style={{ ...S.td, textAlign: "right" }}>{r.output_tokens || 0}</td>
-            <td style={{ ...S.td, textAlign: "right" }}>
+            <td style={{ ...S.td, padding: pad }}>{whenText(r.at)}</td>
+            <td style={{ ...S.td, padding: pad }}>{r.feature || "unknown"}</td>
+            <td style={{ ...S.td, padding: pad, textAlign: "right" }}>{r.input_tokens || 0}</td>
+            <td style={{ ...S.td, padding: pad, textAlign: "right" }}>{r.output_tokens || 0}</td>
+            <td style={{ ...S.td, padding: pad, textAlign: "right" }}>
               {r.cost_usd == null ? "n/a" : cents(r.cost_usd)}
             </td>
           </tr>
@@ -116,11 +122,11 @@ function Rows({ rows }) {
   );
 }
 
-function Body({ state, shown }) {
+function Body({ state, shown, pad }) {
   if (state.status === "loading") return <div style={S.note}>Loading…</div>;
   if (state.status === "error") return <div style={S.note}>Could not load usage.</div>;
   if (!shown.length) return <div style={S.note}>No Claude calls recorded for this filter.</div>;
-  return <Rows rows={shown} />;
+  return <Rows rows={shown} pad={pad} />;
 }
 
 function Total({ shown }) {
@@ -132,7 +138,14 @@ function Total({ shown }) {
   );
 }
 
+/** Type sizes: the table, the title bar, and the filter controls (16 px or more on a phone, so it does not zoom). */
+const TYPE = {
+  phone: { base: "16px", bar: "15px", control: "16px", pad: "6px 8px" },
+  monitor: { base: "16px", bar: "14px", control: "15px", pad: "6px 12px" },
+};
+
 export default function AiUsageModal({ userId, onClose }) {
+  const type = TYPE[useIsPhone() ? "phone" : "monitor"];
   const [period, setPeriod] = useState("30d");
   const [feature, setFeature] = useState("all");
   const [state, setState] = useState({ status: "loading", rows: [] });
@@ -161,19 +174,29 @@ export default function AiUsageModal({ userId, onClose }) {
       <div
         role="dialog"
         aria-label="Claude usage"
-        style={S.box}
+        style={{ ...S.box, fontSize: type.base }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={S.bar}>
+        <div style={{ ...S.bar, fontSize: type.bar }}>
           <span>CLAUDE USAGE</span>
-          <Select label="Period" value={period} onChange={(e) => setPeriod(e.target.value)}>
+          <Select
+            label="Period"
+            size={type.control}
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+          >
             {PERIODS.map((p) => (
               <option key={p.key} value={p.key}>
                 {p.label}
               </option>
             ))}
           </Select>
-          <Select label="Feature" value={feature} onChange={(e) => setFeature(e.target.value)}>
+          <Select
+            label="Feature"
+            size={type.control}
+            value={feature}
+            onChange={(e) => setFeature(e.target.value)}
+          >
             <option value="all">All features</option>
             {features.map((f) => (
               <option key={f} value={f}>
@@ -186,7 +209,7 @@ export default function AiUsageModal({ userId, onClose }) {
           </button>
         </div>
         <div style={S.scroll}>
-          <Body state={state} shown={shown} />
+          <Body state={state} shown={shown} pad={type.pad} />
         </div>
         <Total shown={shown} />
       </div>
