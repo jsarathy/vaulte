@@ -244,7 +244,14 @@ export const claudeEstimatePortionWeight = async (r) => {
     (s, i) => s + (parseFloat(String(i.amount).match(/^(\d+(\.\d+)?)g$/)?.[1]) || 100),
     0,
   );
-  return { total_g: total, portion_g: total / (Number(r.servings) || 1) + 0.4 };
+  const portion = total / (Number(r.servings) || 1) + 0.4;
+  const liquid = /huel|pani|soup|shake/i.test(r.name); // Huel RTD is a drink
+  return {
+    total_g: total,
+    portion_g: portion,
+    form: liquid ? "liquid" : "solid",
+    portion_ml: liquid ? Math.round(portion * 0.9) : 0,
+  };
 };
 
 // ── firebase/auth ────────────────────────────────────────────────────────────

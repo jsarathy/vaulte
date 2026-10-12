@@ -1,5 +1,6 @@
 // src/lib/recipeBuilder.js — the recipe builder (create with Claude / edit a saved recipe).
 import { MACROS, findNameClash } from "../constants/recipeLinks.js";
+import { volumeFields } from "./recipeVolume.js";
 
 /**
  * What a recipe's nutrition was calculated from: servings + non-blank ingredient rows
@@ -23,12 +24,14 @@ export function nameProblem(recipe, recipes) {
   return clash ? `A saved recipe is already called "${clash.name}" — choose another name.` : null;
 }
 
-/** Claude's new recipe with an id; its portion weight rounded and marked estimated. */
+/** Claude's new recipe with an id; its portion weight rounded and marked estimated, its form and volume kept if usable. */
 export function prepareGenerated(recipe, id) {
+  const { form: _form, portion_ml: _ml, ...rest } = recipe;
   const grams = Math.round(Number(recipe.portion_g));
+  const volume = volumeFields(recipe);
   return grams > 0
-    ? { ...recipe, id, portion_g: grams, portion_g_source: "estimated" }
-    : { ...recipe, id, portion_g: null };
+    ? { ...rest, ...volume, id, portion_g: grams, portion_g_source: "estimated" }
+    : { ...rest, ...volume, id, portion_g: null };
 }
 
 /** The saved list with `recipe` added or replaced, sorted by name. */

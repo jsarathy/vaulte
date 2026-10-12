@@ -76,8 +76,18 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   );
   const nimbu = all.find((a) => a[1] === "Nimbu Pani");
   ok(
-    "failed estimate: recipe left without weight, nothing saved",
-    !nimbu[2] && (await saves(nimbu[0])).length === 0,
+    "failed estimate: recipe left without weight; only the count of tries is saved",
+    !nimbu[2] &&
+      (await saves(nimbu[0])).length === 1 &&
+      (await saves(nimbu[0]))[0].portion_g == null &&
+      (await saves(nimbu[0]))[0].fill_attempts.n === 1,
+  );
+  ok(
+    "form and volume saved with the estimate: Pinto solid, Huel a liquid with its ml",
+    pinto.form === "solid" &&
+      !pinto.portion_ml &&
+      (await rec("r5")).form === "liquid" &&
+      (await rec("r5")).portion_ml > 0,
   );
   ok("nutrition untouched by backfill", pinto.nutrition.kcal === 338);
 
@@ -213,11 +223,24 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await ev(() => window.__backfill());
   await p.waitForTimeout(800);
   const again = await ev((b) => window.__est.slice(b).sort().join("|"), before);
+  // Egg White Omelet (weight cleared) and Nimbu Pani (second try) need a weight; Paneer, weighed by
+  // the user while its estimate was pending, has no form yet, so only its form is asked for
   ok(
-    "next load only estimates recipes without a weight",
-    again === "Egg White Omelet|Nimbu Pani",
+    "next load only asks for what is missing",
+    again === "Egg White Omelet|Nimbu Pani|Paneer Bhurji",
     `(${again})`,
   );
+  ok(
+    "Paneer: form filled in, the weighed 300 g kept",
+    (await rec("r2")).form === "solid" && (await rec("r2")).portion_g === 300,
+  );
+  ok("Nimbu Pani: two tries made", (await rec(nimbu[0])).fill_attempts?.n === 2);
+  const third = await ev(async () => {
+    const b = window.__est.length;
+    await window.__backfill();
+    return window.__est.slice(b).sort().join("|");
+  });
+  ok("a recipe that will not fill in is not tried a third time", third === "", `(${third})`);
 
   // Create flow rounds Claude's estimate and marks it
   await p

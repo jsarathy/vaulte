@@ -1,7 +1,8 @@
 // src/lib/recipePortion.js — the "How much?" box for adding a saved recipe (Fixes 19–20).
 // Portions are always scaled on the device; grams / ounces too when the recipe has a
-// Wt/portion. Anything else (ml, or no Wt/portion) is worked out by Claude.
+// Wt/portion, and ml for a liquid with a volume. Anything else is worked out by Claude.
 import { MACROS } from "../constants/recipeLinks.js";
+import { portionVolume } from "./recipeVolume.js";
 
 export const PORTION_UNITS = [
   ["portion", "portion(s)"],
@@ -10,6 +11,10 @@ export const PORTION_UNITS = [
   ["oz", "ounces (oz)"],
 ];
 const GRAMS_PER_UNIT = { g: 1, oz: 28.3495 };
+
+/** The units offered for a recipe: millilitres only for a liquid. */
+export const unitsFor = (recipe) =>
+  PORTION_UNITS.filter(([unit]) => unit !== "ml" || recipe?.form === "liquid");
 
 /** Quantity typed in the box; blank, zero or invalid counts as 1. */
 export const parseQty = (text) => parseFloat(text) || 1;
@@ -21,6 +26,10 @@ export const portionWeight = (recipe) =>
 /** Multiple of one serving, worked out on the device; null = needs Claude. */
 export function localFactor(recipe, qty, unit) {
   if (unit === "portion") return qty;
+  if (unit === "ml") {
+    const ml = portionVolume(recipe);
+    return ml ? qty / ml : null;
+  }
   const grams = portionWeight(recipe);
   return grams && GRAMS_PER_UNIT[unit] ? (qty * GRAMS_PER_UNIT[unit]) / grams : null;
 }

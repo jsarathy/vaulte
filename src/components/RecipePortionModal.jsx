@@ -4,7 +4,7 @@ import { C, FONT } from "../constants/design.jsx";
 import { isEstimatedWeight } from "../api/recipeWeights";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import {
-  PORTION_UNITS,
+  unitsFor,
   portionView,
   portionWeight,
   baseHeading,
@@ -226,7 +226,7 @@ function AmountInputs({ box, phone }) {
           onChange={(e) => box.setUnit(e.target.value)}
           style={phone ? { ...S.unit, ...SHRINK } : S.unit}
         >
-          {PORTION_UNITS.map(([value, label]) => (
+          {unitsFor(box.recipe).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
