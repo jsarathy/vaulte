@@ -8,6 +8,7 @@ import AccountSidebar from "./AccountSidebar.jsx";
 import EditProfileModal from "./EditProfileModal.jsx";
 import HomePanel from "./HomePanel.jsx";
 import AccountPanel from "./AccountPanel.jsx";
+import DashboardPanel from "./DashboardPanel.jsx";
 
 const pageStyle = {
   background: "radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)",
@@ -25,6 +26,7 @@ const mainStyle = (activePanel) => ({
 
 function Panel({ activePanel, profile, userId, account }) {
   if (activePanel === "home") return <HomePanel profile={profile} />;
+  if (activePanel === "dashboard") return <DashboardPanel userId={userId} />;
   if (activePanel === "nutrition")
     return (
       <div className="fade-up nt-wrap" style={{ margin: "-24px" }}>

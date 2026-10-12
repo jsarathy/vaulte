@@ -1,0 +1,124 @@
+// tests/ui/dashboard.spec.mjs — the Dashboard panel (Fix 98): a row per app with when it last gave
+// data and a fresh / stale / missing marker, the Claude usage entry, and failed reads. Firebase is
+// mocked; "now" is 11 Oct 2026, 12:00.
+import { test, expect } from "./cover.mjs";
+
+const start = async (p, init = {}) => {
+  await p.route(
+    (u) => new URL(u).pathname.startsWith("/api/"),
+    (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+  );
+  await p.clock.setFixedTime(new Date(2026, 9, 11, 12, 0, 0));
+  await p.addInitScript((i) => Object.assign(window, i), {
+    __authUser: { uid: "u", email: "jane@example.com" },
+    ...init,
+    __docs: {
+      "users/u": { firstName: "Jane", lastName: "Smith" },
+      ...(init.__docs || {}),
+    },
+  });
+  await p.goto("/app.html");
+  await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
+  await p.getByRole("button", { name: "Dashboard" }).click();
+  await expect(p.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+};
+const hoursAgo = (h) =>
+  new Date(new Date(2026, 9, 11, 12, 0, 0).getTime() - h * 3600000).toISOString();
+const app = (p, id) => p.locator(`[data-app="${id}"]`);
+
+test("every app fresh: Polar, Apple Health and the Renpho scale and tape", async ({ page: p }) => {
+  await start(p, {
+    __docs: { "users/u/polar/connection": { connected: true, last_sync_at: hoursAgo(2) } },
+    __collections: {
+      "users/u/apple_activity": [
+        { id: "2026-10-10", date: "2026-10-10", updated_at: hoursAgo(30) },
+        { id: "2026-10-11", date: "2026-10-11", updated_at: hoursAgo(3) },
+      ],
+      "users/u/weight_log": [
+        { id: "2026-10-01", date: "2026-10-01" },
+        { id: "2026-10-10", date: "2026-10-10" },
+      ],
+      "users/u/body_log": [{ id: "2026-10-01", date: "2026-10-01" }],
+    },
+  });
+  await expect(p.getByText("YOUR APPS")).toBeVisible();
+  await expect(app(p, "polar")).toContainText("Last sync 2 hours ago"); // the newest record is used
+  await expect(app(p, "apple")).toContainText("Last data 3 hours ago");
+  await expect(app(p, "weight")).toContainText("Last reading yesterday");
+  await expect(app(p, "body")).toContainText("Last reading 10 days ago");
+  for (const id of ["polar", "apple", "weight", "body"])
+    await expect(app(p, id).getByRole("img", { name: "Up to date" })).toBeVisible();
+});
+
+test("stale, not connected and no data are marked", async ({ page: p }) => {
+  await start(p, {
+    __docs: { "users/u/polar/connection": { connected: false, last_sync_at: hoursAgo(1) } },
+    __collections: {
+      "users/u/apple_activity": [{ id: "x", date: "2026-10-08", updated_at: hoursAgo(80) }],
+      "users/u/weight_log": [],
+      "users/u/body_log": [{ id: "2026-08-01", date: "2026-08-01" }],
+    },
+  });
+  await expect(app(p, "polar")).toContainText("Not connected");
+  await expect(app(p, "polar").getByRole("img", { name: "No data" })).toBeVisible();
+  await expect(app(p, "apple")).toContainText("Last data 3 days ago");
+  await expect(app(p, "apple").getByRole("img", { name: "Stale" })).toBeVisible();
+  await expect(app(p, "weight")).toContainText("No readings");
+  await expect(app(p, "weight").getByRole("img", { name: "No data" })).toBeVisible();
+  await expect(app(p, "body")).toContainText("Last reading 71 days ago");
+  await expect(app(p, "body").getByRole("img", { name: "Stale" })).toBeVisible();
+});
+
+test("a read that fails shows an error row and leaves the others", async ({ page: p }) => {
+  await start(p, {
+    __failPaths: ["users/u/polar/connection"],
+    __collections: {
+      "users/u/apple_activity": [{ id: "x", date: "2026-10-11", updated_at: hoursAgo(1) }],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  await expect(app(p, "polar")).toContainText("Could not read");
+  await expect(app(p, "polar").getByRole("img", { name: "Error" })).toBeVisible();
+  await expect(app(p, "apple")).toContainText("Last data 1 hour ago");
+});
+
+test("the Claude entry opens the usage table", async ({ page: p }) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+      "users/u/ai_usage": [
+        {
+          id: "a",
+          feature: "chat",
+          at: hoursAgo(2),
+          input_tokens: 4000,
+          output_tokens: 300,
+          cost_usd: 0.0165,
+        },
+      ],
+    },
+  });
+  await expect(p.getByText("CLAUDE", { exact: true })).toBeVisible();
+  await p.getByRole("button", { name: "CLAUDE USAGE" }).dblclick();
+  await expect(p.getByRole("dialog", { name: "Claude usage" })).toContainText("1.65¢");
+});
+
+test("the Dashboard is a navigation item: other panels leave it and come back", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  await p.getByRole("button", { name: "My Account" }).click();
+  await expect(p.getByRole("heading", { name: "My Account" })).toBeVisible();
+  await expect(p.getByRole("heading", { name: "Dashboard" })).toHaveCount(0);
+  await p.getByRole("button", { name: "Dashboard" }).click();
+  await expect(p.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+});
