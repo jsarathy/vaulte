@@ -296,7 +296,9 @@ const userFor = (uid, email, extra = {}) => ({
 export const onAuthStateChanged = (_a, cb) => {
   setTimeout(async () => {
     await authHold("start");
-    auth.currentUser = window.__authUser ?? null;
+    auth.currentUser = window.__authUser
+      ? { ...window.__authUser, getIdToken: async () => "mock-id-token" }
+      : null;
     cb(auth.currentUser);
   }, window.__authDelay || 0);
   return () => {};

@@ -3,11 +3,12 @@
 // mocked; "now" is 11 Oct 2026, 12:00.
 import { test, expect } from "./cover.mjs";
 
-const start = async (p, init = {}) => {
+const start = async (p, init = {}, admin = null) => {
   await p.route(
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
+  const seen = admin ? await adminApi(p, admin) : [];
   await p.clock.setFixedTime(new Date(2026, 9, 11, 12, 0, 0));
   await p.addInitScript((i) => Object.assign(window, i), {
     __authUser: { uid: "u", email: "jane@example.com" },
@@ -21,6 +22,7 @@ const start = async (p, init = {}) => {
   await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await p.getByRole("button", { name: "Dashboard" }).click();
   await expect(p.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  return seen;
 };
 const hoursAgo = (h) =>
   new Date(new Date(2026, 9, 11, 12, 0, 0).getTime() - h * 3600000).toISOString();
@@ -290,4 +292,192 @@ test("the CLAUDE USAGE entry has the same size, colour and font as the Anthropic
   expect(usage[0]).toBe("22px");
   // written like the link, not in capitals
   await expect(claude.getByRole("button", { name: "Claude Usage" })).toHaveText("Claude Usage");
+});
+
+const USERS = [
+  {
+    uid: "FbUid123abcDEF456ghiJKL789",
+    member_id: "USR-ABC123",
+    name: "Jane Smith",
+    email: "jane@example.com",
+    phone: "+44 7700 000000",
+    address: "1 High St, London, SW1A 1AA",
+    created: new Date(2026, 9, 1, 8, 5).toISOString(),
+    last_sign_in: new Date(2026, 9, 11, 9, 0).toISOString(),
+    providers: ["google.com", "password"],
+    disabled: false,
+  },
+  {
+    uid: "FbUid999xyz",
+    member_id: "",
+    name: "",
+    email: "bob@test.org",
+    phone: "",
+    address: "",
+    created: null,
+    last_sign_in: null,
+    providers: ["password"],
+    disabled: true,
+  },
+];
+/** The mocked /api/admin-users: `admin` says who the caller is; the token must be sent. */
+const adminApi = async (p, { admin = true, users = USERS, fail = false } = {}) => {
+  const seen = [];
+  await p.route(
+    (u) => new URL(u).pathname === "/api/admin-users",
+    async (route) => {
+      const req = route.request();
+      const { action } = req.postDataJSON();
+      seen.push({ action, auth: req.headers()["authorization"] });
+      if (action === "check") return route.fulfill({ json: { admin } });
+      if (fail) return route.fulfill({ status: 500, json: { error: "Could not list the users" } });
+      return route.fulfill({ json: { users } });
+    },
+  );
+  return seen;
+};
+
+const startAdmin = (p, options = {}) =>
+  start(
+    p,
+    {
+      __collections: {
+        "users/u/apple_activity": [],
+        "users/u/weight_log": [],
+        "users/u/body_log": [],
+      },
+    },
+    options,
+  );
+const openUsers = async (p) => {
+  await p.getByRole("button", { name: "User accounts" }).click();
+  const dialog = p.getByRole("dialog", { name: "Users" });
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
+
+test("an admin sees a USERS card below the Claude card; the server is asked with the sign-in token", async ({
+  page: p,
+}) => {
+  const seen = await startAdmin(p);
+  const users = p.getByRole("region", { name: "USERS" });
+  await expect(users).toBeVisible();
+  const [claude, card] = [await box(p, "CLAUDE"), await box(p, "USERS")];
+  expect(card.top).toBeGreaterThanOrEqual(claude.bottom); // below it
+  expect(Math.abs(card.left - claude.left)).toBeLessThan(2); // in the same column
+  await expect(users.getByRole("button", { name: "User accounts" })).toBeVisible();
+  expect(seen[0]).toEqual({ action: "check", auth: "Bearer mock-id-token" });
+});
+
+test("not an admin, or a failed check: no USERS card", async ({ page: p }) => {
+  await startAdmin(p, { admin: false });
+  await expect(p.getByRole("region", { name: "CLAUDE" })).toBeVisible();
+  await expect(p.getByRole("region", { name: "USERS" })).toHaveCount(0);
+});
+
+test("the Users table lists the users with their account details and ids", async ({ page: p }) => {
+  const seen = await startAdmin(p);
+  const dialog = await openUsers(p);
+  expect(seen.at(-1)).toEqual({ action: "list", auth: "Bearer mock-id-token" });
+  const heads = dialog.getByRole("columnheader");
+  await expect(heads).toHaveText([
+    "Name",
+    "Email",
+    "Phone",
+    "Member since",
+    "Last sign-in",
+    "Sign-in",
+    "Member ID",
+    "User ID",
+  ]);
+  const rows = dialog.getByRole("row");
+  await expect(rows).toHaveCount(3); // header + 2 users
+  const jane = await rows.nth(1).getByRole("cell").allTextContents();
+  expect(jane).toEqual([
+    "Jane Smith",
+    "jane@example.com",
+    "+44 7700 000000",
+    expect.stringMatching(/^01-Oct-2026 \d\d:\d\d$/),
+    expect.stringMatching(/^11-Oct-2026 \d\d:\d\d$/),
+    "Google, Email and password",
+    "USR-ABC123",
+    "FbUid123abcDEF456ghiJKL789", // the user id string
+  ]);
+  const bob = await rows.nth(2).getByRole("cell").allTextContents();
+  expect(bob.slice(0, 3)).toEqual(["", "bob@test.org", ""]);
+  expect(bob[5]).toBe("Email and password (disabled)");
+  await expect(dialog).toContainText("2 users");
+});
+
+test("search narrows the table by anything in a row, and the count follows", async ({
+  page: p,
+}) => {
+  await startAdmin(p);
+  const dialog = await openUsers(p);
+  const search = dialog.getByRole("searchbox", { name: "Search users" });
+  const rows = dialog.getByRole("row");
+  await search.fill("JANE");
+  await expect(rows).toHaveCount(2);
+  await expect(dialog).toContainText("1 user");
+  await expect(dialog).not.toContainText("2 users");
+  await search.fill("xyz"); // part of a user id
+  await expect(rows.nth(1)).toContainText("bob@test.org");
+  await search.fill("london"); // the address, which has no column
+  await expect(rows.nth(1)).toContainText("Jane Smith");
+  await search.fill("disabled");
+  await expect(rows.nth(1)).toContainText("bob@test.org");
+  await search.fill("nobody at all");
+  await expect(dialog.getByText("No users match.")).toBeVisible();
+  await expect(dialog).toContainText("0 users");
+  await search.fill("");
+  await expect(rows).toHaveCount(3);
+});
+
+test("the Users table looks like the usage table: as wide as its content, bordered, centred headings, large type", async ({
+  page: p,
+}) => {
+  await startAdmin(p);
+  const dialog = await openUsers(p);
+  const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());
+  expect(box.height).toBeGreaterThan(900 * 0.9);
+  expect(box.width).toBeLessThanOrEqual(1400);
+  const table = await dialog
+    .locator("table")
+    .evaluate((t) => ({ w: t.getBoundingClientRect().width, p: t.parentElement.clientWidth }));
+  expect(table.w).toBeLessThanOrEqual(table.p + 1); // no white space beside the table
+  expect(await size(dialog.getByRole("cell").first())).toBeGreaterThanOrEqual(16);
+  const heads = dialog.getByRole("columnheader");
+  expect(await heads.evaluateAll((hs) => hs.map((h) => getComputedStyle(h).textAlign))).toEqual(
+    Array(8).fill("center"),
+  );
+  expect(
+    await dialog
+      .getByRole("cell")
+      .first()
+      .evaluate((e) => getComputedStyle(e).borderTopWidth),
+  ).toBe("1px");
+  expect(await size(dialog.getByText("USERS", { exact: true }))).toBeGreaterThanOrEqual(20);
+  expect(await size(dialog.getByText(/^\d+ users?$/))).toBeGreaterThanOrEqual(21);
+});
+
+test("the Users table closes with Esc, ✕ or a click outside", async ({ page: p }) => {
+  await startAdmin(p);
+  let dialog = await openUsers(p);
+  await p.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+  dialog = await openUsers(p);
+  await dialog.getByRole("searchbox").click(); // inside: stays open
+  await expect(dialog).toBeVisible();
+  await p.mouse.click(2, 2);
+  await expect(dialog).toHaveCount(0);
+});
+
+test("a list that cannot be read says so", async ({ page: p }) => {
+  await startAdmin(p, { fail: true });
+  const dialog = await openUsers(p);
+  await expect(dialog).toContainText("Could not load users: Could not list the users");
 });

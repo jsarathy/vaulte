@@ -5,11 +5,12 @@ import { test, expect } from "./cover.mjs";
 
 const SCREEN = { width: 390, height: 844 };
 
-const start = async (p) => {
+const start = async (p, admin = null) => {
   await p.route(
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
+  if (admin) await adminApi(p, admin);
   await p.clock.setFixedTime(new Date(2026, 9, 11, 12, 0, 0));
   await p.addInitScript(() => {
     window.__authUser = { uid: "u", email: "jane@example.com" };
@@ -159,4 +160,75 @@ test("CLAUDE opens a popup with the usage entry and the Anthropic Console link; 
   await expect(dialog).toBeVisible(); // back to the Claude popup
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
+});
+
+const USERS = [
+  {
+    uid: "FbUid123abcDEF456ghiJKL789",
+    member_id: "USR-ABC123",
+    name: "Jane Smith",
+    email: "jane@example.com",
+    phone: "+44 7700 000000",
+    address: "1 High St, London, SW1A 1AA",
+    created: new Date(2026, 9, 1, 8, 5).toISOString(),
+    last_sign_in: new Date(2026, 9, 11, 9, 0).toISOString(),
+    providers: ["google.com", "password"],
+    disabled: false,
+  },
+  {
+    uid: "FbUid999xyz",
+    member_id: "",
+    name: "",
+    email: "bob@test.org",
+    phone: "",
+    address: "",
+    created: null,
+    last_sign_in: null,
+    providers: ["password"],
+    disabled: true,
+  },
+];
+/** The mocked /api/admin-users: `admin` says who the caller is; the token must be sent. */
+const adminApi = async (p, { admin = true, users = USERS, fail = false } = {}) => {
+  const seen = [];
+  await p.route(
+    (u) => new URL(u).pathname === "/api/admin-users",
+    async (route) => {
+      const req = route.request();
+      const { action } = req.postDataJSON();
+      seen.push({ action, auth: req.headers()["authorization"] });
+      if (action === "check") return route.fulfill({ json: { admin } });
+      if (fail) return route.fulfill({ status: 500, json: { error: "Could not list the users" } });
+      return route.fulfill({ json: { users } });
+    },
+  );
+  return seen;
+};
+
+test("an admin gets a fourth rubric, USERS, that opens the table full window; others do not", async ({
+  page: p,
+}) => {
+  await start(p, {});
+  await expect(rubric(p, "USERS")).toBeVisible();
+  await expect(rubric(p, "USERS")).toContainText("+");
+  await rubric(p, "USERS").click();
+  const dialog = p.getByRole("dialog", { name: "Users" });
+  await expect(dialog).toBeVisible();
+  const b = await rect(dialog); // nearly the whole window, like the usage table
+  expect(b.left).toBeGreaterThanOrEqual(0);
+  expect(b.right).toBeLessThanOrEqual(SCREEN.width);
+  expect(b.width).toBeGreaterThan(370);
+  expect(b.height).toBeGreaterThan(SCREEN.height * 0.9);
+  await expect(dialog.getByRole("row")).toHaveCount(3);
+  await dialog.getByRole("searchbox", { name: "Search users" }).fill("bob");
+  await expect(dialog.getByRole("row")).toHaveCount(2);
+  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("not an admin: three rubrics only", async ({ page: p }) => {
+  await start(p, { admin: false });
+  await expect(rubric(p, "CLAUDE")).toBeVisible();
+  await expect(rubric(p, "USERS")).toHaveCount(0);
 });
