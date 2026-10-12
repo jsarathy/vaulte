@@ -60,7 +60,11 @@ const answer = (url) => {
     ];
   if (url === `${GH}/issues?state=open&per_page=20`)
     return [
-      { number: 161, title: "CI platform check" },
+      {
+        number: 161,
+        title: "CI platform check",
+        body: "Intro\n\n- Java 21 is behind\n- firebase-tools is behind\n",
+      },
       { number: 3, title: "a pull request", pull_request: {} },
     ];
   throw new Error(`unexpected ${url}`);
@@ -145,7 +149,15 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
     at: "2026-10-12T09:05:00Z",
     description: "Deployment has completed",
   });
-  assert.deepEqual(out.body.issues, { issues: [{ number: 161, title: "CI platform check" }] });
+  assert.deepEqual(out.body.issues, {
+    issues: [
+      {
+        number: 161,
+        title: "CI platform check",
+        items: ["Java 21 is behind", "firebase-tools is behind"],
+      },
+    ],
+  });
   assert.equal(out.body.checked_at, new Date(1_000_000).toISOString());
   assert.equal(out.headers["Cache-Control"], "private, max-age=60");
   assert.equal(urls.length, 8); // 3 status pages and feeds, runs, the canary, the deployment and its status, issues

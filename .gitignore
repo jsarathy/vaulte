@@ -23,3 +23,4 @@ playwright-report/
 reports/
 .stryker-tmp/
 .stryker-tmp-api/
+firestore-debug.log

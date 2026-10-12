@@ -52,11 +52,24 @@ export function deploymentState(deployment, statuses) {
   };
 }
 
-/** Open issues (not pull requests): number and title. */
+/** The "- " lines of an issue's text (the weekly CI platform check lists what is behind that way). */
+const bullets = (body) =>
+  String(body || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("- "))
+    .map((l) => l.slice(2).trim().slice(0, 160))
+    .slice(0, 20);
+
+/** Open issues (not pull requests): number, title and the "- " lines of the text. */
 export const openIssues = (list) => ({
   issues: (Array.isArray(list) ? list : [])
     .filter((i) => i && !i.pull_request)
-    .map((i) => ({ number: i.number, title: String(i.title || "").slice(0, 120) })),
+    .map((i) => ({
+      number: i.number,
+      title: String(i.title || "").slice(0, 120),
+      items: bullets(i.body),
+    })),
 });
 
 /** The canary workflow's recent runs (newest first): how each ended and when. */

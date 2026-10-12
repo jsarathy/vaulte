@@ -72,13 +72,26 @@ export function canary(c, now) {
   return { state, line: `Ubuntu 26.04 canary: ${counts} · latest ${ago(latest.at, now)}` };
 }
 
-/** The open issues as a state and a line. */
+const NOTICE = "Notice on the latest CI run";
+
+/** The open issues as a state and a line (and, when they list items, the items). */
 export function issues(i) {
   if (failed(i)) return { state: "never", line: "Issues unavailable" };
   if (!i.issues.length) return { state: "ok", line: "No open issues" };
   const first = i.issues[0];
   const more = i.issues.length > 1 ? ` (+${i.issues.length - 1} more)` : "";
-  return { state: "stale", line: `${i.issues.length} open: ${first.title}${more}` };
+  const line = `${i.issues.length} open: ${first.title}${more}`;
+  // what each issue lists: the items to act on, and a count of the CI run notices
+  const items = i.issues.flatMap((x) => x.items || []);
+  const notices = items.filter((t) => t.startsWith(NOTICE));
+  const todo = items.filter((t) => !t.startsWith(NOTICE));
+  if (!items.length) return { state: "stale", line };
+  const tail = notices.length
+    ? [
+        `+ ${notices.length} notice${notices.length > 1 ? "s" : ""} on the latest CI run (see the issue)`,
+      ]
+    : [];
+  return { state: "stale", line, lines: [line, ...todo, ...tail] };
 }
 
 /** Firebase: ongoing incidents from Google's list. */
@@ -90,7 +103,7 @@ export function firebase(f) {
 
 const merged = (parts) => ({
   state: worst(parts.map((p) => p.state)),
-  lines: parts.map((p) => p.line),
+  lines: parts.flatMap((p) => p.lines || [p.line]),
 });
 
 /** For each INFRA link name, { state, lines }; null when nothing has been loaded yet. */

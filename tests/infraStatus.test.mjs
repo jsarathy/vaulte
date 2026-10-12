@@ -151,13 +151,29 @@ test("openIssues: not the pull requests; title cut to 120 characters", () => {
     ]),
     {
       issues: [
-        { number: 161, title: "CI platform check" },
-        { number: 9, title: "t".repeat(120) },
+        { number: 161, title: "CI platform check", items: [] },
+        { number: 9, title: "t".repeat(120), items: [] },
       ],
     },
   );
   assert.deepEqual(openIssues({}), { issues: [] });
-  assert.deepEqual(openIssues([{ number: 1 }]), { issues: [{ number: 1, title: "" }] });
+  assert.deepEqual(openIssues([{ number: 1 }]), { issues: [{ number: 1, title: "", items: [] }] });
+});
+
+test("openIssues: the '- ' lines of the text become items (trimmed, 160 characters, at most 20)", () => {
+  const body =
+    "CI platform check\n\n- Java 21 is behind\n  - Playwright is behind  \n-not a bullet\n-   Spaced out\n- " +
+    "x".repeat(200);
+  const [one] = openIssues([{ number: 1, title: "t", body }]).issues;
+  assert.deepEqual(one.items, [
+    "Java 21 is behind",
+    "Playwright is behind",
+    "Spaced out",
+    "x".repeat(160),
+  ]);
+  const many = Array.from({ length: 30 }, (_, i) => `- item ${i}`).join("\n");
+  assert.equal(openIssues([{ number: 1, body: many }]).issues[0].items.length, 20);
+  assert.deepEqual(openIssues([{ number: 1, body: null }]).issues[0].items, []);
 });
 
 // ── markers and lines ──────────────────────────────────────────────────────
@@ -341,6 +357,39 @@ test("canary: how many of the last runs passed and when the latest was; the late
   assert.deepEqual(canary({ error: true }, NOW), none);
   assert.deepEqual(canary({}, NOW), none);
   assert.deepEqual(canary(undefined, NOW), none);
+});
+
+test("issues: the items to act on follow the line; the CI run notices are counted", () => {
+  const items = [
+    "Java 21 is behind the latest LTS, 25",
+    "Notice on the latest CI run: Node.js 20 is deprecated",
+    "firebase-tools 15.32.1 is not the latest (15.33.0)",
+    "Notice on the latest CI run: 4 cores",
+  ];
+  assert.deepEqual(issues({ issues: [{ number: 161, title: "CI platform check", items }] }), {
+    state: "stale",
+    line: "1 open: CI platform check",
+    lines: [
+      "1 open: CI platform check",
+      "Java 21 is behind the latest LTS, 25",
+      "firebase-tools 15.32.1 is not the latest (15.33.0)",
+      "+ 2 notices on the latest CI run (see the issue)",
+    ],
+  });
+  const one = ["Notice on the latest CI run: x"];
+  assert.equal(
+    issues({ issues: [{ title: "A", items: one }] }).lines[1],
+    "+ 1 notice on the latest CI run (see the issue)",
+  );
+  assert.deepEqual(
+    issues({
+      issues: [
+        { title: "A", items: ["a"] },
+        { title: "B", items: ["b"] },
+      ],
+    }).lines,
+    ["2 open: A (+1 more)", "a", "b"],
+  );
 });
 
 test("issues: none is fine; any open is amber, the first named, the rest counted", () => {

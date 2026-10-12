@@ -664,7 +664,19 @@ const INFRA = {
     at: infraAgo(2),
     description: "",
   },
-  issues: { issues: [{ number: 161, title: "CI platform check" }] },
+  issues: {
+    issues: [
+      {
+        number: 161,
+        title: "CI platform check",
+        items: [
+          "Java 21 is behind the latest LTS, 25",
+          "Notice on the latest CI run: Node.js 20 is deprecated",
+          "firebase-tools 15.32.1 is not the latest (15.33.0)",
+        ],
+      },
+    ],
+  },
   checked_at: infraAgo(0),
 };
 /** The mocked /api/infra-status; the Authorization headers it was asked with go in infraSeen. */
@@ -713,6 +725,14 @@ test("each infrastructure link shows a marker and live lines: platform, deployme
     "Ubuntu 26.04 canary: 2 of the last 2 runs passed · latest 3 hours ago",
   );
   await expect(link(p, "GitHub issues")).toContainText("1 open: CI platform check");
+  await expect(link(p, "GitHub issues")).toContainText("Java 21 is behind the latest LTS, 25");
+  await expect(link(p, "GitHub issues")).toContainText(
+    "firebase-tools 15.32.1 is not the latest (15.33.0)",
+  );
+  await expect(link(p, "GitHub issues")).toContainText(
+    "+ 1 notice on the latest CI run (see the issue)",
+  );
+  await expect(link(p, "GitHub issues")).not.toContainText("Node.js 20 is deprecated");
   // markers: the worst of what each link shows
   await expect(link(p, "Vercel").getByRole("img", { name: "Stale" })).toBeVisible(); // a platform incident
   await expect(link(p, "Firebase").getByRole("img", { name: "Up to date" })).toBeVisible();
