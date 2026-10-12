@@ -11,6 +11,8 @@ import { loadErrors } from "../api/errorLog.js";
 import { countSince } from "../lib/errorLog.js";
 import { CLAUDE_LINK, INFRA_LINKS } from "../constants/infraLinks.js";
 import { checkAdmin } from "../api/adminUsers.js";
+import { loadInfraStatus } from "../api/infraStatus.js";
+import { infraStatusFor } from "../lib/infraStatus.js";
 import AiUsageCard from "./AiUsageCard.jsx";
 import UsersModal from "./UsersModal.jsx";
 import ErrorsModal from "./ErrorsModal.jsx";
@@ -131,24 +133,67 @@ function AppRows({ rows, size }) {
   );
 }
 
-function LinkList({ links, size }) {
+/** Links, each with a note; with `status` also a marker and live lines under the note (Fix 99). */
+function LinkList({ links, size, status }) {
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {links.map((l) => (
-        <div key={l.name}>
-          <a
-            href={l.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "rgba(212,175,55,0.95)", fontSize: size.name, textDecoration: "none" }}
-          >
-            {l.name}
-          </a>
-          <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>{l.note}</div>
-        </div>
-      ))}
+      {links.map((l) => {
+        const live = status?.[l.name];
+        return (
+          <div key={l.name} data-link={l.name}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {live && (
+                <span
+                  role="img"
+                  aria-label={STATE_LABEL[live.state]}
+                  style={{
+                    width: size.dot,
+                    height: size.dot,
+                    borderRadius: "50%",
+                    background: DOT[live.state],
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              <a
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "rgba(212,175,55,0.95)",
+                  fontSize: size.name,
+                  textDecoration: "none",
+                }}
+              >
+                {l.name}
+              </a>
+            </div>
+            <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>{l.note}</div>
+            {live?.lines.map((line) => (
+              <div key={line} style={{ color: "rgba(240,234,214,0.85)", fontSize: size.text }}>
+                {line}
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+/** The live status of each infrastructure link: null while loading, a marker for each when loaded. */
+function useInfraStatus(userId) {
+  const [status, setStatus] = useState(null);
+  useEffect(() => {
+    let live = true;
+    loadInfraStatus()
+      .then((data) => live && setStatus(infraStatusFor(data)))
+      .catch(() => live && setStatus(infraStatusFor({})));
+    return () => {
+      live = false;
+    };
+  }, [userId]);
+  return status;
 }
 
 /** True once the server says the signed-in user is an admin (the Users card is only for admins). */
@@ -297,7 +342,7 @@ function Header() {
 }
 
 /** A phone: three rubrics; the one tapped opens as a popup that fills the window. */
-function PhoneDashboard({ userId, rows, admin }) {
+function PhoneDashboard({ userId, rows, admin, infra }) {
   const [open, setOpen] = useState(null);
   const close = () => setOpen(null);
   return (
@@ -324,7 +369,7 @@ function PhoneDashboard({ userId, rows, admin }) {
       )}
       {open === "infra" && (
         <Popup title="INFRASTRUCTURE" onClose={close}>
-          <LinkList links={INFRA_LINKS} size={SIZE.popup} />
+          <LinkList links={INFRA_LINKS} size={SIZE.popup} status={infra} />
         </Popup>
       )}
       {open === "users" && <UsersModal onClose={close} />}
@@ -342,6 +387,7 @@ export default function DashboardPanel({ userId }) {
   const phone = useIsPhone();
   const [rows, setRows] = useState(null);
   const admin = useIsAdmin(userId);
+  const infra = useInfraStatus(userId);
   useEffect(() => {
     let live = true;
     loadDashboard(userId).then((data) => live && setRows(dashboardRows(data)));
@@ -349,7 +395,7 @@ export default function DashboardPanel({ userId }) {
       live = false;
     };
   }, [userId]);
-  if (phone) return <PhoneDashboard userId={userId} rows={rows} admin={admin} />;
+  if (phone) return <PhoneDashboard userId={userId} rows={rows} admin={admin} infra={infra} />;
   return (
     <div>
       <Header />
@@ -373,7 +419,7 @@ export default function DashboardPanel({ userId }) {
           )}
         </div>
         <Frame title="INFRASTRUCTURE">
-          <LinkList links={INFRA_LINKS} size={SIZE.box} />
+          <LinkList links={INFRA_LINKS} size={SIZE.box} status={infra} />
         </Frame>
       </div>
     </div>
