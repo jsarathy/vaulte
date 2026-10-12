@@ -80,9 +80,9 @@ test("Fix 21 — recipes built from saved recipes", async ({ page: p }) => {
     `(${exp1})`,
   );
   ok(
-    "create: Wt/portion = (250 + 350) ÷ 2 = 300 (est.)",
+    "create: Wt/portion = (250 + 350) ÷ 2 = 300, not marked as an estimate",
     (await p.locator('label:has-text("Wt/portion") input').inputValue()) === "300" &&
-      (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 1,
+      (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 0,
   );
   ok("create: no stale note", (await p.getByText("nutrition will be recalculated").count()) === 0);
   ok(
@@ -98,7 +98,7 @@ test("Fix 21 — recipes built from saved recipes", async ({ page: p }) => {
   const bowl = await rec("Pinto Rice Bowl");
   ok(
     "create: saved with combined nutrition + weight",
-    bowl.nutrition.kcal === exp1 && bowl.portion_g === 300 && bowl.portion_g_source === "estimated",
+    bowl.nutrition.kcal === exp1 && bowl.portion_g === 300 && bowl.portion_g_source === "weighed",
   );
 
   // 2. Edit: switch to 1 portion of the stew
@@ -116,8 +116,8 @@ test("Fix 21 — recipes built from saved recipes", async ({ page: p }) => {
   await p.waitForTimeout(600);
   const bowl2 = await rec("Pinto Rice Bowl");
   ok(
-    "edit: kcal (338 + rice) ÷ 2, weight (328+350)/2",
-    bowl2.nutrition.kcal === Math.round(((338 + RICE) / 2) * 10) / 10 && bowl2.portion_g === 339,
+    "edit: kcal (338 + rice) ÷ 2, the weight stays as it was (300)",
+    bowl2.nutrition.kcal === Math.round(((338 + RICE) / 2) * 10) / 10 && bowl2.portion_g === 300,
     `(${bowl2.nutrition.kcal}, ${bowl2.portion_g})`,
   );
   ok(
@@ -174,10 +174,10 @@ test("Fix 21 — recipes built from saved recipes", async ({ page: p }) => {
     `(${bowl3.nutrition.kcal})`,
   );
   ok(
-    "linked recipe without weight: Claude weighs it, (100 g) ÷ 2 = 50 est.",
-    (await ev((n) => window.__est.length === n + 1, nEst)) &&
-      bowl3.portion_g === 50 &&
-      bowl3.portion_g_source === "estimated",
+    "only linked: the weight stays 300 and Claude is not asked to weigh anything",
+    (await ev((n) => window.__est.length === n, nEst)) &&
+      bowl3.portion_g === 300 &&
+      bowl3.portion_g_source === "weighed",
     `(${bowl3.portion_g})`,
   );
 

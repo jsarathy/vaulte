@@ -53,12 +53,12 @@ test("nameProblem: blank, clash with another recipe, or none", () => {
   assert.equal(nameProblem({ id: "x", name: "Soup" }, saved), null);
 });
 
-test("prepareGenerated: id; weight rounded + estimated, or null", () => {
+test("prepareGenerated: id; weight rounded and kept as the weight, or null", () => {
   assert.deepEqual(prepareGenerated({ name: "S", portion_g: "224.6" }, "id1"), {
     name: "S",
     id: "id1",
     portion_g: 225,
-    portion_g_source: "estimated",
+    portion_g_source: "weighed",
   });
   assert.deepEqual(prepareGenerated({ name: "S", portion_g: 0 }, "id2"), {
     name: "S",
@@ -75,7 +75,7 @@ test("prepareGenerated: a usable form and volume are kept, the rest dropped", ()
       name: "S",
       id: "i",
       portion_g: 250,
-      portion_g_source: "estimated",
+      portion_g_source: "weighed",
       form: "liquid",
       portion_ml: 250,
     },
@@ -86,7 +86,7 @@ test("prepareGenerated: a usable form and volume are kept, the rest dropped", ()
       name: "S",
       id: "i",
       portion_g: 90,
-      portion_g_source: "estimated",
+      portion_g_source: "weighed",
       form: "solid",
     },
   );

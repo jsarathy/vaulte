@@ -65,13 +65,13 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   ok(
     "Pinto: 1309 g ÷ 4 → 328 g est. (rounded)",
     pinto.portion_g === Math.round((606 + 102 + 100 + 100 + 201 + 100 + 100) / 4 + 0.4) &&
-      pinto.portion_g_source === "estimated",
+      pinto.portion_g_source === "weighed",
     `(${pinto.portion_g})`,
   );
   ok(
     "Pinto saved to Firestore with estimate",
     (await saves("r1")).some(
-      (s) => s.portion_g === pinto.portion_g && s.portion_g_source === "estimated",
+      (s) => s.portion_g === pinto.portion_g && s.portion_g_source === "weighed",
     ),
   );
   const nimbu = all.find((a) => a[1] === "Nimbu Pani");
@@ -95,8 +95,8 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await openList();
   await shot("1_list");
   ok(
-    "list: '303 g (est.)'",
-    (await row("Pinto Bean Stew").getByText(`${pinto.portion_g} g (est.)`).count()) === 1,
+    "list: '328 g', no (est.)",
+    (await row("Pinto Bean Stew").getByText(`${pinto.portion_g} g`, { exact: true }).count()) === 1,
   );
   ok(
     "list: weighed Paneer has no (est.)",
@@ -106,11 +106,11 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await p.waitForTimeout(200);
   await shot("2_card");
   ok(
-    "card: 'Wt/portion 303 g (est.)' after Cook",
+    "card: 'Wt/portion 328 g' after Cook",
     await ev((g) => {
       const sp = [...document.querySelectorAll("span")].map((s) => s.textContent);
       const i = sp.findIndex((t) => t.startsWith("Cook "));
-      return sp[i + 1] === `Wt/portion ${g} g (est.)`;
+      return sp[i + 1] === `Wt/portion ${g} g`;
     }, pinto.portion_g),
   );
   await p.locator("button", { hasText: "×" }).last().click();
@@ -119,8 +119,8 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await row("Pinto Bean Stew").getByText("Pinto Bean Stew", { exact: true }).click();
   await p.waitForTimeout(200);
   ok(
-    "portion box: base '· 303 g (est.)'",
-    (await p.getByText(`Per serving (base) · ${pinto.portion_g} g (est.)`).count()) === 1,
+    "portion box: base '· 328 g'",
+    (await p.getByText(`Per serving (base) · ${pinto.portion_g} g`, { exact: true }).count()) === 1,
   );
   const sel = p
     .locator("select")
@@ -140,13 +140,13 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await p.locator("button", { hasText: "Cancel" }).last().click();
   await p.waitForTimeout(150);
 
-  // Estimated recipe: ingredient change → weight re-estimated with nutrition
+  // Claude's weight is the recipe's weight: an ingredient change recalculates the nutrition but keeps it
   await openList();
   await row("Pinto Bean Stew").locator('button[title="Edit recipe"]').click();
   await p.waitForTimeout(200);
   ok(
-    "editor shows (est.)",
-    (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 1,
+    "editor shows no (est.)",
+    (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 0,
   );
   await shot("4_editor_est");
   await p.locator('input[placeholder="amount"]').first().fill("806g");
@@ -155,10 +155,10 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await p.waitForTimeout(700);
   const pinto2 = await rec("r1");
   ok(
-    "estimated + ingredients changed → re-estimated on save",
-    (await ev(() => window.__est.length)) === nEst + 1 &&
-      pinto2.portion_g === Math.round(1509 / 4 + 0.4) &&
-      pinto2.portion_g_source === "estimated",
+    "ingredients changed → weight kept, no estimate call",
+    (await ev(() => window.__est.length)) === nEst &&
+      pinto2.portion_g === pinto.portion_g &&
+      pinto2.portion_g_source === "weighed",
     `(${pinto2.portion_g})`,
   );
   ok(
@@ -166,7 +166,7 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
     (await ev(() => window.__recalc.length)) >= 1 && pinto2.nutrition.kcal !== 338,
   );
 
-  // Manual recalc button also re-estimates when estimated
+  // The manual recalc button recalculates the nutrition and keeps the weight too
   await openList();
   await row("Pinto Bean Stew").locator('button[title="Edit recipe"]').click();
   await p.waitForTimeout(200);
@@ -174,12 +174,13 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await p.getByText("↻ Recalculate nutrition from ingredients above").click();
   await p.waitForTimeout(700);
   ok(
-    "manual recalc: weight re-estimated (1509/5)",
-    (await wt().inputValue()) === String(Math.round(1509 / 5 + 0.4)) &&
-      (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 1,
+    "manual recalc: weight kept",
+    (await wt().inputValue()) === String(pinto.portion_g) &&
+      (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 0,
   );
 
   // Typing a weighed value: (est.) gone, kept on later ingredient changes
+  const recalcBefore = await ev(() => window.__recalc.length);
   await wt().fill("330");
   ok(
     "typed weight: (est.) removed",
@@ -190,6 +191,10 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   ok(
     "typed weight saved as weighed",
     (await rec("r1")).portion_g === 330 && (await rec("r1")).portion_g_source === "weighed",
+  );
+  ok(
+    "changing only the weight does not recalculate the nutrition",
+    (await ev(() => window.__recalc.length)) === recalcBefore,
   );
   await openList();
   await row("Pinto Bean Stew").locator('button[title="Edit recipe"]').click();
@@ -256,17 +261,17 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await p.getByText("Generate Recipe →").click();
   await p.waitForTimeout(300);
   ok(
-    "create: 180.4 → 180 (est.)",
+    "create: 180.4 → 180, no (est.)",
     (await wt().inputValue()) === "180" &&
-      (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 1,
+      (await p.locator('label:has-text("Wt/portion")').getByText("(est.)").count()) === 0,
   );
   await p.getByText("✓ Save Recipe").click();
   await p.waitForTimeout(300);
   ok(
-    "create: saved 180 estimated",
+    "create: saved 180 as its weight",
     await ev(() => {
       const s = window.__saved.at(-1);
-      return s.portion_g === 180 && s.portion_g_source === "estimated";
+      return s.portion_g === 180 && s.portion_g_source === "weighed";
     }),
   );
 
