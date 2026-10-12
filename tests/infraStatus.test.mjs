@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  canaryRuns,
   deploymentState,
   firebaseIncidents,
   latestRuns,
@@ -10,6 +11,7 @@ import {
   statuspage,
 } from "../api/_infra/status.js";
 import {
+  canary,
   ci,
   deployment,
   firebase,
@@ -160,6 +162,26 @@ test("openIssues: not the pull requests; title cut to 120 characters", () => {
 
 // ── markers and lines ──────────────────────────────────────────────────────
 
+test("canaryRuns: the latest five runs, how each ended and when", () => {
+  const runs = Array.from({ length: 7 }, (_, i) => ({
+    status: "completed",
+    conclusion: i === 1 ? "failure" : "success",
+    updated_at: `2026-10-1${i}T06:00:00Z`,
+  }));
+  const out = canaryRuns({ workflow_runs: runs });
+  assert.equal(out.runs.length, 5);
+  assert.deepEqual(out.runs[1], {
+    status: "completed",
+    conclusion: "failure",
+    at: "2026-10-11T06:00:00Z",
+  });
+  assert.deepEqual(canaryRuns({ workflow_runs: [{ created_at: "2026-10-12T01:00:00Z" }] }).runs, [
+    { status: "", conclusion: null, at: "2026-10-12T01:00:00Z" },
+  ]);
+  assert.deepEqual(canaryRuns({}), { runs: [] });
+  assert.deepEqual(canaryRuns(null), { runs: [] });
+});
+
 test("worst: an error, else amber, else fine, else nothing known", () => {
   assert.equal(worst(["ok", "error", "stale"]), "error");
   assert.equal(worst(["ok", "stale", "never"]), "stale");
@@ -285,6 +307,42 @@ test("ci: the latest runs on main; any failure is an error, any running is amber
   assert.deepEqual(ci({ error: true }, NOW), { state: "never", line: "No CI runs found" });
 });
 
+test("canary: how many of the last runs passed and when the latest was; the latest decides the marker", () => {
+  const run = (conclusion, hoursAgo, status = "completed") => ({
+    status,
+    conclusion,
+    at: minus(hoursAgo * HOUR),
+  });
+  const five = [
+    run("success", 3),
+    run("success", 27),
+    run("success", 51),
+    run("success", 75),
+    run("success", 99),
+  ];
+  assert.deepEqual(canary({ runs: five }, NOW), {
+    state: "ok",
+    line: "Ubuntu 26.04 canary: 5 of the last 5 runs passed · latest 3 hours ago",
+  });
+  assert.equal(canary({ runs: [run("failure", 3), ...five.slice(1)] }, NOW).state, "error");
+  assert.equal(
+    canary({ runs: [run("failure", 3), ...five.slice(1)] }, NOW).line,
+    "Ubuntu 26.04 canary: 4 of the last 5 runs passed · latest 3 hours ago",
+  );
+  assert.equal(canary({ runs: [run("success", 3), run("failure", 27)] }, NOW).state, "ok"); // an old failure
+  assert.equal(canary({ runs: [run("cancelled", 3)] }, NOW).state, "error");
+  assert.equal(canary({ runs: [run("neutral", 3)] }, NOW).state, "stale");
+  assert.deepEqual(canary({ runs: [run(null, 1, "in_progress"), run("success", 25)] }, NOW), {
+    state: "stale",
+    line: "Ubuntu 26.04 canary: 1 of the last 1 runs passed · latest 1 hour ago",
+  });
+  const none = { state: "never", line: "Ubuntu 26.04 canary: no runs found" };
+  assert.deepEqual(canary({ runs: [] }, NOW), none);
+  assert.deepEqual(canary({ error: true }, NOW), none);
+  assert.deepEqual(canary({}, NOW), none);
+  assert.deepEqual(canary(undefined, NOW), none);
+});
+
 test("issues: none is fine; any open is amber, the first named, the rest counted", () => {
   assert.deepEqual(issues({ issues: [] }), { state: "ok", line: "No open issues" });
   assert.deepEqual(issues({ issues: [{ number: 161, title: "CI platform check" }] }), {
@@ -331,6 +389,7 @@ test("infraStatusFor: a state and lines for each link; Vercel joins its platform
           },
         ],
       },
+      canary: { runs: [{ status: "completed", conclusion: "success", at: minus(3 * HOUR) }] },
       deployment: { state: "success", at: minus(2 * HOUR) },
       issues: { issues: [{ number: 161, title: "CI platform check" }] },
     },
@@ -351,7 +410,10 @@ test("infraStatusFor: a state and lines for each link; Vercel joins its platform
   assert.deepEqual(all.GitHub, { state: "ok", lines: ["Platform: All Systems Operational"] });
   assert.deepEqual(all["GitHub Actions"], {
     state: "ok",
-    lines: ["Latest on main: passed 1 hour ago · Fix 98"],
+    lines: [
+      "Latest on main: passed 1 hour ago · Fix 98",
+      "Ubuntu 26.04 canary: 1 of the last 1 runs passed · latest 3 hours ago",
+    ],
   });
   assert.deepEqual(all["GitHub issues"], { state: "stale", lines: ["1 open: CI platform check"] });
   // a failed deployment makes Vercel an error even while the platform is fine

@@ -40,6 +40,12 @@ const answer = (url) => {
         },
       ],
     };
+  if (url === `${GH}/actions/workflows/ubuntu-26-canary.yml/runs?per_page=5`)
+    return {
+      workflow_runs: [
+        { status: "completed", conclusion: "success", updated_at: "2026-10-12T15:34:00Z" },
+      ],
+    };
   if (url === `${GH}/deployments?environment=Production&per_page=1`)
     return [
       { id: 77, environment: "Production", ref: "abc123", created_at: "2026-10-12T09:00:00Z" },
@@ -129,6 +135,9 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
       },
     ],
   });
+  assert.deepEqual(out.body.canary, {
+    runs: [{ status: "completed", conclusion: "success", at: "2026-10-12T15:34:00Z" }],
+  });
   assert.deepEqual(out.body.deployment, {
     environment: "Production",
     ref: "abc123",
@@ -139,16 +148,17 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
   assert.deepEqual(out.body.issues, { issues: [{ number: 161, title: "CI platform check" }] });
   assert.equal(out.body.checked_at, new Date(1_000_000).toISOString());
   assert.equal(out.headers["Cache-Control"], "private, max-age=60");
-  assert.equal(urls.length, 7); // 3 status pages and feeds, runs, the deployment and its status, issues
+  assert.equal(urls.length, 8); // 3 status pages and feeds, runs, the canary, the deployment and its status, issues
 });
 
 test("a source that fails is { error: true } and the others still come back", async () => {
   fail.add("https://www.githubstatus.com");
-  fail.add(`${GH}/actions`);
+  fail.add(`${GH}/actions/runs`); // the main branch runs, not the canary
   const out = await call();
   assert.equal(out.statusCode, 200);
   assert.deepEqual(out.body.github, { error: true });
   assert.deepEqual(out.body.ci, { error: true });
+  assert.equal(out.body.canary.runs.length, 1); // the canary still came back
   assert.equal(out.body.vercel.indicator, "none");
   assert.equal(out.body.issues.issues.length, 1);
   assert.equal(out.body.deployment.state, "success");
@@ -236,4 +246,5 @@ test("gather asks for the Production deployments, the main branch and the open i
   assert.ok(urls.includes(`${GH}/actions/runs?branch=main&per_page=6`));
   assert.ok(urls.includes(`${GH}/deployments?environment=Production&per_page=1`));
   assert.ok(urls.includes(`${GH}/issues?state=open&per_page=20`));
+  assert.ok(urls.includes(`${GH}/actions/workflows/ubuntu-26-canary.yml/runs?per_page=5`));
 });

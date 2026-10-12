@@ -59,6 +59,19 @@ export function ci(c, now) {
   };
 }
 
+/** The Ubuntu 26.04 canary's recent runs: how many of the finished ones passed, and the latest. */
+export function canary(c, now) {
+  const runs = c?.runs || [];
+  if (failed(c) || !runs.length)
+    return { state: "never", line: "Ubuntu 26.04 canary: no runs found" };
+  const done = runs.filter((r) => r.status === "completed");
+  const passed = done.filter((r) => r.conclusion === "success").length;
+  const latest = runs[0];
+  const state = latest.status !== "completed" ? "stale" : RUN_DONE[latest.conclusion] || "stale";
+  const counts = `${passed} of the last ${done.length} runs passed`;
+  return { state, line: `Ubuntu 26.04 canary: ${counts} · latest ${ago(latest.at, now)}` };
+}
+
 /** The open issues as a state and a line. */
 export function issues(i) {
   if (failed(i)) return { state: "never", line: "Issues unavailable" };
@@ -87,7 +100,7 @@ export function infraStatusFor(data, now = new Date()) {
     Vercel: merged([platform(data.vercel), deployment(data.deployment, now)]),
     Firebase: merged([firebase(data.firebase)]),
     GitHub: merged([platform(data.github)]),
-    "GitHub Actions": merged([ci(data.ci, now)]),
+    "GitHub Actions": merged([ci(data.ci, now), canary(data.canary, now)]),
     "GitHub issues": merged([issues(data.issues)]),
   };
 }

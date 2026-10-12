@@ -651,6 +651,12 @@ const INFRA = {
       },
     ],
   },
+  canary: {
+    runs: [
+      { status: "completed", conclusion: "success", at: infraAgo(3) },
+      { status: "completed", conclusion: "success", at: infraAgo(27) },
+    ],
+  },
   deployment: {
     environment: "Production",
     ref: "abc",
@@ -703,6 +709,9 @@ test("each infrastructure link shows a marker and live lines: platform, deployme
   await expect(link(p, "GitHub Actions")).toContainText(
     "Latest on main: passed 1 hour ago · Fix 99: live status",
   );
+  await expect(link(p, "GitHub Actions")).toContainText(
+    "Ubuntu 26.04 canary: 2 of the last 2 runs passed · latest 3 hours ago",
+  );
   await expect(link(p, "GitHub issues")).toContainText("1 open: CI platform check");
   // markers: the worst of what each link shows
   await expect(link(p, "Vercel").getByRole("img", { name: "Stale" })).toBeVisible(); // a platform incident
@@ -735,6 +744,7 @@ test("a failed deployment or CI run is an error marker; a failing source says it
         },
       ],
     },
+    canary: { runs: [{ status: "completed", conclusion: "failure", at: infraAgo(3) }] },
     github: { error: true },
   });
   await expect(link(p, "Vercel")).toContainText("Production: failed 2 hours ago");
@@ -743,6 +753,9 @@ test("a failed deployment or CI run is an error marker; a failing source says it
     "Latest on main: failed 1 hour ago · Broken",
   );
   await expect(link(p, "GitHub Actions").getByRole("img", { name: "Error" })).toBeVisible();
+  await expect(link(p, "GitHub Actions")).toContainText(
+    "Ubuntu 26.04 canary: 0 of the last 1 runs passed · latest 3 hours ago",
+  );
   await expect(link(p, "GitHub")).toContainText("Platform status unavailable");
   await expect(link(p, "GitHub").getByRole("img", { name: "No data" })).toBeVisible();
 });

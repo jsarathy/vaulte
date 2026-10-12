@@ -58,3 +58,12 @@ export const openIssues = (list) => ({
     .filter((i) => i && !i.pull_request)
     .map((i) => ({ number: i.number, title: String(i.title || "").slice(0, 120) })),
 });
+
+/** The canary workflow's recent runs (newest first): how each ended and when. */
+export const canaryRuns = (json) => ({
+  runs: (json?.workflow_runs || []).slice(0, 5).map((r) => ({
+    status: String(r.status || ""),
+    conclusion: r.conclusion ? String(r.conclusion) : null,
+    at: r.updated_at || r.created_at || null,
+  })),
+});

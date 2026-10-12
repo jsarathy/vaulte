@@ -308,6 +308,12 @@ const INFRA = {
       },
     ],
   },
+  canary: {
+    runs: [
+      { status: "completed", conclusion: "success", at: infraAgo(3) },
+      { status: "completed", conclusion: "success", at: infraAgo(27) },
+    ],
+  },
   deployment: {
     environment: "Production",
     ref: "abc",
@@ -343,6 +349,9 @@ test("INFRASTRUCTURE in the phone popup shows the live lines and markers in larg
   await expect(vercel.getByRole("img", { name: "Stale" })).toBeVisible();
   await expect(dialog.locator('[data-link="GitHub Actions"]')).toContainText(
     "Latest on main: passed 1 hour ago",
+  );
+  await expect(dialog.locator('[data-link="GitHub Actions"]')).toContainText(
+    "Ubuntu 26.04 canary: 2 of the last 2 runs passed",
   );
   expect(await size(vercel.getByText("Platform: Minor Service Outage"))).toBeGreaterThanOrEqual(20);
   expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
