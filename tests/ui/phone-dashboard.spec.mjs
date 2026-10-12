@@ -2,6 +2,7 @@
 // navigation; three rubrics (YOUR APPS, CLAUDE, INFRASTRUCTURE); a tap opens that box as a popup
 // that fills the window, in larger type; Claude's opens the usage table.
 import { test, expect } from "./cover.mjs";
+import { fontsReady } from "./fonts.mjs";
 
 const SCREEN = { width: 390, height: 844 };
 
@@ -221,6 +222,7 @@ test("an admin gets a fourth rubric, USERS, that opens the table full window; ot
   expect(b.width).toBeGreaterThan(370);
   expect(b.height).toBeGreaterThan(SCREEN.height * 0.9);
   await expect(dialog.getByRole("row")).toHaveCount(3);
+  await fontsReady(p);
   await dialog.getByRole("searchbox", { name: "Search users" }).fill("bob");
   await expect(dialog.getByRole("row")).toHaveCount(2);
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);

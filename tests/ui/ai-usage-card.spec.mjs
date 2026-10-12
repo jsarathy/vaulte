@@ -3,6 +3,7 @@
 // (a query on the records' time) and by feature, with totals. Firebase is mocked; "now" is
 // 11 Oct 2026, 12:00 UTC.
 import { test, expect } from "./cover.mjs";
+import { fontsReady } from "./fonts.mjs";
 
 const rec = (feature, at, input, output, cost) => ({
   id: at + feature,
@@ -174,6 +175,7 @@ test("it takes the screen height, is only as wide as its table, and scrolls down
   const many = Array.from({ length: 60 }, (_, i) => rec("chat", at(i), 4000, 300, 0.0165));
   await start(p, withRows(many));
   const dialog = await open(p);
+  await fontsReady(p);
   const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());
   expect(box.width).toBeLessThan(700); // as wide as its table, not the screen
   expect(box.height).toBeGreaterThan(900 * 0.9); // 94% of the screen height
@@ -222,6 +224,7 @@ test("on a monitor the dialog is only as wide as its table; dates read dd-MMM-yy
   await start(p, withRows());
   const dialog = await open(p);
   await expect(dialog.getByRole("row")).toHaveCount(4);
+  await fontsReady(p);
   const widths = await dialog.evaluate((d) => {
     const table = d.querySelector("table").getBoundingClientRect();
     const box = d.getBoundingClientRect();
