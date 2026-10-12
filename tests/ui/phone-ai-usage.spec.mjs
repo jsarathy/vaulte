@@ -24,7 +24,8 @@ const start = async (p) => {
   }, many);
   await p.goto("/app.html");
   await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
-  await p.locator(".app-sidebar button").nth(1).click();
+  await p.locator(".app-sidebar button").nth(3).click(); // Dashboard
+  await p.getByRole("button", { name: "CLAUDE", exact: true }).click(); // its Claude popup
 };
 
 const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
@@ -35,7 +36,7 @@ test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters
   await start(p);
   const head = p.getByRole("button", { name: /CLAUDE USAGE/ });
   await expect(head).toBeVisible();
-  await expect(p.getByRole("dialog")).toHaveCount(0);
+  await expect(p.getByRole("dialog", { name: "Claude usage" })).toHaveCount(0);
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await head.click();
   const dialog = p.getByRole("dialog", { name: "Claude usage" });

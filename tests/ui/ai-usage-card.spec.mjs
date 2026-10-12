@@ -1,4 +1,4 @@
-// tests/ui/ai-usage-card.spec.mjs — the Claude usage entry on My Account (Fix 84) and the table a
+// tests/ui/ai-usage-card.spec.mjs — the Claude usage entry on the Dashboard (Fix 84, 98) and the table a
 // double click opens (Fix 85, 86): one row per call with its date, newest first, filtered by period
 // (a query on the records' time) and by feature, with totals. Firebase is mocked; "now" is
 // 11 Oct 2026, 12:00 UTC.
@@ -35,8 +35,8 @@ const start = async (p, init) => {
   });
   await p.goto("/app.html");
   await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
-  await p.locator(".app-sidebar button").nth(1).click();
-  await expect(p.getByRole("heading", { name: "My Account" })).toBeVisible();
+  await p.getByRole("button", { name: "Dashboard" }).click();
+  await expect(p.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 };
 const open = async (p) => {
   await p.getByRole("button", { name: "CLAUDE USAGE" }).dblclick();
@@ -184,7 +184,7 @@ test("it takes most of the screen, capped by 1200px wide, and scrolls down for m
   expect(size.scrollH).toBeGreaterThan(size.clientH); // more rows than fit: it scrolls
 });
 
-test("on a monitor the table's records are large and bordered, the headings centred, the summary and title large; the My Account heading is larger", async ({
+test("on a monitor the table's records are large and bordered, the headings centred, the summary and title large", async ({
   page: p,
 }) => {
   await start(p, withRows());
