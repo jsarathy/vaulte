@@ -1,7 +1,7 @@
 // src/components/DashboardPanel.jsx — the Dashboard (Fix 98, 99): three framed boxes side by side on
 // a monitor (large type): the apps Vaulte uses with when each last gave data, Claude, and links to
 // the infrastructure. On a phone the three are rubrics; a tap opens that box as a popup that fills
-// the window (Claude's opens the usage table).
+// the window; + opens it and − closes it, as in My Account.
 import { useEffect, useState } from "react";
 import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
@@ -176,7 +176,7 @@ function Popup({ title, onClose, children }) {
       <div style={popupHeader}>
         <span>{title}</span>
         <button aria-label="Close" style={closeStyle} onClick={onClose}>
-          ✕
+          −
         </button>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>{children}</div>
@@ -208,7 +208,7 @@ function PhoneDashboard({ userId, rows }) {
         ].map(([id, title]) => (
           <button key={id} aria-haspopup="dialog" style={rubricStyle} onClick={() => setOpen(id)}>
             <span>{title}</span>
-            <span aria-hidden="true">›</span>
+            <span aria-hidden="true">+</span>
           </button>
         ))}
       </div>

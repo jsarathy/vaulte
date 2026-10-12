@@ -54,6 +54,8 @@ test("three rubrics, nothing else, each inside the screen", async ({ page: p }) 
     expect(b.right).toBeLessThanOrEqual(SCREEN.width);
     expect(b.height).toBeGreaterThanOrEqual(56); // a comfortable tap
   }
+  for (const name of ["YOUR APPS", "CLAUDE", "INFRASTRUCTURE"])
+    await expect(rubric(p, name)).toContainText("+"); // closed: a + to open it, as in My Account
   await expect(p.locator("[data-app]")).toHaveCount(0); // the cards are not open
   await expect(p.getByRole("dialog")).toHaveCount(0);
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -82,6 +84,7 @@ test("YOUR APPS opens as a popup that fills the window, in large type; ✕ and E
     expect(row.left).toBeGreaterThanOrEqual(0);
     expect(row.right).toBeLessThanOrEqual(SCREEN.width);
   }
+  await expect(dialog.getByRole("button", { name: "Close" })).toHaveText("−"); // open: a − to close it
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
   await rubric(p, "YOUR APPS").click();
