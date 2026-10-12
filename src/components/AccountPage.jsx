@@ -9,6 +9,7 @@ import EditProfileModal from "./EditProfileModal.jsx";
 import HomePanel from "./HomePanel.jsx";
 import AccountPanel from "./AccountPanel.jsx";
 import DashboardPanel from "./DashboardPanel.jsx";
+import { useErrorLog } from "../hooks/useErrorLog.js";
 
 const pageStyle = {
   background: "radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)",
@@ -37,6 +38,7 @@ function Panel({ activePanel, profile, userId, account }) {
 }
 
 export default function AccountPage({ profile, toast, userId, page, nav, edit }) {
+  useErrorLog(userId);
   return (
     <div className="app-page" style={pageStyle}>
       <style>{globalStyle}</style>
