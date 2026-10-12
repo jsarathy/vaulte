@@ -2,6 +2,7 @@
 // data and a fresh / stale / missing marker, the Claude usage entry, and failed reads. Firebase is
 // mocked; "now" is 11 Oct 2026, 12:00.
 import { test, expect } from "./cover.mjs";
+import { fontsReady } from "./fonts.mjs";
 
 const start = async (p, init = {}, admin = null, infra = null) => {
   await p.route(
@@ -443,6 +444,7 @@ test("the Users table looks like the usage table: as wide as its content, border
   const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());
   expect(box.height).toBeGreaterThan(900 * 0.9);
   expect(box.width).toBeLessThanOrEqual(1400);
+  await fontsReady(p);
   const table = await dialog
     .locator("table")
     .evaluate((t) => ({ w: t.getBoundingClientRect().width, p: t.parentElement.clientWidth }));
@@ -585,6 +587,7 @@ test("the errors table looks like the others: as wide as its content, bordered, 
   await p.getByRole("button", { name: "Recent errors" }).click();
   const dialog = p.getByRole("dialog", { name: "Errors" });
   const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  await fontsReady(p);
   const table = await dialog
     .locator("table")
     .evaluate((t) => ({ w: t.getBoundingClientRect().width, p: t.parentElement.clientWidth }));

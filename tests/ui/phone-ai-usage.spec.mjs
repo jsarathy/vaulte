@@ -1,6 +1,7 @@
 // tests/ui/phone-ai-usage.spec.mjs — the Claude usage table on a phone (Fix 84–87): one tap on
 // CLAUDE USAGE opens it, it uses the screen and fits the 390px width, with its filters, and scrolls.
 import { test, expect } from "./cover.mjs";
+import { fontsReady } from "./fonts.mjs";
 
 const many = Array.from({ length: 40 }, (_, i) => ({
   id: `r${i}`,
@@ -56,6 +57,7 @@ test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters
     expect(b.right).toBeLessThanOrEqual(390);
     expect(b.left).toBeGreaterThanOrEqual(0);
   }
+  await fontsReady(p); // the table is only as wide as the web font makes it
   // every column is on screen: the table is not wider than the scroll area
   const fit = await dialog
     .locator("table")
