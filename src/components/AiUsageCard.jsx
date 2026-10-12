@@ -7,7 +7,7 @@ import AiUsageModal from "./AiUsageModal.jsx";
 const gold = "rgba(212,175,55,0.6)";
 const headingStyle = {
   color: gold,
-  fontSize: "10px",
+  fontSize: "15px",
   letterSpacing: "2px",
   fontFamily: "'Cinzel',serif",
   marginTop: "28px",

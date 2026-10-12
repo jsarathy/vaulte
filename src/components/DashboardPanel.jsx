@@ -81,7 +81,7 @@ const popupHeader = {
   borderBottom: "1px solid rgba(212,175,55,0.2)",
   color: gold,
   fontFamily: "'Cinzel',serif",
-  fontSize: "16px",
+  fontSize: "28px",
   letterSpacing: "3px",
 };
 const closeStyle = {
