@@ -1,18 +1,7 @@
-// api/_admin/users.js — the admin Users list behind the Dashboard's Users card (Fix 104): who counts
-// as an admin, and one row per user joining Firebase Authentication (email, sign-in method, dates)
-// with the profile in Firestore (name, phone, address, member id). Firebase Admin; never called
-// from the browser directly.
-import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-
-export function adminApp() {
-  if (!getApps().length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
-    initializeApp({ credential: cert(serviceAccount) });
-  }
-}
-
+// api/_admin/users.js — the admin Users list behind the Dashboard's Users card (Fix 104), without
+// any Firebase call (so the unit tests can load it): who counts as an admin, and one row per user
+// joining Firebase Authentication (email, sign-in method, dates) with the profile in Firestore
+// (name, phone, address, member id). The reading is in store.js.
 /** The addresses in ADMIN_EMAILS (comma separated, any case) as a lower-case set. */
 export const adminEmails = (env = process.env) =>
   new Set(
@@ -65,25 +54,4 @@ export function mergeUsers(authUsers, profiles) {
       (a, b) =>
         (a.created || "9999").localeCompare(b.created || "9999") || a.email.localeCompare(b.email),
     );
-}
-
-async function allAuthUsers(auth) {
-  const out = [];
-  let token;
-  do {
-    const page = await auth.listUsers(1000, token);
-    out.push(...page.users);
-    token = page.pageToken;
-  } while (token);
-  return out;
-}
-
-export async function listUsers() {
-  adminApp();
-  const [authUsers, snap] = await Promise.all([
-    allAuthUsers(getAuth()),
-    getFirestore().collection("users").get(),
-  ]);
-  const profiles = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]));
-  return mergeUsers(authUsers, profiles);
 }

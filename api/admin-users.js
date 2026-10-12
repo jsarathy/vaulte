@@ -5,7 +5,8 @@
 // An admin is a verified-email user whose address is in the ADMIN_EMAILS environment variable
 // (comma separated). With the variable unset nobody is an admin.
 import { getAuth } from "firebase-admin/auth";
-import { adminApp, isAdmin, listUsers } from "./_admin/users.js";
+import { adminApp, listUsers } from "./_admin/store.js";
+import { isAdmin } from "./_admin/users.js";
 
 const bearer = (req) => String(req.headers?.authorization || "").replace(/^Bearer\s+/i, "");
 
