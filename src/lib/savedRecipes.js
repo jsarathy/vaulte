@@ -25,6 +25,25 @@ export function deletedNotice(recipe, dependents) {
 export const weightLabel = (recipe, estimated) =>
   recipe.portion_g != null ? `${recipe.portion_g} g${estimated ? " (est.)" : ""}` : null;
 
+/** "250 ml" for a liquid with a Vol/portion, else null. */
+export const volumeLabel = (recipe) =>
+  recipe.form === "liquid" && recipe.portion_ml > 0 ? `${recipe.portion_ml} ml` : null;
+
+/** The recipes whose name, description or ingredients contain every word typed (any case). */
+export function filterRecipes(recipes, query) {
+  const words = String(query || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return recipes;
+  return recipes.filter((r) => {
+    const text = [r.name, r.description, JSON.stringify(r.ingredients || [])]
+      .join(" ")
+      .toLowerCase();
+    return words.every((w) => text.includes(w));
+  });
+}
+
 /** The list without the deleted recipes. */
 export const withoutRecipes = (recipes, gone) => {
   const ids = new Set(gone.map((r) => r.id));

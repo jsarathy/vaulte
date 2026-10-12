@@ -122,3 +122,54 @@ test("Saved Recipes list", async ({ page: p }) => {
 
   expect(errs).toEqual([]);
 });
+
+test("Saved Recipes: search narrows the list by name, description or ingredient", async ({
+  page: p,
+}) => {
+  await p.addInitScript(() => (window.__noBackfill = true));
+  await p.goto("/addentry.html");
+  await p.waitForFunction(() => window.__setRecipes);
+  const nutrition = { kcal: 100 };
+  await p.evaluate(
+    (rs) => window.__setRecipes(rs),
+    [
+      {
+        id: "a",
+        name: "Pinto Bean Stew",
+        description: "Slow cooked",
+        nutrition,
+        ingredients: [{ amount: "200g", item: "pinto beans" }],
+      },
+      {
+        id: "b",
+        name: "Tomato Soup",
+        description: "Smooth starter",
+        nutrition,
+        form: "liquid",
+        portion_g: 300,
+        portion_ml: 250,
+        ingredients: [{ amount: "4", item: "Tomatoes" }],
+      },
+      { id: "c", name: "Rice Bowl", description: "", nutrition, ingredients: [] },
+    ],
+  );
+  await p.getByText("📖 Browse Saved Recipes").click();
+  const search = p.getByRole("searchbox", { name: "Search recipes" });
+  const rows = p.locator('button[title="Edit recipe"]');
+  await expect(rows).toHaveCount(3);
+  await expect(p.getByText("300 g · 250 ml")).toBeVisible(); // the liquid shows its volume
+  await search.fill("SOUP");
+  await expect(rows).toHaveCount(1);
+  await expect(p.getByText("Tomato Soup", { exact: true })).toBeVisible();
+  await search.fill("beans"); // an ingredient
+  await expect(rows).toHaveCount(1);
+  await expect(p.getByText("Pinto Bean Stew", { exact: true })).toBeVisible();
+  await search.fill("bean soup"); // every word must match
+  await expect(rows).toHaveCount(0);
+  await expect(p.getByText("No recipes match.")).toBeVisible();
+  await search.fill("");
+  await expect(rows).toHaveCount(3);
+  await search.fill("rice");
+  await p.getByText("Rice Bowl", { exact: true }).click(); // a found recipe can still be picked
+  await expect(p.getByText("Per serving (base)")).toBeVisible(); // its portion box opened
+});

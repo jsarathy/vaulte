@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   deleteConfirmText,
   deletedNotice,
+  filterRecipes,
+  volumeLabel,
   weightLabel,
   withoutRecipes,
 } from "../src/lib/savedRecipes.js";
@@ -47,4 +49,45 @@ test("weight label", () => {
 test("withoutRecipes removes by id", () => {
   assert.deepEqual(withoutRecipes([A, B, C], [A, C]), [B]);
   assert.deepEqual(withoutRecipes([A], []), [A]);
+});
+
+const LIST = [
+  {
+    id: "1",
+    name: "Pinto Bean Stew",
+    description: "Slow cooked",
+    ingredients: [{ amount: "200g", item: "pinto beans" }],
+  },
+  {
+    id: "2",
+    name: "Tomato Soup",
+    description: "A smooth starter",
+    ingredients: [{ amount: "4", item: "Tomatoes" }],
+  },
+  { id: "3", name: "Rice Bowl", description: "", ingredients: undefined },
+];
+const names = (list) => list.map((r) => r.name);
+
+test("filterRecipes: every word must be in the name, description or ingredients, in any case", () => {
+  assert.equal(filterRecipes(LIST, ""), LIST);
+  assert.equal(filterRecipes(LIST, "   "), LIST);
+  assert.equal(filterRecipes(LIST, undefined), LIST);
+  assert.deepEqual(names(filterRecipes(LIST, "SOUP")), ["Tomato Soup"]);
+  assert.deepEqual(names(filterRecipes(LIST, "bean")), ["Pinto Bean Stew"]); // name and ingredient
+  assert.deepEqual(names(filterRecipes(LIST, "smooth")), ["Tomato Soup"]); // description
+  assert.deepEqual(names(filterRecipes(LIST, "tomatoes")), ["Tomato Soup"]); // ingredient only
+  assert.deepEqual(names(filterRecipes(LIST, "tomato soup")), ["Tomato Soup"]);
+  assert.deepEqual(names(filterRecipes(LIST, "  rice   bowl ")), ["Rice Bowl"]);
+  assert.deepEqual(names(filterRecipes(LIST, "bean soup")), []); // both words must match
+  assert.deepEqual(names(filterRecipes(LIST, "o")), names(LIST)); // all contain an o
+  assert.deepEqual(filterRecipes([], "x"), []);
+});
+
+test("volumeLabel: '250 ml' for a liquid with a volume, else nothing", () => {
+  assert.equal(volumeLabel({ form: "liquid", portion_ml: 250 }), "250 ml");
+  assert.equal(volumeLabel({ form: "liquid", portion_ml: 187.5 }), "187.5 ml");
+  assert.equal(volumeLabel({ form: "liquid" }), null);
+  assert.equal(volumeLabel({ form: "liquid", portion_ml: 0 }), null);
+  assert.equal(volumeLabel({ form: "solid", portion_ml: 250 }), null);
+  assert.equal(volumeLabel({ portion_ml: 250 }), null);
 });

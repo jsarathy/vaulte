@@ -1,7 +1,8 @@
 // src/lib/recipeVolume.js — whether a saved recipe is a liquid or a solid, and its volume per portion
 // (Fix 91), and the limit on how often the backfill tries to fill in what a recipe is missing.
 //
-// form         "liquid" | "solid" — from Claude when the recipe is built or estimated
+// form         "liquid" | "solid" — from Claude when the recipe is built or its weight estimated, or
+//              set by typing a Vol/portion in the editor (blank = solid). No form counts as a solid.
 // portion_ml   millilitres in one portion, for a liquid (blank when not known)
 // fill_attempts { key, n } — how many times the backfill has tried while the recipe's servings
 //              and ingredients were as `key`; editing them starts the count again
@@ -28,8 +29,8 @@ export function portionVolume(recipe) {
 /** What the recipe was made from: servings and ingredients. */
 export const contentKey = (r) => JSON.stringify([Number(r?.servings) || 0, r?.ingredients || []]);
 
-/** True while the recipe lacks a Wt/portion or a form. */
-export const needsFill = (r) => !(Number(r?.portion_g) > 0) || !FORMS.includes(r?.form);
+/** True while the recipe has no Wt/portion. A recipe with no form counts as a solid. */
+export const needsFill = (r) => !(Number(r?.portion_g) > 0);
 
 /** True unless the backfill has already tried the maximum number of times for this content. */
 export const attemptsLeft = (r) =>

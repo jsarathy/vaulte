@@ -3,7 +3,13 @@
 // lib/recipeEdits and go through builder.setPreview.
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import { isEstimatedWeight } from "../api/recipeWeights";
-import { withField, withServings, withWeighedPortion, withMacro } from "../lib/recipeEdits.js";
+import {
+  withField,
+  withServings,
+  withWeighedPortion,
+  withPortionVolume,
+  withMacro,
+} from "../lib/recipeEdits.js";
 import { IngredientsEditor, StepsEditor, SectionHeading } from "./RecipeListEditors";
 
 const MACRO_FIELDS = [
@@ -141,6 +147,28 @@ function PortionWeight({ recipe, edit }) {
   );
 }
 
+function PortionVolume({ recipe, edit }) {
+  const ml = recipe.form === "liquid" && recipe.portion_ml > 0 ? recipe.portion_ml : "";
+  return (
+    <label
+      title="Volume of one portion in ml, for a liquid. Leave blank for a solid."
+      style={S.label}
+    >
+      🥛 Vol/portion
+      <input
+        type="number"
+        min="0"
+        step="any"
+        value={ml}
+        placeholder="solid"
+        onChange={(e) => edit(withPortionVolume, e.target.value)}
+        style={small("56px")}
+      />
+      ml
+    </label>
+  );
+}
+
 function TimeField({ recipe, edit, field }) {
   const [key, label, placeholder] = field;
   return (
@@ -172,6 +200,7 @@ function Details({ recipe, edit }) {
       <TimeField recipe={recipe} edit={edit} field={["prep_time", "⏱ Prep", "10 minutes"]} />
       <TimeField recipe={recipe} edit={edit} field={["cook_time", "🍳 Cook", "25 minutes"]} />
       <PortionWeight recipe={recipe} edit={edit} />
+      <PortionVolume recipe={recipe} edit={edit} />
     </div>
   );
 }

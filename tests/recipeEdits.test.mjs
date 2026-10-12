@@ -5,6 +5,7 @@ import {
   withField,
   withServings,
   withWeighedPortion,
+  withPortionVolume,
   withMacro,
   withIngredient,
   withoutIngredient,
@@ -100,4 +101,24 @@ test("link badge text", () => {
     linkBadgeText({ ok: false, reason: "use an amount in g, kg, oz or portions" }),
     "📖 Saved recipe — use an amount in g, kg, oz or portions; Claude will estimate it instead",
   );
+});
+
+test("withPortionVolume: a number is a liquid with that ml; blank, zero or invalid is a solid", () => {
+  const R = { name: "S", portion_g: 300 };
+  assert.deepEqual(withPortionVolume(R, "250"), {
+    name: "S",
+    portion_g: 300,
+    form: "liquid",
+    portion_ml: 250,
+  });
+  assert.equal(withPortionVolume(R, "187.5").portion_ml, 187.5);
+  for (const text of ["", "0", "-5", "abc", undefined]) {
+    assert.deepEqual(withPortionVolume({ ...R, form: "liquid", portion_ml: 250 }, text), {
+      name: "S",
+      portion_g: 300,
+      form: "solid",
+      portion_ml: null,
+    });
+  }
+  assert.equal(R.form, undefined); // not changed
 });

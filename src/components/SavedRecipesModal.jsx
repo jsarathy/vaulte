@@ -1,7 +1,8 @@
 // src/components/SavedRecipesModal.jsx — the Saved Recipes list. Render only; state and
 // deleting in useSavedRecipes. onPick (row) adds it, onEdit ✏️, onView 👁.
+import { useState } from "react";
 import { isEstimatedWeight } from "../api/recipeWeights";
-import { weightLabel } from "../lib/savedRecipes.js";
+import { filterRecipes, volumeLabel, weightLabel } from "../lib/savedRecipes.js";
 
 const S = {
   backdrop: {
@@ -49,6 +50,15 @@ const S = {
     background: ok ? "#E8F5E9" : "#FFF8E1",
     color: ok ? "#2E7D32" : "#8D6E00",
   }),
+  search: {
+    margin: "8px 8px 0",
+    padding: "8px 10px",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    fontSize: "16px",
+    boxSizing: "border-box",
+    width: "calc(100% - 16px)",
+  },
   empty: { textAlign: "center", padding: "30px", color: "#6b7280", fontSize: "13px" },
   row: {
     display: "flex",
@@ -106,7 +116,9 @@ function RowActions({ recipe, saved, on }) {
 }
 
 function RecipeRow({ recipe, saved, on }) {
-  const weight = weightLabel(recipe, isEstimatedWeight(recipe));
+  const weight = [weightLabel(recipe, isEstimatedWeight(recipe)), volumeLabel(recipe)]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div
       style={S.row}
@@ -130,7 +142,8 @@ function RecipeRow({ recipe, saved, on }) {
   );
 }
 
-function RecipeList({ recipes, saved, on }) {
+function RecipeList({ recipes, saved, on, searching }) {
+  if (recipes.length === 0 && searching) return <div style={S.empty}>No recipes match.</div>;
   if (recipes.length === 0)
     return (
       <div style={S.empty}>
@@ -142,6 +155,8 @@ function RecipeList({ recipes, saved, on }) {
 
 /** saved: useSavedRecipes(); on: { pick, edit, view } for a recipe. */
 export default function SavedRecipesModal({ saved, recipes, on }) {
+  const [query, setQuery] = useState("");
+  const shown = filterRecipes(recipes, query);
   return (
     <div onClick={(e) => e.target === e.currentTarget && saved.setOpen(false)} style={S.backdrop}>
       <div style={S.box}>
@@ -156,8 +171,16 @@ export default function SavedRecipesModal({ saved, recipes, on }) {
             {saved.notice.text}
           </div>
         )}
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search recipes"
+          aria-label="Search recipes"
+          style={S.search}
+        />
         <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-          <RecipeList recipes={recipes} saved={saved} on={on} />
+          <RecipeList recipes={shown} saved={saved} on={on} searching={query.trim() !== ""} />
         </div>
       </div>
     </div>

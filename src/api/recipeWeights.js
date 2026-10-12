@@ -69,16 +69,6 @@ export async function estimatePortionWeight(recipe, recipes = []) {
   }
 }
 
-// Only the form and volume, for a recipe that has a weight already (its weight is not touched).
-async function estimateForm(recipe) {
-  try {
-    return volumeFields(await claudeEstimatePortionWeight(recipe));
-  } catch (e) {
-    console.error("recipe form estimate failed for", recipe?.name, e);
-    return {};
-  }
-}
-
 // Linked saved-recipe ingredients use their own nutrition; Claude only
 // calculates the other ingredients.
 async function nutritionPerServing(recipe, recipes) {
@@ -153,7 +143,7 @@ export async function propagateRecipeChange({ uid, oldA, newA, recipes, setUserR
   return propagate({ uid, setUserRecipes }, { oldA, newA, list: recipes }, new Set());
 }
 
-// ── Wt/portion and form backfill ─────────────────────────────────────────────
+// ── Wt/portion backfill ─────────────────────────────────────────────
 // Weights Claude estimated before are kept as the recipe's weight from now on ("weighed"): they
 // are not re-estimated when the recipe changes, and typing a new weight replaces them.
 async function settleEstimates(ctx) {
@@ -166,12 +156,12 @@ async function settleEstimates(ctx) {
   }
 }
 
-// The recipe as it is now, unless it was edited (or filled in) meanwhile
+// The recipe as it is now, unless it was edited (or given a weight) meanwhile
 function unchangedSince(getRecipes, r) {
   const latest = getRecipes().find((x) => x.id === r.id);
-  if (!latest || contentKey(latest) !== contentKey(r)) return null;
-  const same = hasPortionWeight(latest) === hasPortionWeight(r) && !!latest.form === !!r.form;
-  return same ? latest : null;
+  return latest && contentKey(latest) === contentKey(r) && !hasPortionWeight(latest)
+    ? latest
+    : null;
 }
 
 // Save the filled-in recipe. Still missing something: count the try, so a recipe that will not
@@ -189,14 +179,11 @@ async function saveFilled(ctx, merged) {
 
 // ctx = { uid, getRecipes, setUserRecipes }
 async function backfillOne(ctx, r) {
-  const hadWeight = hasPortionWeight(r);
-  const fields = hadWeight
-    ? await estimateForm(r)
-    : await estimatePortionWeight(r, ctx.getRecipes());
+  const fields = await estimatePortionWeight(r, ctx.getRecipes());
   const latest = unchangedSince(ctx.getRecipes, r);
   if (!latest) return;
   const updated = await saveFilled(ctx, { ...latest, ...fields });
-  if (hadWeight || !hasPortionWeight(updated)) return;
+  if (!hasPortionWeight(updated)) return;
   // Recipes built on this one may now link properly (grams need a Wt/portion)
   const recipes = replaceById(ctx.getRecipes(), updated);
   await propagateRecipeChange({ ...ctx, oldA: latest, newA: updated, recipes }).catch((e) =>
@@ -204,10 +191,10 @@ async function backfillOne(ctx, r) {
   );
 }
 
-// Fill-in for saved recipes with no Wt/portion or no form (liquid or solid). Runs once per page
-// load; each recipe is saved as soon as its estimate arrives. A recipe that still lacks something
-// is tried at most twice for the same servings and ingredients (editing them starts again); one
-// edited meanwhile (or filled in) is skipped and picked up on a later load.
+// Fill-in for saved recipes with no Wt/portion (the same call also says liquid or solid). Runs once
+// per page load; each recipe is saved as soon as its estimate arrives. A recipe still without a
+// weight is tried at most twice for the same servings and ingredients (editing them starts again);
+// one edited meanwhile (or given a weight) is skipped and picked up on a later load.
 let running = false;
 export async function backfillPortionWeights(uid, getRecipes, setUserRecipes) {
   if (running) return;

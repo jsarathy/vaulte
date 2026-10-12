@@ -62,14 +62,14 @@ test("contentKey: servings and ingredients only", () => {
   assert.equal(contentKey(undefined), "[0,[]]");
 });
 
-test("needsFill: a recipe lacks a weight or a form", () => {
+test("needsFill: a recipe has no Wt/portion; a missing form counts as a solid", () => {
   assert.equal(needsFill({ portion_g: 200, form: "solid" }), false);
   assert.equal(needsFill({ portion_g: 200, form: "liquid" }), false);
-  assert.equal(needsFill({ portion_g: 200 }), true);
+  assert.equal(needsFill({ portion_g: 200 }), false);
+  assert.equal(needsFill({ portion_g: "250" }), false);
   assert.equal(needsFill({ form: "solid" }), true);
   assert.equal(needsFill({ portion_g: 0, form: "solid" }), true);
-  assert.equal(needsFill({ portion_g: "250", form: "solid" }), false);
-  assert.equal(needsFill({ portion_g: 200, form: "other" }), true);
+  assert.equal(needsFill({ portion_g: null }), true);
   assert.equal(needsFill({}), true);
   assert.equal(needsFill(undefined), true);
 });
