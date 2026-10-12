@@ -104,18 +104,41 @@ test("INFRASTRUCTURE opens as a popup with the links in large type", async ({ pa
     "GitHub",
     "GitHub Actions",
     "GitHub issues",
-    "Anthropic Console",
   ]);
-  expect(await size(links.first())).toBeGreaterThanOrEqual(22);
+  expect(await size(links.first())).toBeGreaterThanOrEqual(26);
+  expect(
+    await size(dialog.getByText("Hosting, deployments and function logs")),
+  ).toBeGreaterThanOrEqual(20);
   expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
 });
 
-test("CLAUDE opens the usage table", async ({ page: p }) => {
+test("CLAUDE opens a popup with the usage entry and the Anthropic Console link; the entry opens the table", async ({
+  page: p,
+}) => {
   await start(p);
   await rubric(p, "CLAUDE").click();
-  await expect(p.getByRole("dialog", { name: "Claude usage" })).toContainText("1.65¢");
-  await p.getByRole("button", { name: "Close" }).click();
-  await expect(p.getByRole("dialog")).toHaveCount(0);
+  const dialog = p.getByRole("dialog", { name: "CLAUDE" });
+  await expect(dialog).toBeVisible();
+  const b = await rect(dialog);
+  expect([b.left, b.top, b.right, b.bottom]).toEqual([0, 0, SCREEN.width, SCREEN.height]);
+  const usage = dialog.getByRole("button", { name: "CLAUDE USAGE" });
+  const link = dialog.getByRole("link", { name: "Anthropic Console" });
+  await expect(link).toHaveAttribute("href", "https://console.anthropic.com");
+  expect(await size(usage)).toBeGreaterThanOrEqual(26);
+  expect(await size(link)).toBeGreaterThanOrEqual(26);
+  expect(await size(dialog.getByText("Claude API usage and spend limits"))).toBeGreaterThanOrEqual(
+    20,
+  );
+  await usage.click();
+  const table = p.getByRole("dialog", { name: "Claude usage" });
+  await expect(table).toContainText("1.65¢");
+  expect(await size(table)).toBeGreaterThanOrEqual(16); // the table's type is larger on a phone
+  expect(await size(table.getByLabel("Period"))).toBeGreaterThanOrEqual(16);
+  await table.getByRole("button", { name: "Close" }).click();
+  await expect(table).toHaveCount(0);
+  await expect(dialog).toBeVisible(); // back to the Claude popup
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
 });

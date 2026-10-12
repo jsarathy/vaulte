@@ -7,9 +7,8 @@ import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import { loadDashboard } from "../api/dashboard.js";
 import { dashboardRows } from "../lib/dashboard.js";
-import { INFRA_LINKS } from "../constants/infraLinks.js";
+import { CLAUDE_LINK, INFRA_LINKS } from "../constants/infraLinks.js";
 import AiUsageCard from "./AiUsageCard.jsx";
-import AiUsageModal from "./AiUsageModal.jsx";
 
 const gold = "rgba(212,175,55,0.6)";
 const eyebrow = {
@@ -35,7 +34,7 @@ const frameStyle = {
 };
 const frameTitle = {
   color: gold,
-  fontSize: "14px",
+  fontSize: "16px",
   letterSpacing: "3px",
   fontFamily: "'Cinzel',serif",
   marginBottom: "20px",
@@ -44,8 +43,8 @@ const DOT = { ok: "#6fbf73", stale: "#e0a030", never: "#8a8a8a", error: "#d9534f
 const STATE_LABEL = { ok: "Up to date", stale: "Stale", never: "No data", error: "Error" };
 /** Type sizes: in a box on a monitor, and in a popup on a phone. */
 const SIZE = {
-  box: { name: "21px", text: "17px", dot: "14px", gap: "16px" },
-  popup: { name: "23px", text: "18px", dot: "16px", gap: "18px" },
+  box: { name: "22px", text: "18px", dot: "15px", gap: "16px" },
+  popup: { name: "26px", text: "20px", dot: "18px", gap: "18px" },
 };
 
 const rubricStyle = {
@@ -127,10 +126,10 @@ function AppRows({ rows, size }) {
   );
 }
 
-function InfraLinks({ size }) {
+function LinkList({ links, size }) {
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {INFRA_LINKS.map((l) => (
+      {links.map((l) => (
         <div key={l.name}>
           <a
             href={l.url}
@@ -143,6 +142,16 @@ function InfraLinks({ size }) {
           <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>{l.note}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The usage table entry, then the link to the Anthropic Console. */
+function ClaudeCard({ userId, phone, size }) {
+  return (
+    <div style={{ display: "grid", gap: "26px" }}>
+      <AiUsageCard userId={userId} phone={phone} flush fontSize={size.name} />
+      <LinkList links={[CLAUDE_LINK]} size={size} />
     </div>
   );
 }
@@ -210,10 +219,14 @@ function PhoneDashboard({ userId, rows }) {
       )}
       {open === "infra" && (
         <Popup title="INFRASTRUCTURE" onClose={close}>
-          <InfraLinks size={SIZE.popup} />
+          <LinkList links={INFRA_LINKS} size={SIZE.popup} />
         </Popup>
       )}
-      {open === "claude" && <AiUsageModal userId={userId} onClose={close} />}
+      {open === "claude" && (
+        <Popup title="CLAUDE" onClose={close}>
+          <ClaudeCard userId={userId} phone size={SIZE.popup} />
+        </Popup>
+      )}
     </div>
   );
 }
@@ -237,10 +250,10 @@ export default function DashboardPanel({ userId }) {
           <AppRows rows={rows} size={SIZE.box} />
         </Frame>
         <Frame title="CLAUDE">
-          <AiUsageCard userId={userId} phone={false} flush fontSize="16px" />
+          <ClaudeCard userId={userId} phone={false} size={SIZE.box} />
         </Frame>
         <Frame title="INFRASTRUCTURE">
-          <InfraLinks size={SIZE.box} />
+          <LinkList links={INFRA_LINKS} size={SIZE.box} />
         </Frame>
       </div>
     </div>
