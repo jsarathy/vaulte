@@ -26,9 +26,14 @@ export const deleteDoc = async (ref) => {
   if (window.__failDeleteDoc) throw new Error("Mock deleteDoc failure");
   (window.__deletedDocs ||= []).push(ref.path);
 };
-// reads can be slowed per path (window.__getDocDelays) or made to fail (window.__failGetDoc)
+// A reply can be held until the test releases it (window.__hold = { key: true }; the test then
+// calls window.__release[key]()): a gate, not a timer, so a slow runner cannot miss the state.
+const held = (key) =>
+  window.__hold?.[key] ? new Promise((res) => ((window.__release ||= {})[key] = res)) : null;
+// reads can be slowed per path (window.__getDocDelays), held (window.__hold) or made to fail (window.__failGetDoc)
 export const getDoc = async (ref) => {
   (window.__getDocPaths ||= []).push(ref.path);
+  await held(ref.path);
   const delay = window.__getDocDelays?.[ref.path];
   if (delay) await new Promise((res) => setTimeout(res, delay));
   if (window.__failGetDoc || window.__failPaths?.includes(ref.path))
@@ -135,6 +140,7 @@ export const claudeParseFood = async (text) => {
 export const claudeChat = async (history, recipes) => {
   (window.__chatCalls ||= []).push(JSON.parse(JSON.stringify(history)));
   (window.__chatRecipes ||= []).push((recipes || []).map((r) => r.name));
+  await held("chat");
   if (window.__chatDelay) await new Promise((res) => setTimeout(res, window.__chatDelay));
   if (window.__failChat) throw new Error("Mock chat failure");
   return window.__chatReply ?? "";
