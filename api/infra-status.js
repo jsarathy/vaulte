@@ -5,6 +5,7 @@
 // APIs are not hammered. An optional GITHUB_TOKEN environment variable raises GitHub's rate limit.
 import { verifyIdToken } from "./_admin/verify.js";
 import {
+  canaryRuns,
   deploymentState,
   firebaseIncidents,
   latestRuns,
@@ -50,15 +51,20 @@ const safe = (promise) => promise.catch(() => ({ error: true }));
 
 export async function gather() {
   const gh = githubHeaders();
-  const [vercel, github, firebase, ci, deployment, issues] = await Promise.all([
+  const [vercel, github, firebase, ci, canary, deployment, issues] = await Promise.all([
     safe(deps.getJson("https://www.vercel-status.com/api/v2/status.json").then(statuspage)),
     safe(deps.getJson("https://www.githubstatus.com/api/v2/status.json").then(statuspage)),
     safe(deps.getJson("https://status.firebase.google.com/incidents.json").then(firebaseIncidents)),
     safe(deps.getJson(`${GITHUB}/actions/runs?branch=main&per_page=6`, gh).then(latestRuns)),
+    safe(
+      deps
+        .getJson(`${GITHUB}/actions/workflows/ubuntu-26-canary.yml/runs?per_page=5`, gh)
+        .then(canaryRuns),
+    ),
     safe(productionDeployment()),
     safe(deps.getJson(`${GITHUB}/issues?state=open&per_page=20`, gh).then(openIssues)),
   ]);
-  return { vercel, github, firebase, ci, deployment, issues };
+  return { vercel, github, firebase, ci, canary, deployment, issues };
 }
 
 let cache = null;
