@@ -1,6 +1,6 @@
 // src/components/AiUsageCard.jsx — the CLAUDE USAGE heading in the Dashboard's Claude card (Fix 84–87, 98). On a
 // computer a double click on it opens the table of calls; on a phone one tap does. The table loads
-// its own data. `flush` removes the top margin (inside a box); `fontSize` sets the heading size; `asLink` gives it a link's colour and font.
+// its own data. `flush` removes the top margin (inside a box); `fontSize` sets the heading size; `asLink` gives it a link's colour and font; `label` is its text.
 import { useState } from "react";
 import AiUsageModal from "./AiUsageModal.jsx";
 
@@ -37,7 +37,14 @@ const phoneStyle = {
 /** Looks like a link beside it: the same colour and the page's own font, no capitals styling. */
 const AS_LINK = { color: "rgba(212,175,55,0.95)", fontFamily: "inherit", letterSpacing: "normal" };
 
-export default function AiUsageCard({ userId, phone, flush = false, fontSize, asLink = false }) {
+export default function AiUsageCard({
+  userId,
+  phone,
+  flush = false,
+  fontSize,
+  asLink = false,
+  label = "CLAUDE USAGE",
+}) {
   const [open, setOpen] = useState(false);
   const show = () => setOpen(true);
   return (
@@ -53,7 +60,7 @@ export default function AiUsageCard({ userId, phone, flush = false, fontSize, as
           }}
           onClick={show}
         >
-          <span>CLAUDE USAGE</span>
+          <span>{label}</span>
           <span>›</span>
         </button>
       ) : (
@@ -71,7 +78,7 @@ export default function AiUsageCard({ userId, phone, flush = false, fontSize, as
           onDoubleClick={show}
           onKeyDown={(e) => e.key === "Enter" && show()}
         >
-          CLAUDE USAGE
+          {label}
         </div>
       )}
       {open && <AiUsageModal userId={userId} onClose={() => setOpen(false)} />}

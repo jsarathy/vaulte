@@ -147,6 +147,8 @@ test("CLAUDE opens a popup with the usage entry and the Anthropic Console link; 
       return [c.fontSize, c.color, c.fontFamily, c.letterSpacing];
     });
   expect(await style(usage)).toEqual(await style(link)); // the same size, colour and font as the link
+  await expect(usage).toContainText("Claude Usage"); // written like the link, not in capitals
+  expect(await usage.evaluate((e) => e.textContent.trim().startsWith("Claude Usage"))).toBe(true);
   await usage.click();
   const table = p.getByRole("dialog", { name: "Claude usage" });
   await expect(table).toContainText("1.65¢");

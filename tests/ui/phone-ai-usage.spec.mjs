@@ -34,7 +34,7 @@ test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters
   page: p,
 }) => {
   await start(p);
-  const head = p.getByRole("button", { name: /CLAUDE USAGE/ });
+  const head = p.getByRole("button", { name: /Claude Usage/i });
   await expect(head).toBeVisible();
   await expect(p.getByRole("dialog", { name: "Claude usage" })).toHaveCount(0);
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
