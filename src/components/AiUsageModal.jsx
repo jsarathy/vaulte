@@ -23,7 +23,8 @@ const S = {
     background: "#14141a",
     border: "1px solid rgba(212,175,55,0.25)",
     borderRadius: "10px",
-    width: "1200px",
+    width: "fit-content",
+    minWidth: "min(100%, 520px)",
     maxWidth: "100%",
     height: "94dvh",
     display: "flex",
@@ -32,6 +33,9 @@ const S = {
     fontSize: "13px",
   },
   bar: {
+    width: 0, // the title bar fills the dialog but does not make it wider than the table
+    minWidth: "100%",
+    boxSizing: "border-box",
     display: "flex",
     flexWrap: "wrap",
     gap: "10px",
@@ -51,7 +55,6 @@ const S = {
     cursor: "pointer",
     minWidth: "44px",
     minHeight: "44px",
-    marginLeft: "auto",
   },
   select: {
     background: "#0d0d0f",
@@ -61,6 +64,13 @@ const S = {
     padding: "6px 8px",
     fontSize: "13px",
     minHeight: "36px",
+  },
+  filters: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px 14px",
+    flexBasis: "100%",
+    letterSpacing: "1px",
   },
   scroll: { overflow: "auto", flex: 1, WebkitOverflowScrolling: "touch" },
   th: {
@@ -75,7 +85,14 @@ const S = {
   },
   td: { padding: "6px 12px", whiteSpace: "nowrap", border: CELL_BORDER },
   note: { padding: "24px", textAlign: "center", color: "rgba(240,234,214,0.5)" },
-  total: { padding: "10px 16px", borderTop: "1px solid rgba(212,175,55,0.2)", color: gold },
+  total: {
+    width: 0,
+    minWidth: "100%",
+    boxSizing: "border-box",
+    padding: "10px 16px",
+    borderTop: "1px solid rgba(212,175,55,0.2)",
+    color: gold,
+  },
 };
 const COLUMNS = ["Date", "Feature", "In", "Out", "Cost"];
 
@@ -97,7 +114,7 @@ function Select({ label, value, onChange, size, children }) {
 
 function Rows({ rows, pad }) {
   return (
-    <table style={{ borderCollapse: "collapse", width: "100%" }}>
+    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "max-content" }}>
       <thead>
         <tr>
           {COLUMNS.map((h) => (
@@ -180,35 +197,37 @@ export default function AiUsageModal({ userId, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ ...S.bar, fontSize: type.bar }}>
-          <span style={{ marginRight: "28px" }}>CLAUDE USAGE</span>
-          <Select
-            label="Period"
-            size={type.control}
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-          >
-            {PERIODS.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Feature"
-            size={type.control}
-            value={feature}
-            onChange={(e) => setFeature(e.target.value)}
-          >
-            <option value="all">All features</option>
-            {features.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </Select>
+          <span style={{ flex: 1 }}>CLAUDE USAGE</span>
           <button aria-label="Close" style={S.close} onClick={onClose}>
             ✕
           </button>
+          <div style={{ ...S.filters, fontSize: type.control }}>
+            <Select
+              label="Period"
+              size={type.control}
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+            >
+              {PERIODS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Feature"
+              size={type.control}
+              value={feature}
+              onChange={(e) => setFeature(e.target.value)}
+            >
+              <option value="all">All features</option>
+              {features.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
         <div style={S.scroll}>
           <Body state={state} shown={shown} pad={type.pad} />
