@@ -1,6 +1,7 @@
 // src/components/DashboardPanel.jsx — the Dashboard (Fix 98, 99): three framed boxes side by side on
-// a monitor (stacked on a phone): the apps Vaulte uses with when each last gave data, Claude, and
-// links to the infrastructure (Vercel, Firebase, GitHub).
+// a monitor (large type): the apps Vaulte uses with when each last gave data, Claude, and links to
+// the infrastructure. On a phone the three are rubrics; a tap opens that box as a popup that fills
+// the window (Claude's opens the usage table).
 import { useEffect, useState } from "react";
 import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
@@ -8,39 +9,143 @@ import { loadDashboard } from "../api/dashboard.js";
 import { dashboardRows } from "../lib/dashboard.js";
 import { INFRA_LINKS } from "../constants/infraLinks.js";
 import AiUsageCard from "./AiUsageCard.jsx";
+import AiUsageModal from "./AiUsageModal.jsx";
 
+const gold = "rgba(212,175,55,0.6)";
 const eyebrow = {
   color: "rgba(212,175,55,0.4)",
   fontFamily: "'Cinzel',serif",
-  fontSize: "10px",
+  fontSize: "13px",
   letterSpacing: "3px",
-  marginBottom: "8px",
+  marginBottom: "10px",
 };
 const gridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-  gap: "20px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+  gap: "24px",
   alignItems: "start",
-  marginTop: "24px",
+  marginTop: "28px",
 };
 const frameStyle = {
   border: "1px solid rgba(212,175,55,0.25)",
-  borderRadius: "10px",
-  padding: "18px",
+  borderRadius: "12px",
+  padding: "24px",
   background: "rgba(255,255,255,0.02)",
   minWidth: 0,
 };
 const frameTitle = {
-  color: "rgba(212,175,55,0.6)",
-  fontSize: "10px",
-  letterSpacing: "2px",
+  color: gold,
+  fontSize: "14px",
+  letterSpacing: "3px",
   fontFamily: "'Cinzel',serif",
-  marginBottom: "14px",
+  marginBottom: "20px",
 };
 const DOT = { ok: "#6fbf73", stale: "#e0a030", never: "#8a8a8a", error: "#d9534f" };
 const STATE_LABEL = { ok: "Up to date", stale: "Stale", never: "No data", error: "Error" };
-const linkStyle = { color: "rgba(212,175,55,0.9)", fontSize: "15px", textDecoration: "none" };
-const muted = { color: "rgba(240,234,214,0.55)", fontSize: "13px" };
+/** Type sizes: in a box on a monitor, and in a popup on a phone. */
+const SIZE = {
+  box: { name: "21px", text: "17px", dot: "14px", gap: "16px" },
+  popup: { name: "23px", text: "18px", dot: "16px", gap: "18px" },
+};
+
+const rubricStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  width: "100%",
+  minHeight: "64px",
+  padding: "0 16px",
+  marginBottom: "12px",
+  background: "rgba(255,255,255,0.02)",
+  border: "1px solid rgba(212,175,55,0.25)",
+  borderRadius: "10px",
+  color: "rgba(212,175,55,0.9)",
+  fontSize: "16px",
+  letterSpacing: "3px",
+  fontFamily: "'Cinzel',serif",
+  cursor: "pointer",
+};
+const popupStyle = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 3000,
+  background: "#0d0d0f",
+  display: "flex",
+  flexDirection: "column",
+  color: "#f0ead6",
+};
+const popupHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "8px 8px 8px 20px",
+  borderBottom: "1px solid rgba(212,175,55,0.2)",
+  color: gold,
+  fontFamily: "'Cinzel',serif",
+  fontSize: "16px",
+  letterSpacing: "3px",
+};
+const closeStyle = {
+  background: "none",
+  border: "none",
+  color: gold,
+  fontSize: "28px",
+  cursor: "pointer",
+  minWidth: "56px",
+  minHeight: "56px",
+};
+
+function AppRows({ rows, size }) {
+  if (!rows) return <div style={{ fontSize: size.text, opacity: 0.6 }}>Loading…</div>;
+  return (
+    <div style={{ display: "grid", gap: "14px" }}>
+      {rows.map((app) => (
+        <div
+          key={app.id}
+          className="info-card"
+          data-app={app.id}
+          style={{ alignItems: "center", gap: size.gap, padding: "16px 18px" }}
+        >
+          <span
+            role="img"
+            aria-label={STATE_LABEL[app.state]}
+            style={{
+              width: size.dot,
+              height: size.dot,
+              borderRadius: "50%",
+              background: DOT[app.state],
+              flexShrink: 0,
+            }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: "#f0ead6", fontSize: size.name }}>{app.name}</div>
+            <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>{app.text}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InfraLinks({ size }) {
+  return (
+    <div style={{ display: "grid", gap: "20px" }}>
+      {INFRA_LINKS.map((l) => (
+        <div key={l.name}>
+          <a
+            href={l.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "rgba(212,175,55,0.95)", fontSize: size.name, textDecoration: "none" }}
+          >
+            {l.name}
+          </a>
+          <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>{l.note}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function Frame({ title, children }) {
   return (
@@ -51,39 +156,64 @@ function Frame({ title, children }) {
   );
 }
 
-function AppRow({ app }) {
+function Popup({ title, onClose, children }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
-    <div className="info-card" data-app={app.id} style={{ alignItems: "center", gap: "12px" }}>
-      <span
-        role="img"
-        aria-label={STATE_LABEL[app.state]}
-        style={{
-          width: "12px",
-          height: "12px",
-          borderRadius: "50%",
-          background: DOT[app.state],
-          flexShrink: 0,
-        }}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "#f0ead6", fontSize: "15px" }}>{app.name}</div>
-        <div style={muted}>{app.text}</div>
+    <div role="dialog" aria-label={title} style={popupStyle}>
+      <div style={popupHeader}>
+        <span>{title}</span>
+        <button aria-label="Close" style={closeStyle} onClick={onClose}>
+          ✕
+        </button>
       </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>{children}</div>
     </div>
   );
 }
 
-function InfraLinks() {
+function Header() {
   return (
-    <div style={{ display: "grid", gap: "12px" }}>
-      {INFRA_LINKS.map((l) => (
-        <div key={l.name}>
-          <a href={l.url} target="_blank" rel="noopener noreferrer" style={linkStyle}>
-            {l.name}
-          </a>
-          <div style={muted}>{l.note}</div>
-        </div>
-      ))}
+    <div className="fade-up" style={{ marginBottom: "8px" }}>
+      <div style={eyebrow}>OVERVIEW</div>
+      <h2 style={{ ...hdg, fontSize: "34px", marginBottom: 0 }}>Dashboard</h2>
+    </div>
+  );
+}
+
+/** A phone: three rubrics; the one tapped opens as a popup that fills the window. */
+function PhoneDashboard({ userId, rows }) {
+  const [open, setOpen] = useState(null);
+  const close = () => setOpen(null);
+  return (
+    <div>
+      <Header />
+      <div style={{ marginTop: "20px" }}>
+        {[
+          ["apps", "YOUR APPS"],
+          ["claude", "CLAUDE"],
+          ["infra", "INFRASTRUCTURE"],
+        ].map(([id, title]) => (
+          <button key={id} aria-haspopup="dialog" style={rubricStyle} onClick={() => setOpen(id)}>
+            <span>{title}</span>
+            <span aria-hidden="true">›</span>
+          </button>
+        ))}
+      </div>
+      {open === "apps" && (
+        <Popup title="YOUR APPS" onClose={close}>
+          <AppRows rows={rows} size={SIZE.popup} />
+        </Popup>
+      )}
+      {open === "infra" && (
+        <Popup title="INFRASTRUCTURE" onClose={close}>
+          <InfraLinks size={SIZE.popup} />
+        </Popup>
+      )}
+      {open === "claude" && <AiUsageModal userId={userId} onClose={close} />}
     </div>
   );
 }
@@ -98,27 +228,19 @@ export default function DashboardPanel({ userId }) {
       live = false;
     };
   }, [userId]);
+  if (phone) return <PhoneDashboard userId={userId} rows={rows} />;
   return (
     <div>
-      <div className="fade-up" style={{ marginBottom: "8px" }}>
-        <div style={eyebrow}>OVERVIEW</div>
-        <h2 style={{ ...hdg, fontSize: "26px", marginBottom: 0 }}>Dashboard</h2>
-      </div>
+      <Header />
       <div style={gridStyle}>
         <Frame title="YOUR APPS">
-          <div style={{ display: "grid", gap: "12px" }}>
-            {rows ? (
-              rows.map((app) => <AppRow key={app.id} app={app} />)
-            ) : (
-              <div style={muted}>Loading…</div>
-            )}
-          </div>
+          <AppRows rows={rows} size={SIZE.box} />
         </Frame>
         <Frame title="CLAUDE">
-          <AiUsageCard userId={userId} phone={phone} flush />
+          <AiUsageCard userId={userId} phone={false} flush fontSize="16px" />
         </Frame>
         <Frame title="INFRASTRUCTURE">
-          <InfraLinks />
+          <InfraLinks size={SIZE.box} />
         </Frame>
       </div>
     </div>
