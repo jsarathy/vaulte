@@ -24,6 +24,21 @@ const iso = (t) => {
 const fullName = (p, a) =>
   [p?.firstName, p?.lastName].filter(Boolean).join(" ") || a?.displayName || "";
 
+const msIso = (ms) => {
+  const d = new Date(Number(ms));
+  return ms && !Number.isNaN(d.getTime()) ? d.toISOString() : undefined;
+};
+
+/** A user from the Identity Toolkit REST list (accounts:batchGet) as the shape userRow reads. */
+export const restUserToAuth = (u) => ({
+  uid: u.localId,
+  email: u.email,
+  displayName: u.displayName,
+  disabled: u.disabled === true,
+  metadata: { creationTime: msIso(u.createdAt), lastSignInTime: msIso(u.lastLoginAt) },
+  providerData: (u.providerUserInfo || []).map((p) => ({ providerId: p.providerId })),
+});
+
 const contact = (p) => ({
   phone: p?.phone || "",
   address: [p?.address, p?.city, p?.postcode].filter(Boolean).join(", "),

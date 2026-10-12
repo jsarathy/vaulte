@@ -335,6 +335,25 @@ export default [
     rules: { "no-unused-vars": unused, ...QUALITY },
   },
   {
+    // Fix 105: firebase-admin/auth crashes on Vercel (jwks-rsa require()s the ES-only jose:
+    // ERR_REQUIRE_ESM), and no CI job runs on Vercel's Node. Verify tokens with jose instead.
+    files: ["api/**/*.js"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "firebase-admin/auth",
+              message:
+                "Crashes on Vercel (ERR_REQUIRE_ESM from jwks-rsa and jose). See api/_admin/verify.js.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: CLEAN_FILES.filter((f) => !f.endsWith(".jsx")),
     rules: { ...TARGETS, "max-lines-per-function": lengthRule(TARGET_LENGTH.logic) },
   },
