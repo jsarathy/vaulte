@@ -193,3 +193,30 @@ test("the infrastructure box links to Vercel, Firebase and GitHub, each in a new
   );
   await expect(p.getByText("Hosting, deployments and function logs")).toBeVisible();
 });
+
+test("on a monitor the type is large: box titles, app names and notes, links, the Claude heading", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  });
+  const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const apps = p.getByRole("region", { name: "YOUR APPS" });
+  expect(await size(apps.getByText("YOUR APPS", { exact: true }))).toBeGreaterThanOrEqual(14);
+  expect(await size(apps.locator('[data-app="polar"] div div').first())).toBeGreaterThanOrEqual(21);
+  expect(await size(apps.locator('[data-app="polar"] div div').nth(1))).toBeGreaterThanOrEqual(17);
+  const infra = p.getByRole("region", { name: "INFRASTRUCTURE" });
+  expect(await size(infra.getByRole("link").first())).toBeGreaterThanOrEqual(21);
+  expect(
+    await size(infra.getByText("Hosting, deployments and function logs")),
+  ).toBeGreaterThanOrEqual(17);
+  const claude = p
+    .getByRole("region", { name: "CLAUDE" })
+    .getByRole("button", { name: "CLAUDE USAGE" });
+  expect(await size(claude)).toBeGreaterThanOrEqual(16);
+  expect(await size(p.getByRole("heading", { name: "Dashboard" }))).toBeGreaterThanOrEqual(34);
+});

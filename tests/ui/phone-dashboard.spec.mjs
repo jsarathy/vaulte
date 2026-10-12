@@ -1,10 +1,11 @@
-// tests/ui/phone-dashboard.spec.mjs — the Dashboard on a phone (Fix 98): reached from the bottom
-// navigation, the rows fit the 390px width, and one tap on CLAUDE USAGE opens the usage table.
+// tests/ui/phone-dashboard.spec.mjs — the Dashboard on a phone (Fix 98, 99): reached from the bottom
+// navigation; three rubrics (YOUR APPS, CLAUDE, INFRASTRUCTURE); a tap opens that box as a popup
+// that fills the window, in larger type; Claude's opens the usage table.
 import { test, expect } from "./cover.mjs";
 
-test("the Dashboard fits the phone; one tap on CLAUDE USAGE opens the table", async ({
-  page: p,
-}) => {
+const SCREEN = { width: 390, height: 844 };
+
+const start = async (p) => {
   await p.route(
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
@@ -14,7 +15,10 @@ test("the Dashboard fits the phone; one tap on CLAUDE USAGE opens the table", as
     window.__authUser = { uid: "u", email: "jane@example.com" };
     window.__docs = {
       "users/u": { firstName: "Jane", lastName: "Smith" },
-      "users/u/polar/connection": { connected: true, last_sync_at: "2026-10-11T09:00:00.000Z" },
+      "users/u/polar/connection": {
+        connected: true,
+        last_sync_at: new Date(2026, 9, 11, 9, 0, 0).toISOString(), // 3 hours before "now"
+      },
     };
     window.__collections = {
       "users/u/apple_activity": [],
@@ -36,30 +40,82 @@ test("the Dashboard fits the phone; one tap on CLAUDE USAGE opens the table", as
   await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   await p.locator(".app-sidebar button").nth(3).click(); // Home, My Account, Nutrition, Dashboard
   await expect(p.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  for (const id of ["polar", "apple", "weight", "body"]) {
-    const box = await p
-      .locator(`[data-app="${id}"]`)
-      .evaluate((e) => e.getBoundingClientRect().toJSON());
-    expect(box.left).toBeGreaterThanOrEqual(0);
-    expect(box.right).toBeLessThanOrEqual(390);
-  }
-  await expect(p.locator('[data-app="weight"]')).toContainText("Last reading yesterday");
-  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  // the three boxes are stacked, in order, each inside the screen
-  const boxes = [];
-  for (const title of ["YOUR APPS", "CLAUDE", "INFRASTRUCTURE"])
-    boxes.push(
-      await p
-        .getByRole("region", { name: title })
-        .evaluate((e) => e.getBoundingClientRect().toJSON()),
-    );
-  boxes.forEach((b) => {
+};
+const rubric = (p, name) => p.getByRole("button", { name, exact: true });
+const rect = (loc) => loc.evaluate((e) => e.getBoundingClientRect().toJSON());
+const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+
+test("three rubrics, nothing else, each inside the screen", async ({ page: p }) => {
+  await start(p);
+  for (const name of ["YOUR APPS", "CLAUDE", "INFRASTRUCTURE"]) {
+    await expect(rubric(p, name)).toBeVisible();
+    const b = await rect(rubric(p, name));
     expect(b.left).toBeGreaterThanOrEqual(0);
-    expect(b.right).toBeLessThanOrEqual(390);
-  });
-  expect(boxes[0].bottom).toBeLessThanOrEqual(boxes[1].top);
-  expect(boxes[1].bottom).toBeLessThanOrEqual(boxes[2].top);
-  await expect(p.getByRole("link", { name: "Vercel" })).toBeVisible();
-  await p.getByRole("button", { name: /CLAUDE USAGE/ }).click();
+    expect(b.right).toBeLessThanOrEqual(SCREEN.width);
+    expect(b.height).toBeGreaterThanOrEqual(56); // a comfortable tap
+  }
+  await expect(p.locator("[data-app]")).toHaveCount(0); // the cards are not open
+  await expect(p.getByRole("dialog")).toHaveCount(0);
+  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test("YOUR APPS opens as a popup that fills the window, in large type; ✕ and Esc close it", async ({
+  page: p,
+}) => {
+  await start(p);
+  await rubric(p, "YOUR APPS").click();
+  const dialog = p.getByRole("dialog", { name: "YOUR APPS" });
+  await expect(dialog).toBeVisible();
+  const b = await rect(dialog);
+  expect([b.left, b.top, b.right, b.bottom]).toEqual([0, 0, SCREEN.width, SCREEN.height]);
+  await expect(dialog.locator("[data-app]")).toHaveCount(4);
+  await expect(dialog.locator('[data-app="weight"]')).toContainText("Last reading yesterday");
+  await expect(dialog.locator('[data-app="polar"]')).toContainText("Last sync 3 hours ago");
+  expect(await size(dialog.locator('[data-app="polar"] div div').first())).toBeGreaterThanOrEqual(
+    22,
+  );
+  expect(await size(dialog.locator('[data-app="polar"] div div').nth(1))).toBeGreaterThanOrEqual(
+    17,
+  );
+  for (const id of ["polar", "apple", "weight", "body"]) {
+    const row = await rect(dialog.locator(`[data-app="${id}"]`));
+    expect(row.left).toBeGreaterThanOrEqual(0);
+    expect(row.right).toBeLessThanOrEqual(SCREEN.width);
+  }
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+  await rubric(p, "YOUR APPS").click();
+  await expect(dialog).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
+test("INFRASTRUCTURE opens as a popup with the links in large type", async ({ page: p }) => {
+  await start(p);
+  await rubric(p, "INFRASTRUCTURE").click();
+  const dialog = p.getByRole("dialog", { name: "INFRASTRUCTURE" });
+  await expect(dialog).toBeVisible();
+  const b = await rect(dialog);
+  expect([b.left, b.top, b.right, b.bottom]).toEqual([0, 0, SCREEN.width, SCREEN.height]);
+  const links = dialog.getByRole("link");
+  await expect(links).toHaveText([
+    "Vercel",
+    "Firebase",
+    "GitHub",
+    "GitHub Actions",
+    "GitHub issues",
+    "Anthropic Console",
+  ]);
+  expect(await size(links.first())).toBeGreaterThanOrEqual(22);
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("CLAUDE opens the usage table", async ({ page: p }) => {
+  await start(p);
+  await rubric(p, "CLAUDE").click();
   await expect(p.getByRole("dialog", { name: "Claude usage" })).toContainText("1.65¢");
+  await p.getByRole("button", { name: "Close" }).click();
+  await expect(p.getByRole("dialog")).toHaveCount(0);
 });

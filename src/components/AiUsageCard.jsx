@@ -1,6 +1,6 @@
 // src/components/AiUsageCard.jsx — the CLAUDE USAGE heading on My Account (Fix 84–87). On a
 // computer a double click on it opens the table of calls; on a phone one tap does. The table loads
-// its own data. `flush` removes the top margin (inside a box).
+// its own data. `flush` removes the top margin (inside a box); `fontSize` sets the heading size.
 import { useState } from "react";
 import AiUsageModal from "./AiUsageModal.jsx";
 
@@ -34,7 +34,7 @@ const phoneStyle = {
   fontFamily: "'Cinzel',serif",
 };
 
-export default function AiUsageCard({ userId, phone, flush = false }) {
+export default function AiUsageCard({ userId, phone, flush = false, fontSize }) {
   const [open, setOpen] = useState(false);
   const show = () => setOpen(true);
   return (
@@ -54,7 +54,7 @@ export default function AiUsageCard({ userId, phone, flush = false }) {
           tabIndex={0}
           aria-haspopup="dialog"
           title="Double-click to open"
-          style={flush ? { ...headingStyle, marginTop: 0 } : headingStyle}
+          style={{ ...headingStyle, ...(flush && { marginTop: 0 }), ...(fontSize && { fontSize }) }}
           onDoubleClick={show}
           onKeyDown={(e) => e.key === "Enter" && show()}
         >
