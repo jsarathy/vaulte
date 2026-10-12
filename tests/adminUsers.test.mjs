@@ -2,7 +2,7 @@
 // profile (api/_admin/users.js, Fix 104). No Firebase calls: these are the pure functions.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adminEmails, isAdmin, mergeUsers, userRow } from "../api/_admin/users.js";
+import { adminEmails, isAdmin, mergeUsers, restUserToAuth, userRow } from "../api/_admin/users.js";
 
 test("adminEmails: a comma separated list, trimmed and lower-cased; empty or unset gives nobody", () => {
   assert.deepEqual(
@@ -123,4 +123,47 @@ test("mergeUsers: everyone from either source once, the oldest account first", (
     ["dated", "undated"],
   );
   assert.deepEqual(mergeUsers([], {}), []);
+});
+
+test("restUserToAuth: an Identity Toolkit user as the shape userRow reads (times from milliseconds)", () => {
+  const ms = String(Date.parse("2026-10-01T08:05:00Z"));
+  assert.deepEqual(
+    restUserToAuth({
+      localId: "u1",
+      email: "jane@example.com",
+      displayName: "Jane",
+      disabled: true,
+      createdAt: ms,
+      lastLoginAt: String(Date.parse("2026-10-11T14:32:00Z")),
+      providerUserInfo: [{ providerId: "google.com", rawId: "1" }, { providerId: "password" }],
+    }),
+    {
+      uid: "u1",
+      email: "jane@example.com",
+      displayName: "Jane",
+      disabled: true,
+      metadata: {
+        creationTime: "2026-10-01T08:05:00.000Z",
+        lastSignInTime: "2026-10-11T14:32:00.000Z",
+      },
+      providerData: [{ providerId: "google.com" }, { providerId: "password" }],
+    },
+  );
+  const bare = restUserToAuth({ localId: "u2" });
+  assert.deepEqual(bare.metadata, { creationTime: undefined, lastSignInTime: undefined });
+  assert.deepEqual(bare.providerData, []);
+  assert.equal(bare.disabled, false);
+  assert.equal(restUserToAuth({ localId: "u3", disabled: "yes" }).disabled, false); // only true counts
+  assert.equal(
+    restUserToAuth({ localId: "u4", createdAt: "garbage" }).metadata.creationTime,
+    undefined,
+  );
+  // and it goes straight into a row
+  const row = userRow(
+    "u1",
+    restUserToAuth({ localId: "u1", email: "a@b.c", createdAt: ms }),
+    undefined,
+  );
+  assert.equal(row.created, "2026-10-01T08:05:00.000Z");
+  assert.equal(row.email, "a@b.c");
 });
