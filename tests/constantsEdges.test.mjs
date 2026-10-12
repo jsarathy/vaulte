@@ -254,26 +254,16 @@ const row = (oldG, newG) => ({
   newLi: { grams: newG, nutrition: { ...NUTR, kcal: 140 } },
 });
 
-test("recipeLinks: applyLinkDelta moves an estimated weight by the gram difference", () => {
+test("recipeLinks: applyLinkDelta shifts the nutrition; the weight is kept ({}) or needs estimating (null)", () => {
   const b = { servings: 2, portion_g: 300, nutrition: { ...NUTR, kcal: 500 } };
   const out = applyLinkDelta(b, [row(100, 160)]);
   assert.equal(out.nutrition.kcal, 520); // 500 + (140 - 100) / 2
-  assert.deepEqual(out.weight, { portion_g: 330, portion_g_source: "estimated" }); // 300 + 60 / 2
+  assert.equal(out.weight, null); // the caller decides: keepWeight false means B needs a weight
   assert.deepEqual(applyLinkDelta(b, [row(100, 160)], { keepWeight: true }).weight, {});
-});
-
-test("recipeLinks: the weight needs re-estimating when it cannot be shifted", () => {
-  const b = { servings: 2, portion_g: 300, nutrition: NUTR };
   assert.equal(applyLinkDelta({ ...b, portion_g: undefined }, [row(100, 160)]).weight, null);
-  assert.equal(applyLinkDelta({ ...b, portion_g: 0 }, [row(100, 160)]).weight, null);
-  assert.equal(applyLinkDelta(b, [row(null, 160)]).weight, null); // old grams unknown
-  assert.equal(applyLinkDelta(b, [row(100, null)]).weight, null); // new grams unknown
-  assert.equal(applyLinkDelta(b, [row(100, 160), row(null, 50)]).weight, null);
-  assert.equal(applyLinkDelta({ ...b, portion_g: 30 }, [row(100, 40)]).weight, null); // 30 - 30 = 0
-  assert.deepEqual(applyLinkDelta({ ...b, portion_g: 31 }, [row(100, 40)]).weight, {
-    portion_g: 1,
-    portion_g_source: "estimated",
-  });
+  // the grams of the linked recipes no longer matter to the weight
+  assert.deepEqual(applyLinkDelta(b, [row(null, 160)], { keepWeight: true }).weight, {});
+  assert.deepEqual(applyLinkDelta(b, [row(100, null)], { keepWeight: true }).weight, {});
 });
 
 test("recipeLinks: findDependentsDeep lists each dependent once, through other recipes", () => {

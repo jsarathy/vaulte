@@ -30,14 +30,13 @@ const NUTRITION = [
   ["protein", "Prot g"],
 ];
 
-/** The tag texts for a recipe: prep, cook, weight per portion (with "(est.)"), serves. */
+/** The tag texts for a recipe: prep, cook, weight per portion, serves. */
 export function recipeTags(recipe) {
   const tags = [];
   if (recipe.prep_time) tags.push(`Prep ${recipe.prep_time}`);
   if (recipe.cook_time) tags.push(`Cook ${recipe.cook_time}`);
   if (recipe.portion_g > 0) {
-    const est = recipe.portion_g_source === "estimated" ? " (est.)" : "";
-    tags.push(`Wt/portion ${recipe.portion_g} g${est}`);
+    tags.push(`Wt/portion ${recipe.portion_g} g`);
   }
   if (recipe.servings) tags.push(`Serves ${recipe.servings}`);
   return tags;

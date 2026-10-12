@@ -1,6 +1,6 @@
 // tests/ui/recipe-modal.spec.mjs — the recipe card modal (Fix 26 PR 45), opened with 👁 from
 // Saved Recipes: header (name, source, ×), description, the tag row (prep, cook, Wt/portion
-// with "(est.)", serves), nutrition per serving, ingredients, numbered method, notes; a bare
+// serves), nutrition per serving, ingredients, numbered method, notes; a bare
 // recipe shows only what it has; closing by ×, by the backdrop, not by the card.
 import { test, expect } from "./cover.mjs";
 
@@ -13,7 +13,7 @@ const FULL = {
   cook_time: "45 min",
   servings: 4,
   portion_g: 225,
-  portion_g_source: "estimated",
+  portion_g_source: "weighed",
   nutrition: { kcal: 338, fat: 7.5, carbs: 52, fibre: 12, net_carbs: 40, protein: 18 },
   ingredients: [
     { amount: "400 g", item: "pinto beans, cooked" },
@@ -67,12 +67,7 @@ test("a full recipe: every section, in order", async ({ page: p }) => {
   await expect(body.locator("p")).toHaveText("A hearty stew for cold evenings.");
   expect(await style(body.locator("p"), "lineHeight")).toBe("19.2px"); // 1.6 × 12px
   const tags = body.locator("> div").first().locator("span");
-  expect(await texts(tags)).toEqual([
-    "Prep 10 min",
-    "Cook 45 min",
-    "Wt/portion 225 g (est.)",
-    "Serves 4",
-  ]);
+  expect(await texts(tags)).toEqual(["Prep 10 min", "Cook 45 min", "Wt/portion 225 g", "Serves 4"]);
   expect(await style(tags.first(), "borderRadius")).toBe("20px");
   expect(await style(tags.first(), "fontSize")).toBe("11px");
 
@@ -130,7 +125,7 @@ test("a bare recipe: only name, nutrition zeros, empty lists; no tags, notes or 
 }) => {
   await start(p, [
     BARE,
-    { ...FULL, id: "r2", name: "Stew 2", portion_g: 0, portion_g_source: "estimated" },
+    { ...FULL, id: "r2", name: "Stew 2", portion_g: 0, portion_g_source: "weighed" },
   ]);
   const m = await open(p, "Toast");
   const body = card(p).locator("> div").nth(1);
@@ -158,13 +153,13 @@ test("a bare recipe: only name, nutrition zeros, empty lists; no tags, notes or 
   await m.getByRole("button", { name: "×" }).click();
   await expect(modal(p)).toHaveCount(0);
 
-  // no nutrition at all: no nutrition section; a zero Wt/portion is not a tag; a plain weight has no "(est.)"
+  // no nutrition at all: no nutrition section; a zero Wt/portion is not a tag
   await p.evaluate(
     (rs) => window.__setRecipes(rs),
     [
       { id: "r3", name: "Water", ingredients: [{ amount: "1", item: "glass" }] },
       { id: "r4", name: "Rice", portion_g: 150, portion_g_source: "measured", servings: 2 },
-      { ...FULL, id: "r2", name: "Stew 2", portion_g: 0, portion_g_source: "estimated" },
+      { ...FULL, id: "r2", name: "Stew 2", portion_g: 0, portion_g_source: "weighed" },
       { id: "r5", name: "Oats", portion_g: 40 },
     ],
   );

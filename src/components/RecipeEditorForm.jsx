@@ -2,7 +2,6 @@
 // nutrition (+ Recalculate), ingredients, method, notes. Render only; edits come from
 // lib/recipeEdits and go through builder.setPreview.
 import { useIsPhone } from "../hooks/useIsPhone.js";
-import { isEstimatedWeight } from "../api/recipeWeights";
 import {
   withField,
   withServings,
@@ -135,14 +134,6 @@ function PortionWeight({ recipe, edit }) {
         style={small("56px")}
       />
       g
-      {isEstimatedWeight(recipe) && (
-        <span
-          title="Estimated from ingredient weights ÷ servings. Type your weighed value to replace it."
-          style={{ color: "#8D6E00", fontWeight: "normal" }}
-        >
-          &nbsp;(est.)
-        </span>
-      )}
     </label>
   );
 }

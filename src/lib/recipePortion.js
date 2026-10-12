@@ -65,9 +65,8 @@ export function portionView(recipe, { qtyText, unit, claudeResult }) {
   };
 }
 
-/** "Per serving (base) · 225 g (est.)" */
-export const baseHeading = (grams, estimated) =>
-  `Per serving (base)${grams ? ` · ${grams} g${estimated ? " (est.)" : ""}` : ""}`;
+/** "Per serving (base) · 225 g" */
+export const baseHeading = (grams) => `Per serving (base)${grams ? ` · ${grams} g` : ""}`;
 
 export const claudeHint = (unit) =>
   unit === "ml"

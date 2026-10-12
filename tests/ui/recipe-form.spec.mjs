@@ -1,6 +1,6 @@
 // tests/ui/recipe-form.spec.mjs — the recipe builder's editable form (Fix 26 PR 7): every field
 // reaches the saved recipe, list rows add/edit/remove the right entry, link badges and
-// highlighting, the saved-name list, the (est.) marker and the Recalculate button's states.
+// highlighting, the saved-name list, the weight field and the Recalculate button's states.
 import { test, expect } from "./cover.mjs";
 
 const STEW = {
@@ -8,7 +8,7 @@ const STEW = {
   name: "Form Stew",
   servings: 2,
   portion_g: 328,
-  portion_g_source: "estimated",
+  portion_g_source: "weighed",
   nutrition: { kcal: 338, fat: 11, protein: 15 },
   ingredients: [{ amount: "600g", item: "beans" }],
   steps: ["Soak"],
@@ -69,7 +69,7 @@ test("recipe form", async ({ page: p }) => {
     ),
   ).toEqual(["Form Punch", "Form Stew"]);
 
-  // Plain fields; invalid servings → blank; Wt/portion typed (no (est.)), then estimated shown
+  // Plain fields; invalid servings → blank; Wt/portion typed
   await field("One-line description").fill("new desc");
   await label("⏱ Prep").fill("15 minutes");
   await label("🍳 Cook").fill("40 minutes");
@@ -159,14 +159,13 @@ test("recipe form", async ({ page: p }) => {
   ]);
   expect(saved.steps).toEqual(["One!", "Three", "Four"]);
 
-  // Estimated weight shows (est.); typing a weight makes it the user's; clearing → null
+  // Clearing the Wt/portion → null
   await p
     .locator("div", { hasText: "Form Stew" })
     .filter({ has: p.locator('button[title="Edit recipe"]') })
     .last()
     .locator('button[title="Edit recipe"]')
     .click();
-  await expect(p.getByText("(est.)")).toBeVisible();
   await label("⚖ Wt/portion").fill("0");
   expect(await label("⚖ Wt/portion").inputValue()).toBe("");
   await expect(p.getByText("(est.)")).toHaveCount(0);

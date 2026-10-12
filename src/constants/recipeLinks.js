@@ -153,21 +153,12 @@ function shiftedNutrition(B, rows) {
   );
 }
 
-// B's estimated weight moved by the gram difference; null = needs re-estimating
-function shiftedWeight(B, rows) {
-  if (!(Number(B.portion_g) > 0)) return null;
-  if (!rows.every((r) => r.oldLi.grams != null && r.newLi.grams != null)) return null;
-  const shift = rowsDelta(rows, (li) => li.grams) / servingCount(B.servings);
-  const g = Math.round(Number(B.portion_g) + shift);
-  return g > 0 ? { portion_g: g, portion_g_source: "estimated" } : null;
-}
-
 // B's new per-serving nutrition = old + (new A contribution − old) ÷ servings.
-// weight: {} = leave as is, {portion_g, …} = adjusted estimate, null = needs re-estimating.
+// weight: {} = leave as is (B has a Wt/portion), null = B has none and needs one estimated.
 export function applyLinkDelta(B, rows, { keepWeight = false } = {}) {
   return {
     nutrition: shiftedNutrition(B, rows),
-    weight: keepWeight ? {} : shiftedWeight(B, rows),
+    weight: keepWeight ? {} : null,
   };
 }
 

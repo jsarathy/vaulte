@@ -39,11 +39,10 @@ test("deleted notice: none without dependents", () => {
 });
 
 test("weight label", () => {
-  assert.equal(weightLabel({ portion_g: 225 }, false), "225 g");
-  assert.equal(weightLabel({ portion_g: 225 }, true), "225 g (est.)");
-  assert.equal(weightLabel({ portion_g: 0 }, false), "0 g");
-  assert.equal(weightLabel({ portion_g: null }, true), null);
-  assert.equal(weightLabel({}, false), null);
+  assert.equal(weightLabel({ portion_g: 225 }), "225 g");
+  assert.equal(weightLabel({ portion_g: 0 }), "0 g");
+  assert.equal(weightLabel({ portion_g: null }), null);
+  assert.equal(weightLabel({}), null);
 });
 
 test("withoutRecipes removes by id", () => {
@@ -81,6 +80,12 @@ test("filterRecipes: every word must be in the name, description or ingredients,
   assert.deepEqual(names(filterRecipes(LIST, "bean soup")), []); // both words must match
   assert.deepEqual(names(filterRecipes(LIST, "o")), names(LIST)); // all contain an o
   assert.deepEqual(filterRecipes([], "x"), []);
+});
+
+test("filterRecipes: a word cannot match across two fields", () => {
+  const one = [{ id: "1", name: "Stew", description: "Slow", ingredients: [] }];
+  assert.equal(filterRecipes(one, "stewslow").length, 0); // end of the name + start of the description
+  assert.equal(filterRecipes(one, "slow").length, 1);
 });
 
 test("volumeLabel: '250 ml' for a liquid with a volume, else nothing", () => {

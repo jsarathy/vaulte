@@ -21,9 +21,8 @@ export function deletedNotice(recipe, dependents) {
   };
 }
 
-/** "225 g", "225 g (est.)", or null when the recipe has no Wt/portion. */
-export const weightLabel = (recipe, estimated) =>
-  recipe.portion_g != null ? `${recipe.portion_g} g${estimated ? " (est.)" : ""}` : null;
+/** "225 g", or null when the recipe has no Wt/portion. */
+export const weightLabel = (recipe) => (recipe.portion_g != null ? `${recipe.portion_g} g` : null);
 
 /** "250 ml" for a liquid with a Vol/portion, else null. */
 export const volumeLabel = (recipe) =>

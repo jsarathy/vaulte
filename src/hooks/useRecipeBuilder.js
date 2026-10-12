@@ -5,12 +5,7 @@ import { genId } from "../constants/helpers";
 import { saveRecipe } from "../api/firestore";
 import { claudeCreateRecipe } from "../api/claude";
 import { splitIngredients } from "../constants/recipeLinks";
-import {
-  computeRecipeFields,
-  propagateRecipeChange,
-  hasPortionWeight,
-  isEstimatedWeight,
-} from "../api/recipeWeights";
+import { computeRecipeFields, propagateRecipeChange, hasPortionWeight } from "../api/recipeWeights";
 import {
   nutritionKey,
   editorCopy,
@@ -36,10 +31,10 @@ const CLOSED = {
   saving: false,
 };
 
-// Nutrition and, unless the user weighed the portion, a re-estimated Wt/portion.
+// Nutrition and, if the recipe has no Wt/portion yet, an estimated one.
 const recalcFields = (recipe, recipes) =>
   computeRecipeFields(recipe, recipes, {
-    keepWeight: hasPortionWeight(recipe) && !isEstimatedWeight(recipe),
+    keepWeight: hasPortionWeight(recipe),
   });
 
 // Built on saved recipes → use their own nutrition and weights

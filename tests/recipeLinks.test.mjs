@@ -81,7 +81,7 @@ const B = {
   name: "Pinto Rice Bowl",
   servings: 2,
   portion_g: 300,
-  portion_g_source: "estimated",
+  portion_g_source: "weighed",
   ingredients: [
     { amount: "250g", item: "Pinto Bean Stew" },
     { amount: "350g", item: "Cooked basmati rice" },
@@ -123,7 +123,8 @@ test("A's kcal 338 → 400: B changes by (400−338)×250/328 ÷ 2", () => {
   const { nutrition, weight } = applyLinkDelta(B, rows);
   assert.equal(nutrition.kcal, Math.round((733.8 + ((400 - 338) * 250) / 328 / 2) * 10) / 10); // 757.4
   assert.equal(nutrition.protein, 15.7);
-  assert.deepEqual(weight, { portion_g: 300, portion_g_source: "estimated" }); // grams unchanged
+  assert.equal(weight, null); // no keepWeight: B has no weight to keep, so it needs one estimated
+  assert.deepEqual(applyLinkDelta(B, rows, { keepWeight: true }).weight, {}); // B's own weight kept
 });
 test("A's Wt/portion 328 → 400: grams link re-scales, B's weight unchanged", () => {
   const A2 = { ...A, portion_g: 400 };
@@ -139,7 +140,7 @@ test("A's Wt/portion 328 → 400: grams link re-scales, B's weight unchanged", (
     Math.round((733.8 + ((338 * 250) / 400 - (338 * 250) / 328) / 2) * 10) / 10,
   );
 });
-test("portions link: A's weight change moves B's estimated weight; weighed B kept", () => {
+test("portions link: A's weight change leaves B's weight alone (kept as it is)", () => {
   const Bp = {
     ...B,
     ingredients: [{ amount: "1 portion", item: "Pinto Bean Stew" }, B.ingredients[1]],
@@ -151,14 +152,8 @@ test("portions link: A's weight change moves B's estimated weight; weighed B kep
     recipesOld: recipes,
     recipesNew: [A2, N],
   });
-  assert.deepEqual(applyLinkDelta(Bp, rows).weight, {
-    portion_g: 306,
-    portion_g_source: "estimated",
-  }); // 300 + 12/2
-  assert.deepEqual(
-    applyLinkDelta({ ...Bp, portion_g_source: "weighed" }, rows, { keepWeight: true }).weight,
-    {},
-  );
+  assert.deepEqual(applyLinkDelta(Bp, rows, { keepWeight: true }).weight, {});
+  assert.equal(applyLinkDelta(Bp, rows).weight, null);
 });
 test("rename: B's ingredient follows the new name", () => {
   const A2 = { ...A, name: "Pinto Stew v2" };

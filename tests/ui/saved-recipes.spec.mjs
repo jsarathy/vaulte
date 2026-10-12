@@ -8,7 +8,7 @@ const BASE = {
   description: "the base",
   servings: 1,
   portion_g: 200,
-  portion_g_source: "estimated",
+  portion_g_source: "weighed",
   nutrition: { kcal: 250 },
   ingredients: [],
 };
@@ -58,11 +58,11 @@ test("Saved Recipes list", async ({ page: p }) => {
   const open = () => p.getByText("📖 Browse Saved Recipes").click();
   const closeX = () => p.getByRole("button", { name: "×" }).first().click();
 
-  // Rows: name, description, kcal, weight with (est.) only when estimated, none when unknown
+  // Rows: name, description, kcal, weight, none when unknown
   await open();
   await expect(row("Base")).toContainText("the base");
   await expect(row("Base")).toContainText("250 kcal");
-  await expect(row("Base").getByText("200 g (est.)", { exact: true })).toBeVisible();
+  await expect(row("Base").getByText("200 g", { exact: true })).toBeVisible();
   await expect(row("User").getByText("150 g", { exact: true })).toBeVisible();
   await expect(row("Plain")).toContainText("80 kcal");
   expect(await row("Plain").textContent()).not.toContain(" g");

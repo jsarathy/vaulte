@@ -1,7 +1,6 @@
 // src/components/RecipePortionModal.jsx — "How much?" box for adding a saved recipe to the
 // Add Food form. Render only: state lives in useRecipePortion, logic in lib/recipePortion.
 import { C, FONT } from "../constants/design.jsx";
-import { isEstimatedWeight } from "../api/recipeWeights";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import {
   unitsFor,
@@ -197,9 +196,7 @@ function BaseNutrition({ recipe }) {
   const values = recipe.nutrition || {};
   return (
     <div style={S.base}>
-      <div style={S.baseHeading}>
-        {baseHeading(portionWeight(recipe), isEstimatedWeight(recipe))}
-      </div>
+      <div style={S.baseHeading}>{baseHeading(portionWeight(recipe))}</div>
       <MacroTiles tiles={BASE_TILES} values={values} color="#185FA5" border="#e5e7eb" />
     </div>
   );
