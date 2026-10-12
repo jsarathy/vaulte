@@ -38,7 +38,10 @@ export const getDoc = async (ref) => {
 };
 // getDocs: window.__collections[path] (e.g. "users/u/weight_log") when a test sets it, else
 // window.__polarDocs (Polar sessions); __polarDelay / __failGetDocs
-const cut = (rows, constraints = []) => {
+const cut = (all, constraints = []) => {
+  // where(field, ">=", value): keeps the rows at or after the value
+  const w = constraints.find((c) => c.where)?.where;
+  const rows = w ? all.filter((r) => String(r[w[0]]) >= w[2]) : all;
   const order = constraints.find((c) => c.orderBy)?.orderBy;
   const max = constraints.find((c) => c.limit)?.limit;
   const sorted = order
@@ -63,7 +66,7 @@ export const collection = (...a) => ({ path: a.slice(1).join("/") });
 export const orderBy = (field, dir) => ({ orderBy: [field, dir] });
 export const limit = (n) => ({ limit: n });
 export const query = (ref, ...constraints) => ({ ...ref, constraints });
-export const where = () => ({});
+export const where = (field, op, value) => ({ where: [field, op, value] });
 // onSnapshot: one reply, from window.__docs like getDoc, after any window.__getDocDelays delay;
 // a path in window.__failPaths errors instead
 export const onSnapshot = (ref, cb, onError) => {

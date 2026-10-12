@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { PRICES, WEB_SEARCH_USD, costOf } from "../api/_usage/pricing.js";
 import { cleanMeta, usageRecord } from "../api/_usage/record.js";
 import { format, summarise } from "../scripts/ai-usage.mjs";
-import { periodCosts, usd, whenText } from "../src/lib/aiUsage.js";
+import { PERIODS, periodStart, usd, whenText } from "../src/lib/aiUsage.js";
 import { setUsageUser, usageField } from "../src/api/usageContext.js";
 
 const MODEL = "claude-sonnet-4-6";
@@ -198,23 +198,36 @@ test("format: plain text tables with the totals first", () => {
   assert.match(text, /day +calls +total/);
 });
 
-test("periodCosts: what the last day, 7 days and 30 days cost; an unpriced call adds nothing", () => {
-  const now = Date.parse("2026-10-11T12:00:00.000Z");
-  const at = (d, h = 0) => new Date(now - d * 86400000 - h * 3600000).toISOString();
-  const c = periodCosts(
+test("PERIODS: today, 7 days, 30 days, 3 months, 1 year, year to date, in that order", () => {
+  assert.deepEqual(
+    PERIODS.map((p) => [p.key, p.label]),
     [
-      { at: at(0, 1), cost_usd: 1 }, // 1 hour ago
-      { at: at(2), cost_usd: 10 },
-      { at: at(20), cost_usd: 100 },
-      { at: at(40), cost_usd: 1000 }, // too old for any period
-      { at: at(0, 2), cost_usd: null },
-      { cost_usd: 5 }, // no time recorded
+      ["today", "Today"],
+      ["7d", "Last 7 days"],
+      ["30d", "Last 30 days"],
+      ["3m", "Last 3 months"],
+      ["1y", "Last 1 year"],
+      ["ytd", "Year to date"],
     ],
-    now,
   );
-  assert.deepEqual(c, { day: 1, week: 11, month: 111 });
-  assert.deepEqual(periodCosts([], now), { day: 0, week: 0, month: 0 });
-  assert.ok(periodCosts([{ at: new Date().toISOString(), cost_usd: 2 }]).day === 2);
+});
+
+test("periodStart: where each period begins, in the viewer's time zone", () => {
+  process.env.TZ = "UTC";
+  const now = new Date("2026-10-12T15:30:45.123Z");
+  assert.equal(periodStart("today", now), "2026-10-12T00:00:00.000Z");
+  assert.equal(periodStart("7d", now), "2026-10-05T15:30:45.123Z");
+  assert.equal(periodStart("30d", now), "2026-09-12T15:30:45.123Z");
+  assert.equal(periodStart("3m", now), "2026-07-12T15:30:45.123Z");
+  assert.equal(periodStart("1y", now), "2025-10-12T15:30:45.123Z");
+  assert.equal(periodStart("ytd", now), "2026-01-01T00:00:00.000Z");
+  assert.equal(now.toISOString(), "2026-10-12T15:30:45.123Z"); // the date passed in is not changed
+  process.env.TZ = "Asia/Kolkata"; // 05:30 ahead: local midnight is the evening before in UTC
+  assert.equal(periodStart("today", now), "2026-10-11T18:30:00.000Z");
+  assert.equal(periodStart("ytd", now), "2025-12-31T18:30:00.000Z");
+  process.env.TZ = "UTC";
+  assert.throws(() => periodStart("forever", now), /Unknown period: forever/);
+  assert.match(periodStart("today"), /^\d{4}-\d{2}-\d{2}T/); // no date given: now
 });
 
 test("usd: dollars to four places", () => {

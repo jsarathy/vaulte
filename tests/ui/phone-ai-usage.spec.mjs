@@ -1,11 +1,11 @@
-// tests/ui/phone-ai-usage.spec.mjs — the Claude usage card on a phone (Fix 84, 85): a CLAUDE USAGE
-// heading that starts closed, a double tap that opens the table of calls, and the table fitting the
-// 390px screen width and scrolling.
+// tests/ui/phone-ai-usage.spec.mjs — the Claude usage entry on a phone (Fix 84, 85, 86): a CLAUDE
+// USAGE heading that starts closed, a double tap that opens the table of calls, and the table using
+// the screen and fitting the 390px width, with its filters, and scrolling.
 import { test, expect } from "./cover.mjs";
 
 const many = Array.from({ length: 40 }, (_, i) => ({
   id: `r${i}`,
-  feature: "create_recipe",
+  feature: i % 2 ? "create_recipe" : "chat",
   at: `2026-10-11T08:${String(i).padStart(2, "0")}:00.000Z`,
   input_tokens: 5000,
   output_tokens: 1200,
@@ -32,25 +32,35 @@ test("CLAUDE USAGE starts closed and opens on tap", async ({ page: p }) => {
   await start(p);
   const head = p.getByRole("button", { name: /CLAUDE USAGE/ });
   await expect(head).toHaveAttribute("aria-expanded", "false");
-  await expect(p.getByText("double-tap for every call")).toHaveCount(0);
+  await expect(p.getByText("Double-tap here to see every Claude call")).toHaveCount(0);
   await head.click();
-  await expect(p.getByText("40 calls · double-tap for every call")).toBeVisible();
-  await expect(p.getByText(/^Today \$2\.1200/)).toBeVisible();
+  await expect(p.getByText("Double-tap here to see every Claude call and its cost")).toBeVisible();
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
-test("a double tap opens the table inside the screen width, and it scrolls", async ({
+test("a double tap opens a table that fills the screen width, filters and scrolls", async ({
   page: p,
 }) => {
   await start(p);
   await p.getByRole("button", { name: /CLAUDE USAGE/ }).click();
-  await p.getByText("40 calls").dblclick();
+  await p.getByText("Double-tap here to see").dblclick();
   const dialog = p.getByRole("dialog", { name: "Claude usage" });
   await expect(dialog).toBeVisible();
   const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());
   expect(box.left).toBeGreaterThanOrEqual(0);
   expect(box.right).toBeLessThanOrEqual(390);
+  expect(box.width).toBeGreaterThan(370); // nearly the full width
+  expect(box.height).toBeGreaterThan(844 * 0.9); // and nearly the full height
   expect(box.bottom).toBeLessThanOrEqual(844);
+  // the filters are on screen
+  for (const name of ["Period", "Feature", "Close"]) {
+    const b = await dialog
+      .getByLabel(name)
+      .first()
+      .evaluate((e) => e.getBoundingClientRect().toJSON());
+    expect(b.right).toBeLessThanOrEqual(390);
+    expect(b.left).toBeGreaterThanOrEqual(0);
+  }
   // every column is on screen: the table is not wider than the scroll area
   const fit = await dialog
     .locator("div")
@@ -63,6 +73,8 @@ test("a double tap opens the table inside the screen width, and it scrolls", asy
     }));
   expect(fit.scroll).toBeLessThanOrEqual(fit.client + 1);
   expect(fit.scrollH).toBeGreaterThan(fit.clientH); // 40 rows: scrolls down
+  await dialog.getByLabel("Feature").selectOption("chat");
+  await expect(dialog.getByRole("row")).toHaveCount(21); // header + 20 chat calls
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
