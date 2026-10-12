@@ -1,4 +1,4 @@
-// src/components/AiUsageCard.jsx — the CLAUDE USAGE heading on My Account (Fix 84–87). On a
+// src/components/AiUsageCard.jsx — the CLAUDE USAGE heading in the Dashboard's Claude card (Fix 84–87, 98). On a
 // computer a double click on it opens the table of calls; on a phone one tap does. The table loads
 // its own data. `flush` removes the top margin (inside a box); `fontSize` sets the heading size.
 import { useState } from "react";

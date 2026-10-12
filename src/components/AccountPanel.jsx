@@ -4,7 +4,6 @@ import { useState } from "react";
 import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import ProfileCard from "./ProfileCard.jsx";
-import AiUsageCard from "./AiUsageCard.jsx";
 import { EditIcon } from "./NavIcons.jsx";
 
 const headerStyle = { marginBottom: "32px" };
@@ -172,7 +171,7 @@ function PanelHeader({ openEdit }) {
   );
 }
 
-export default function AccountPanel({ profile, photo, openEdit, userId }) {
+export default function AccountPanel({ profile, photo, openEdit }) {
   const phone = useIsPhone();
   return (
     <div>
@@ -186,13 +185,11 @@ export default function AccountPanel({ profile, photo, openEdit, userId }) {
           <Collapsible title="CONNECTED SERVICES">
             <LinkedAccounts phone />
           </Collapsible>
-          <AiUsageCard userId={userId} phone />
         </>
       ) : (
         <>
           <ContactCards profile={profile} />
           <LinkedAccounts />
-          <AiUsageCard userId={userId} />
         </>
       )}
     </div>
