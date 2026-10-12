@@ -481,3 +481,144 @@ test("a list that cannot be read says so", async ({ page: p }) => {
   const dialog = await openUsers(p);
   await expect(dialog).toContainText("Could not load users: Could not list the users");
 });
+
+const hoursAgoAt = (h) =>
+  new Date(new Date(2026, 9, 11, 12, 0, 0).getTime() - h * 3600000).toISOString();
+const ERRORS = [
+  {
+    id: "e1",
+    at: hoursAgoAt(3),
+    source: "console",
+    page: "/app.html",
+    message: "Weight save failed Mock setDoc failure",
+  },
+  {
+    id: "e2",
+    at: hoursAgoAt(50),
+    source: "promise",
+    page: "/tracker.html",
+    message: "Network request failed",
+  },
+  {
+    id: "e3",
+    at: hoursAgoAt(24 * 20),
+    source: "error",
+    page: "/app.html",
+    message: "Cannot read properties of undefined",
+  },
+];
+
+const startErrors = (p, errors = ERRORS, extra = {}) =>
+  start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+      "users/u/app_errors": errors,
+    },
+    ...extra,
+  });
+
+test("an ERRORS card sits under YOUR APPS and says how many errors the last week had", async ({
+  page: p,
+}) => {
+  await startErrors(p);
+  const card = p.getByRole("region", { name: "ERRORS" });
+  await expect(card).toBeVisible();
+  const [apps, errors] = [await box(p, "YOUR APPS"), await box(p, "ERRORS")];
+  expect(errors.top).toBeGreaterThanOrEqual(apps.bottom); // below it
+  expect(Math.abs(errors.left - apps.left)).toBeLessThan(2); // in the same column
+  await expect(card.getByRole("button", { name: "Recent errors" })).toBeVisible();
+  await expect(card).toContainText("2 in the last 7 days · latest 3 hours ago"); // the 20-day-old one is not counted
+});
+
+test("when the only errors are older than a week the card says none in the last 7 days", async ({
+  page: p,
+}) => {
+  await startErrors(p, [ERRORS[2]]);
+  await expect(p.getByRole("region", { name: "ERRORS" })).toContainText("None in the last 7 days");
+});
+
+test("an unreadable error log says so on the card and in the table", async ({ page: p }) => {
+  await startErrors(p, ERRORS, { __failGetDocs: true });
+  await expect(p.getByRole("region", { name: "ERRORS" })).toContainText("Could not read the log");
+  await p.getByRole("button", { name: "Recent errors" }).click();
+  await expect(p.getByRole("dialog", { name: "Errors" })).toContainText(
+    "Could not load the error log.",
+  );
+});
+
+test("the errors table: newest first, with the kind, page and message, searchable, counted", async ({
+  page: p,
+}) => {
+  await startErrors(p);
+  await p.getByRole("button", { name: "Recent errors" }).click();
+  const dialog = p.getByRole("dialog", { name: "Errors" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("columnheader")).toHaveText(["Date", "Kind", "Page", "Message"]);
+  const rows = dialog.getByRole("row");
+  await expect(rows).toHaveCount(4); // header + 3
+  const first = await rows.nth(1).getByRole("cell").allTextContents();
+  expect(first[0]).toMatch(/^\d\d-[A-Z][a-z]{2}-2026 \d\d:\d\d$/);
+  expect(first.slice(1)).toEqual(["Logged", "/app.html", "Weight save failed Mock setDoc failure"]);
+  expect(await rows.nth(2).getByRole("cell").allTextContents()).toContain("Promise");
+  expect(await rows.nth(3).getByRole("cell").allTextContents()).toContain("Error");
+  await expect(dialog).toContainText("3 errors");
+  const search = dialog.getByRole("searchbox", { name: "Search errors" });
+  await search.fill("network");
+  await expect(rows).toHaveCount(2);
+  await expect(dialog).toContainText("1 error");
+  await search.fill("tracker.html promise");
+  await expect(rows).toHaveCount(2);
+  await search.fill("nothing like this");
+  await expect(dialog.getByText("No errors match.")).toBeVisible();
+  await expect(dialog).toContainText("0 errors");
+  await search.fill("");
+  await expect(rows).toHaveCount(4);
+});
+
+test("the errors table looks like the others: as wide as its content, bordered, centred headings, large type", async ({
+  page: p,
+}) => {
+  await startErrors(p);
+  await p.getByRole("button", { name: "Recent errors" }).click();
+  const dialog = p.getByRole("dialog", { name: "Errors" });
+  const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const table = await dialog
+    .locator("table")
+    .evaluate((t) => ({ w: t.getBoundingClientRect().width, p: t.parentElement.clientWidth }));
+  expect(table.w).toBeLessThanOrEqual(table.p + 1);
+  expect(await size(dialog.getByRole("cell").first())).toBeGreaterThanOrEqual(16);
+  expect(
+    await dialog
+      .getByRole("columnheader")
+      .evaluateAll((hs) => hs.map((h) => getComputedStyle(h).textAlign)),
+  ).toEqual(Array(4).fill("center"));
+  expect(
+    await dialog
+      .getByRole("cell")
+      .first()
+      .evaluate((e) => getComputedStyle(e).borderTopWidth),
+  ).toBe("1px");
+  expect(await size(dialog.getByText("ERRORS", { exact: true }))).toBeGreaterThanOrEqual(20);
+  expect(await size(dialog.getByText(/^\d+ errors?$/))).toBeGreaterThanOrEqual(21);
+});
+
+test("an empty log, and the errors table closing with Esc, ✕ or a click outside", async ({
+  page: p,
+}) => {
+  await startErrors(p, []);
+  await expect(p.getByRole("region", { name: "ERRORS" })).toContainText("None in the last 7 days");
+  await p.getByRole("button", { name: "Recent errors" }).click();
+  let dialog = p.getByRole("dialog", { name: "Errors" });
+  await expect(dialog.getByText("No errors recorded.")).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await p.getByRole("button", { name: "Recent errors" }).click();
+  dialog = p.getByRole("dialog", { name: "Errors" });
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+  await p.getByRole("button", { name: "Recent errors" }).click();
+  await p.mouse.click(2, 2);
+  await expect(p.getByRole("dialog", { name: "Errors" })).toHaveCount(0);
+});

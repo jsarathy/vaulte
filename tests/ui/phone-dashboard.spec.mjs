@@ -232,3 +232,51 @@ test("not an admin: three rubrics only", async ({ page: p }) => {
   await expect(rubric(p, "CLAUDE")).toBeVisible();
   await expect(rubric(p, "USERS")).toHaveCount(0);
 });
+
+const hoursAgoAt = (h) =>
+  new Date(new Date(2026, 9, 11, 12, 0, 0).getTime() - h * 3600000).toISOString();
+const ERRORS = [
+  {
+    id: "e1",
+    at: hoursAgoAt(3),
+    source: "console",
+    page: "/app.html",
+    message: "Weight save failed Mock setDoc failure",
+  },
+  {
+    id: "e2",
+    at: hoursAgoAt(50),
+    source: "promise",
+    page: "/tracker.html",
+    message: "Network request failed",
+  },
+  {
+    id: "e3",
+    at: hoursAgoAt(24 * 20),
+    source: "error",
+    page: "/app.html",
+    message: "Cannot read properties of undefined",
+  },
+];
+
+test("ERRORS is a rubric that opens the error log full window, searchable", async ({ page: p }) => {
+  await p.route("**/__never__", (r) => r.abort());
+  await start(p);
+  await expect(rubric(p, "ERRORS")).toBeVisible();
+  await expect(rubric(p, "ERRORS")).toContainText("+");
+  // the page has no app_errors yet: seed them and reopen
+  await p.evaluate((rows) => (window.__collections["users/u/app_errors"] = rows), ERRORS);
+  await rubric(p, "ERRORS").click();
+  const dialog = p.getByRole("dialog", { name: "Errors" });
+  await expect(dialog).toBeVisible();
+  const b = await rect(dialog);
+  expect(b.left).toBeGreaterThanOrEqual(0);
+  expect(b.right).toBeLessThanOrEqual(SCREEN.width);
+  expect(b.height).toBeGreaterThan(SCREEN.height * 0.9);
+  await expect(dialog.getByRole("row")).toHaveCount(4);
+  await dialog.getByRole("searchbox", { name: "Search errors" }).fill("promise");
+  await expect(dialog.getByRole("row")).toHaveCount(2);
+  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+});

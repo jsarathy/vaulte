@@ -30,7 +30,9 @@ const start = async (p, init = {}) => {
   await p.goto("/app.html");
   await expect(p.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
 };
-const saved = (p) => p.evaluate(() => window.__setDocs);
+// the error log (app_errors) writes its own documents; these tests are about the profile
+const saved = (p) =>
+  p.evaluate(() => window.__setDocs.filter((d) => !d.path.includes("/app_errors/")));
 const calls = (p) =>
   p.evaluate(() =>
     window.__authCalls.filter((c) => c.fn !== "isLink").map(({ fn, ...a }) => [fn, a]),

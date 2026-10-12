@@ -6,11 +6,14 @@ import { useEffect, useState } from "react";
 import { hdg } from "../styles/authStyles.js";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import { loadDashboard } from "../api/dashboard.js";
-import { dashboardRows } from "../lib/dashboard.js";
+import { ago, dashboardRows } from "../lib/dashboard.js";
+import { loadErrors } from "../api/errorLog.js";
+import { countSince } from "../lib/errorLog.js";
 import { CLAUDE_LINK, INFRA_LINKS } from "../constants/infraLinks.js";
 import { checkAdmin } from "../api/adminUsers.js";
 import AiUsageCard from "./AiUsageCard.jsx";
 import UsersModal from "./UsersModal.jsx";
+import ErrorsModal from "./ErrorsModal.jsx";
 
 const gold = "rgba(212,175,55,0.6)";
 const eyebrow = {
@@ -163,6 +166,53 @@ function useIsAdmin(userId) {
   return admin;
 }
 
+/** How many errors are logged for the last 7 days, and when the latest was (read once). */
+function useErrorSummary(userId) {
+  const [text, setText] = useState("Loading…");
+  useEffect(() => {
+    let live = true;
+    loadErrors(userId)
+      .then((rows) => {
+        const n = countSince(rows, 7);
+        const latest = rows[0] ? ` · latest ${ago(rows[0].at)}` : "";
+        live && setText(n ? `${n} in the last 7 days${latest}` : "None in the last 7 days");
+      })
+      .catch(() => live && setText("Could not read the log"));
+    return () => {
+      live = false;
+    };
+  }, [userId]);
+  return text;
+}
+
+/** The entry that opens the error log. */
+function ErrorsEntry({ userId, size }) {
+  const [open, setOpen] = useState(false);
+  const summary = useErrorSummary(userId);
+  return (
+    <>
+      <button
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        style={{
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          textAlign: "left",
+          color: "rgba(212,175,55,0.95)",
+          fontSize: size.name,
+          fontFamily: "inherit",
+        }}
+      >
+        Recent errors
+      </button>
+      <div style={{ color: "rgba(240,234,214,0.6)", fontSize: size.text }}>{summary}</div>
+      {open && <ErrorsModal userId={userId} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 /** The entry that opens the Users table. */
 function UsersEntry({ size }) {
   const [open, setOpen] = useState(false);
@@ -256,6 +306,7 @@ function PhoneDashboard({ userId, rows, admin }) {
       <div style={{ marginTop: "20px" }}>
         {[
           ["apps", "YOUR APPS"],
+          ["errors", "ERRORS"],
           ["claude", "CLAUDE"],
           ["infra", "INFRASTRUCTURE"],
           ...(admin ? [["users", "USERS"]] : []),
@@ -277,6 +328,7 @@ function PhoneDashboard({ userId, rows, admin }) {
         </Popup>
       )}
       {open === "users" && <UsersModal onClose={close} />}
+      {open === "errors" && <ErrorsModal userId={userId} onClose={close} />}
       {open === "claude" && (
         <Popup title="CLAUDE" onClose={close}>
           <ClaudeCard userId={userId} phone size={SIZE.popup} />
@@ -302,9 +354,14 @@ export default function DashboardPanel({ userId }) {
     <div>
       <Header />
       <div style={gridStyle}>
-        <Frame title="YOUR APPS">
-          <AppRows rows={rows} size={SIZE.box} />
-        </Frame>
+        <div style={{ display: "grid", gap: "24px", minWidth: 0 }}>
+          <Frame title="YOUR APPS">
+            <AppRows rows={rows} size={SIZE.box} />
+          </Frame>
+          <Frame title="ERRORS">
+            <ErrorsEntry userId={userId} size={SIZE.box} />
+          </Frame>
+        </div>
         <div style={{ display: "grid", gap: "24px", minWidth: 0 }}>
           <Frame title="CLAUDE">
             <ClaudeCard userId={userId} phone={false} size={SIZE.box} />
