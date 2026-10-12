@@ -1,6 +1,5 @@
-// tests/ui/phone-ai-usage.spec.mjs — the Claude usage entry on a phone (Fix 84, 85, 86): a CLAUDE
-// USAGE heading that starts closed, a double tap that opens the table of calls, and the table using
-// the screen and fitting the 390px width, with its filters, and scrolling.
+// tests/ui/phone-ai-usage.spec.mjs — the Claude usage table on a phone (Fix 84–87): one tap on
+// CLAUDE USAGE opens it, it uses the screen and fits the 390px width, with its filters, and scrolls.
 import { test, expect } from "./cover.mjs";
 
 const many = Array.from({ length: 40 }, (_, i) => ({
@@ -28,22 +27,15 @@ const start = async (p) => {
   await p.locator(".app-sidebar button").nth(1).click();
 };
 
-test("CLAUDE USAGE starts closed and opens on tap", async ({ page: p }) => {
-  await start(p);
-  const head = p.getByRole("button", { name: /CLAUDE USAGE/ });
-  await expect(head).toHaveAttribute("aria-expanded", "false");
-  await expect(p.getByText("Double-tap here to see every Claude call")).toHaveCount(0);
-  await head.click();
-  await expect(p.getByText("Double-tap here to see every Claude call and its cost")).toBeVisible();
-  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-});
-
-test("a double tap opens a table that fills the screen width, filters and scrolls", async ({
+test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters and scrolls", async ({
   page: p,
 }) => {
   await start(p);
-  await p.getByRole("button", { name: /CLAUDE USAGE/ }).click();
-  await p.getByText("Double-tap here to see").dblclick();
+  const head = p.getByRole("button", { name: /CLAUDE USAGE/ });
+  await expect(head).toBeVisible();
+  await expect(p.getByRole("dialog")).toHaveCount(0);
+  expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await head.click();
   const dialog = p.getByRole("dialog", { name: "Claude usage" });
   await expect(dialog).toBeVisible();
   const box = await dialog.evaluate((e) => e.getBoundingClientRect().toJSON());

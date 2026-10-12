@@ -39,21 +39,22 @@ const start = async (p, init) => {
   await expect(p.getByRole("heading", { name: "My Account" })).toBeVisible();
 };
 const open = async (p) => {
-  await p.getByText("Double-click here to see every Claude call").dblclick();
+  await p.getByRole("button", { name: "CLAUDE USAGE" }).dblclick();
   const dialog = p.getByRole("dialog", { name: "Claude usage" });
   await expect(dialog).toBeVisible();
   return dialog;
 };
 const withRows = (rows = ROWS) => ({ __collections: { "users/u/ai_usage": rows } });
 
-test("the card has no summary line; a double click opens the table, last 30 days to start", async ({
+test("the CLAUDE USAGE heading has no box or summary; a double click on it opens the table, last 30 days to start", async ({
   page: p,
 }) => {
   await start(p, withRows());
-  await expect(p.getByText("CLAUDE USAGE (YOUR ACCOUNT)")).toBeVisible();
-  await expect(p.getByText(/Today \$|7 days \$|calls ·/)).toHaveCount(0);
+  await expect(p.getByRole("button", { name: "CLAUDE USAGE" })).toBeVisible();
+  await expect(p.getByText(/Today \$|7 days \$|calls ·|Double-click/)).toHaveCount(0);
+  await expect(p.locator(".info-card", { hasText: "CLAUDE USAGE" })).toHaveCount(0); // no box
   await expect(p.getByRole("dialog")).toHaveCount(0);
-  await p.getByText("Double-click here to see every Claude call").click(); // one click: nothing
+  await p.getByRole("button", { name: "CLAUDE USAGE" }).click(); // one click: nothing
   await expect(p.getByRole("dialog")).toHaveCount(0);
   const dialog = await open(p);
   await expect(dialog.getByLabel("Period")).toHaveValue("30d");

@@ -186,9 +186,7 @@ export default function AccountPanel({ profile, photo, openEdit, userId }) {
           <Collapsible title="CONNECTED SERVICES">
             <LinkedAccounts phone />
           </Collapsible>
-          <Collapsible title="CLAUDE USAGE">
-            <AiUsageCard userId={userId} phone />
-          </Collapsible>
+          <AiUsageCard userId={userId} phone />
         </>
       ) : (
         <>
