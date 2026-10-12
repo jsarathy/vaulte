@@ -84,10 +84,19 @@ const calculator = (p) =>
 const calcSaves = (p) =>
   p.evaluate(() => window.__setDocs.filter((s) => s.path === "users/u/settings/calculator"));
 
+const release = async (p, key) => {
+  await p.waitForFunction((k) => window.__release?.[k], key);
+  await p.evaluate((k) => {
+    delete window.__hold[k];
+    window.__release[k]();
+  }, key);
+};
+
 test("start-up: everything loaded", async ({ page: p }) => {
   const w = watch(p);
-  await start(p, { ...FULL, __getDocDelays: { [P("settings/calculator")]: 400 } });
+  await start(p, { ...FULL, __hold: { [P("settings/calculator")]: true } });
   await expect(p.getByText("Loading your log…")).toBeVisible();
+  await release(p, P("settings/calculator"));
   await p.getByText("October 2026").waitFor();
   await expect(p.getByText("Loading your log…")).toHaveCount(0);
   const ev = (f, a) => p.evaluate(f, a);

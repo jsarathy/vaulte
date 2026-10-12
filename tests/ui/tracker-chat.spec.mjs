@@ -43,6 +43,14 @@ const chatSaves = (p) =>
   ev(p, () => window.__setDocs.filter((s) => s.path.endsWith("claude_chat/conversation")));
 const mode = (p) => p.locator("select").filter({ has: p.locator('option[value="__chat__"]') });
 
+const release = async (p, key) => {
+  await p.waitForFunction((k) => window.__release?.[k], key);
+  await p.evaluate((k) => {
+    delete window.__hold[k];
+    window.__release[k]();
+  }, key);
+};
+
 test("chat: question, reply, history, errors, clear", async ({ page: p }) => {
   const w = watch(p);
   await start(p, {
@@ -52,7 +60,7 @@ test("chat: question, reply, history, errors, clear", async ({ page: p }) => {
   await openChat(p);
   await ev(p, () => {
     window.__chatReply = "sure thing";
-    window.__chatDelay = 400;
+    window.__hold = { chat: true };
   });
   await ask(p, "  hello  ");
   await expect(input(p)).toHaveValue("");
@@ -60,6 +68,7 @@ test("chat: question, reply, history, errors, clear", async ({ page: p }) => {
   await expect(p.getByText("…", { exact: true })).toBeVisible(); // thinking
   // a second question while waiting is ignored (and stays in the box)
   await ask(p, "again");
+  await release(p, "chat");
   await expect(p.getByText("sure thing", { exact: true })).toBeVisible();
   await expect(p.getByText("…", { exact: true })).toHaveCount(0);
   await expect(input(p)).toHaveValue("again");

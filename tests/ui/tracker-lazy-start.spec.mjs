@@ -40,10 +40,19 @@ test("the first screen shows before the slow reads finish; older days join after
   await expect.poll(() => stat(p, "Streak"), { timeout: 6000 }).toBe("8 days");
 });
 
+const release = async (p, key) => {
+  await p.waitForFunction((k) => window.__release?.[k], key);
+  await p.evaluate((k) => {
+    delete window.__hold[k];
+    window.__release[k]();
+  }, key);
+};
+
 test("a skeleton shows while the first screen loads", async ({ page: p }) => {
-  await start(p, { __days: EIGHT, __getDocDelays: { [P("settings/calculator")]: 800 } });
+  await start(p, { __days: EIGHT, __hold: { [P("settings/calculator")]: true } });
   await expect(p.getByTestId("start-skeleton")).toBeVisible();
   await expect(p.getByText("Loading your log…")).toBeVisible();
+  await release(p, P("settings/calculator"));
   await expect(p.getByTestId("start-skeleton")).toHaveCount(0);
 });
 
