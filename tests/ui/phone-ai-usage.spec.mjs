@@ -27,6 +27,8 @@ const start = async (p) => {
   await p.locator(".app-sidebar button").nth(1).click();
 };
 
+const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+
 test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters and scrolls", async ({
   page: p,
 }) => {
@@ -65,6 +67,18 @@ test("one tap on CLAUDE USAGE opens a table that fills the screen width, filters
     }));
   expect(fit.scroll).toBeLessThanOrEqual(fit.client + 1);
   expect(fit.scrollH).toBeGreaterThan(fit.clientH); // 40 rows: scrolls down
+  // the summary at the bottom is large; the headings are centred and the cells bordered
+  expect(await size(dialog.getByText(/^\d+ calls · /))).toBeGreaterThanOrEqual(19);
+  const heads = dialog.getByRole("columnheader");
+  expect(await heads.evaluateAll((hs) => hs.map((h) => getComputedStyle(h).textAlign))).toEqual(
+    Array(5).fill("center"),
+  );
+  expect(
+    await dialog
+      .getByRole("cell")
+      .first()
+      .evaluate((e) => getComputedStyle(e).borderTopWidth),
+  ).toBe("1px");
   await dialog.getByLabel("Feature").selectOption("chat");
   await expect(dialog.getByRole("row")).toHaveCount(21); // header + 20 chat calls
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);

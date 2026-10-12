@@ -183,3 +183,34 @@ test("it takes most of the screen, capped by 1200px wide, and scrolls down for m
     .evaluate((e) => ({ scrollH: e.scrollHeight, clientH: e.clientHeight }));
   expect(size.scrollH).toBeGreaterThan(size.clientH); // more rows than fit: it scrolls
 });
+
+test("on a monitor the table's records are large and bordered, the headings centred, the summary and title large; the My Account heading is larger", async ({
+  page: p,
+}) => {
+  await start(p, withRows());
+  const size = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  expect(await size(p.getByRole("button", { name: "CLAUDE USAGE" }))).toBeGreaterThanOrEqual(15);
+  const dialog = await open(p);
+  await expect(dialog.getByRole("row")).toHaveCount(4);
+  const cell = dialog.getByRole("cell").first();
+  expect(await size(cell)).toBeGreaterThanOrEqual(19); // the records
+  const borders = await cell.evaluate((e) => {
+    const c = getComputedStyle(e);
+    return [
+      c.borderTopWidth,
+      c.borderTopStyle,
+      c.borderRightWidth,
+      c.borderBottomWidth,
+      c.borderLeftWidth,
+    ];
+  });
+  expect(borders).toEqual(["1px", "solid", "1px", "1px", "1px"]);
+  const heads = dialog.getByRole("columnheader");
+  await expect(heads).toHaveCount(5);
+  expect(await heads.evaluateAll((hs) => hs.map((h) => getComputedStyle(h).textAlign))).toEqual(
+    Array(5).fill("center"),
+  );
+  expect(await heads.first().evaluate((h) => getComputedStyle(h).borderTopWidth)).toBe("1px");
+  expect(await size(dialog.getByText("CLAUDE USAGE", { exact: true }))).toBeGreaterThanOrEqual(20); // the title
+  expect(await size(dialog.getByText(/^\d+ calls · /))).toBeGreaterThanOrEqual(21); // the summary
+});

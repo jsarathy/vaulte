@@ -6,6 +6,7 @@ import { useIsPhone } from "../hooks/useIsPhone.js";
 import { loadMyUsage } from "../api/aiUsage.js";
 import { PERIODS, periodStart, summarise, cents, whenText } from "../lib/aiUsage.js";
 
+const CELL_BORDER = "1px solid rgba(212,175,55,0.22)";
 const gold = "rgba(212,175,55,0.8)";
 const S = {
   backdrop: {
@@ -66,12 +67,13 @@ const S = {
     position: "sticky",
     top: 0,
     background: "#14141a",
-    color: "rgba(240,234,214,0.55)",
-    fontWeight: 400,
+    color: "rgba(240,234,214,0.8)",
+    fontWeight: 600,
     padding: "8px 12px",
     whiteSpace: "nowrap",
+    border: CELL_BORDER,
   },
-  td: { padding: "6px 12px", whiteSpace: "nowrap" },
+  td: { padding: "6px 12px", whiteSpace: "nowrap", border: CELL_BORDER },
   note: { padding: "24px", textAlign: "center", color: "rgba(240,234,214,0.5)" },
   total: { padding: "10px 16px", borderTop: "1px solid rgba(212,175,55,0.2)", color: gold },
 };
@@ -98,8 +100,8 @@ function Rows({ rows, pad }) {
     <table style={{ borderCollapse: "collapse", width: "100%" }}>
       <thead>
         <tr>
-          {COLUMNS.map((h, i) => (
-            <th key={h} style={{ ...S.th, padding: pad, textAlign: i > 1 ? "right" : "left" }}>
+          {COLUMNS.map((h) => (
+            <th key={h} style={{ ...S.th, padding: pad, textAlign: "center" }}>
               {h}
             </th>
           ))}
@@ -129,10 +131,10 @@ function Body({ state, shown, pad }) {
   return <Rows rows={shown} pad={pad} />;
 }
 
-function Total({ shown }) {
+function Total({ shown, size }) {
   const t = summarise(shown).total;
   return (
-    <div style={S.total}>
+    <div style={{ ...S.total, fontSize: size }}>
       {t.calls} calls · {t.input} in · {t.output} out · {cents(t.cost)}
     </div>
   );
@@ -140,8 +142,8 @@ function Total({ shown }) {
 
 /** Type sizes: the table, the title bar, and the filter controls (16 px or more on a phone, so it does not zoom). */
 const TYPE = {
-  phone: { base: "16px", bar: "15px", control: "16px", pad: "6px 8px" },
-  monitor: { base: "16px", bar: "14px", control: "15px", pad: "6px 12px" },
+  phone: { base: "16px", bar: "15px", control: "16px", pad: "6px 8px", total: "19px" },
+  monitor: { base: "19px", bar: "20px", control: "17px", pad: "8px 14px", total: "21px" },
 };
 
 export default function AiUsageModal({ userId, onClose }) {
@@ -178,7 +180,7 @@ export default function AiUsageModal({ userId, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ ...S.bar, fontSize: type.bar }}>
-          <span>CLAUDE USAGE</span>
+          <span style={{ marginRight: "28px" }}>CLAUDE USAGE</span>
           <Select
             label="Period"
             size={type.control}
@@ -211,7 +213,7 @@ export default function AiUsageModal({ userId, onClose }) {
         <div style={S.scroll}>
           <Body state={state} shown={shown} pad={type.pad} />
         </div>
-        <Total shown={shown} />
+        <Total shown={shown} size={type.total} />
       </div>
     </div>
   );

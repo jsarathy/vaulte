@@ -129,6 +129,13 @@ test("CLAUDE opens a popup with the usage entry and the Anthropic Console link; 
   const usage = dialog.getByRole("button", { name: "CLAUDE USAGE" });
   const link = dialog.getByRole("link", { name: "Anthropic Console" });
   await expect(link).toHaveAttribute("href", "https://console.anthropic.com");
+  // the popup's title is the biggest type in it: bigger than the Claude usage entry and the link
+  const title = await size(dialog.getByText("CLAUDE", { exact: true }));
+  expect(title).toBeGreaterThanOrEqual(28);
+  expect(title).toBeGreaterThan(await size(usage));
+  expect(title).toBeGreaterThan(
+    await size(dialog.getByRole("link", { name: "Anthropic Console" })),
+  );
   expect(await size(usage)).toBeGreaterThanOrEqual(26);
   expect(await size(link)).toBeGreaterThanOrEqual(26);
   expect(await size(dialog.getByText("Claude API usage and spend limits"))).toBeGreaterThanOrEqual(
