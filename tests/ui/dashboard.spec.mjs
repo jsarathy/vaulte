@@ -288,4 +288,6 @@ test("the CLAUDE USAGE entry has the same size, colour and font as the Anthropic
   const usage = await style(claude.getByRole("button", { name: "CLAUDE USAGE" }));
   expect(usage).toEqual(await style(claude.getByRole("link", { name: "Anthropic Console" })));
   expect(usage[0]).toBe("22px");
+  // written like the link, not in capitals
+  await expect(claude.getByRole("button", { name: "Claude Usage" })).toHaveText("Claude Usage");
 });
