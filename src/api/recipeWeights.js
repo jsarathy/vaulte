@@ -1,7 +1,8 @@
 // src/api/recipeWeights.js — estimated Wt/portion for saved recipes
 //
 // portion_g          weight of one portion in grams
-// portion_g_source   "estimated" = sum of ingredient weights ÷ servings (from
+// portion_g_source   Claude's weights are now saved as "weighed" too (Fix 92); "estimated" is only on
+//                    recipes saved before, settled to "weighed" on the next load. It meant: sum of ingredient weights ÷ servings (from
 //                    Claude, no allowance for cooking losses); anything else
 //                    with a portion_g (typed in / weighed) is the user's value
 //                    and is never overwritten.
@@ -28,7 +29,7 @@ const replaceById = (list, recipe) => list.map((r) => (r.id === recipe.id ? reci
 
 const estimatedWeight = (grams) => {
   const g = Math.round(Number(grams));
-  return g > 0 ? { portion_g: g, portion_g_source: "estimated" } : null;
+  return g > 0 ? { portion_g: g, portion_g_source: "weighed" } : null;
 };
 
 // Claude's total weight (g) of some ingredients, treated as one batch
@@ -153,6 +154,18 @@ export async function propagateRecipeChange({ uid, oldA, newA, recipes, setUserR
 }
 
 // ── Wt/portion and form backfill ─────────────────────────────────────────────
+// Weights Claude estimated before are kept as the recipe's weight from now on ("weighed"): they
+// are not re-estimated when the recipe changes, and typing a new weight replaces them.
+async function settleEstimates(ctx) {
+  for (const r of ctx.getRecipes().filter(isEstimatedWeight)) {
+    const settled = { ...r, portion_g_source: "weighed" };
+    await saveRecipe(ctx.uid, settled);
+    ctx.setUserRecipes((prev) =>
+      prev.map((x) => (x.id === settled.id && isEstimatedWeight(x) ? settled : x)),
+    );
+  }
+}
+
 // The recipe as it is now, unless it was edited (or filled in) meanwhile
 function unchangedSince(getRecipes, r) {
   const latest = getRecipes().find((x) => x.id === r.id);
@@ -201,6 +214,7 @@ export async function backfillPortionWeights(uid, getRecipes, setUserRecipes) {
   running = true;
   const ctx = { uid, getRecipes, setUserRecipes };
   try {
+    await settleEstimates(ctx);
     for (const r of getRecipes().filter((x) => needsFill(x) && attemptsLeft(x)))
       await backfillOne(ctx, r);
   } catch (e) {

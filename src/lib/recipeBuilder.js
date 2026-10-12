@@ -24,13 +24,13 @@ export function nameProblem(recipe, recipes) {
   return clash ? `A saved recipe is already called "${clash.name}" — choose another name.` : null;
 }
 
-/** Claude's new recipe with an id; its portion weight rounded and marked estimated, its form and volume kept if usable. */
+/** Claude's new recipe with an id; its portion weight rounded and kept as its weight ("weighed"), its form and volume kept if usable. */
 export function prepareGenerated(recipe, id) {
   const { form: _form, portion_ml: _ml, ...rest } = recipe;
   const grams = Math.round(Number(recipe.portion_g));
   const volume = volumeFields(recipe);
   return grams > 0
-    ? { ...rest, ...volume, id, portion_g: grams, portion_g_source: "estimated" }
+    ? { ...rest, ...volume, id, portion_g: grams, portion_g_source: "weighed" }
     : { ...rest, ...volume, id, portion_g: null };
 }
 
