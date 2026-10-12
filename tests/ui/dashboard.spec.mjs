@@ -3,12 +3,13 @@
 // mocked; "now" is 11 Oct 2026, 12:00.
 import { test, expect } from "./cover.mjs";
 
-const start = async (p, init = {}, admin = null) => {
+const start = async (p, init = {}, admin = null, infra = null) => {
   await p.route(
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
   const seen = admin ? await adminApi(p, admin) : [];
+  if (infra) await infraApi(p, infra);
   await p.clock.setFixedTime(new Date(2026, 9, 11, 12, 0, 0));
   await p.addInitScript((i) => Object.assign(window, i), {
     __authUser: { uid: "u", email: "jane@example.com" },
@@ -621,4 +622,146 @@ test("an empty log, and the errors table closing with Esc, ✕ or a click outsid
   await p.getByRole("button", { name: "Recent errors" }).click();
   await p.mouse.click(2, 2);
   await expect(p.getByRole("dialog", { name: "Errors" })).toHaveCount(0);
+});
+
+const infraAgo = (h) =>
+  new Date(new Date(2026, 9, 11, 12, 0, 0).getTime() - h * 3600000).toISOString();
+const INFRA = {
+  vercel: { indicator: "minor", description: "Minor Service Outage" },
+  github: { indicator: "none", description: "All Systems Operational" },
+  firebase: { ongoing: [] },
+  ci: {
+    runs: [
+      {
+        name: "ci",
+        status: "completed",
+        conclusion: "success",
+        title: "Fix 99: live status",
+        at: infraAgo(1),
+      },
+      {
+        name: "security",
+        status: "completed",
+        conclusion: "success",
+        title: "Fix 99: live status",
+        at: infraAgo(1),
+      },
+    ],
+  },
+  deployment: {
+    environment: "Production",
+    ref: "abc",
+    state: "success",
+    at: infraAgo(2),
+    description: "",
+  },
+  issues: { issues: [{ number: 161, title: "CI platform check" }] },
+  checked_at: infraAgo(0),
+};
+/** The mocked /api/infra-status; the Authorization headers it was asked with go in infraSeen. */
+const infraSeen = [];
+const infraApi = async (p, data = INFRA) => {
+  infraSeen.length = 0;
+  const seen = infraSeen;
+  await p.route(
+    (u) => new URL(u).pathname === "/api/infra-status",
+    (route) => {
+      seen.push(route.request().headers()["authorization"]);
+      return route.fulfill({ json: data });
+    },
+  );
+  return seen;
+};
+
+const startInfra = (p, data = INFRA) =>
+  start(
+    p,
+    {
+      __collections: {
+        "users/u/apple_activity": [],
+        "users/u/weight_log": [],
+        "users/u/body_log": [],
+      },
+    },
+    null,
+    data,
+  );
+const link = (p, name) =>
+  p.getByRole("region", { name: "INFRASTRUCTURE" }).locator(`[data-link="${name}"]`);
+
+test("each infrastructure link shows a marker and live lines: platform, deployment, CI, issues", async ({
+  page: p,
+}) => {
+  await startInfra(p);
+  await expect(link(p, "Vercel")).toContainText("Platform: Minor Service Outage");
+  await expect(link(p, "Vercel")).toContainText("Production: deployed 2 hours ago");
+  await expect(link(p, "Firebase")).toContainText("Platform: no ongoing incidents");
+  await expect(link(p, "GitHub")).toContainText("Platform: All Systems Operational");
+  await expect(link(p, "GitHub Actions")).toContainText(
+    "Latest on main: passed 1 hour ago · Fix 99: live status",
+  );
+  await expect(link(p, "GitHub issues")).toContainText("1 open: CI platform check");
+  // markers: the worst of what each link shows
+  await expect(link(p, "Vercel").getByRole("img", { name: "Stale" })).toBeVisible(); // a platform incident
+  await expect(link(p, "Firebase").getByRole("img", { name: "Up to date" })).toBeVisible();
+  await expect(link(p, "GitHub").getByRole("img", { name: "Up to date" })).toBeVisible();
+  await expect(link(p, "GitHub Actions").getByRole("img", { name: "Up to date" })).toBeVisible();
+  await expect(link(p, "GitHub issues").getByRole("img", { name: "Stale" })).toBeVisible(); // one is open
+  // the links themselves are unchanged
+  await expect(link(p, "Vercel").getByRole("link", { name: "Vercel" })).toHaveAttribute(
+    "href",
+    "https://vercel.com/jsarathys-projects/vaulte",
+  );
+});
+
+test("a failed deployment or CI run is an error marker; a failing source says it is unavailable", async ({
+  page: p,
+}) => {
+  await startInfra(p, {
+    ...INFRA,
+    vercel: { indicator: "none", description: "All Systems Operational" },
+    deployment: { ...INFRA.deployment, state: "failure" },
+    ci: {
+      runs: [
+        {
+          name: "ci",
+          status: "completed",
+          conclusion: "failure",
+          title: "Broken",
+          at: infraAgo(1),
+        },
+      ],
+    },
+    github: { error: true },
+  });
+  await expect(link(p, "Vercel")).toContainText("Production: failed 2 hours ago");
+  await expect(link(p, "Vercel").getByRole("img", { name: "Error" })).toBeVisible();
+  await expect(link(p, "GitHub Actions")).toContainText(
+    "Latest on main: failed 1 hour ago · Broken",
+  );
+  await expect(link(p, "GitHub Actions").getByRole("img", { name: "Error" })).toBeVisible();
+  await expect(link(p, "GitHub")).toContainText("Platform status unavailable");
+  await expect(link(p, "GitHub").getByRole("img", { name: "No data" })).toBeVisible();
+});
+
+test("when the status cannot be loaded every link says it is unavailable, and the links still work", async ({
+  page: p,
+}) => {
+  await start(p, {
+    __collections: {
+      "users/u/apple_activity": [],
+      "users/u/weight_log": [],
+      "users/u/body_log": [],
+    },
+  }); // the generic mock answers {}
+  await expect(link(p, "Vercel")).toContainText("Platform status unavailable");
+  await expect(link(p, "Firebase")).toContainText("Platform status unavailable");
+  await expect(link(p, "GitHub issues")).toContainText("Issues unavailable");
+  await expect(p.getByRole("region", { name: "INFRASTRUCTURE" }).getByRole("link")).toHaveCount(5);
+});
+
+test("the status is asked for with the sign-in token", async ({ page: p }) => {
+  await startInfra(p);
+  await expect(link(p, "Firebase")).toContainText("no ongoing incidents");
+  expect(infraSeen[0]).toBe("Bearer mock-id-token");
 });

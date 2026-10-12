@@ -5,12 +5,13 @@ import { test, expect } from "./cover.mjs";
 
 const SCREEN = { width: 390, height: 844 };
 
-const start = async (p, admin = null) => {
+const start = async (p, admin = null, infra = null) => {
   await p.route(
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
   if (admin) await adminApi(p, admin);
+  if (infra) await infraApi(p, infra);
   await p.clock.setFixedTime(new Date(2026, 9, 11, 12, 0, 0));
   await p.addInitScript(() => {
     window.__authUser = { uid: "u", email: "jane@example.com" };
@@ -277,6 +278,72 @@ test("ERRORS is a rubric that opens the error log full window, searchable", asyn
   await dialog.getByRole("searchbox", { name: "Search errors" }).fill("promise");
   await expect(dialog.getByRole("row")).toHaveCount(2);
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+const infraAgo = (h) =>
+  new Date(new Date(2026, 9, 11, 12, 0, 0).getTime() - h * 3600000).toISOString();
+const INFRA = {
+  vercel: { indicator: "minor", description: "Minor Service Outage" },
+  github: { indicator: "none", description: "All Systems Operational" },
+  firebase: { ongoing: [] },
+  ci: {
+    runs: [
+      {
+        name: "ci",
+        status: "completed",
+        conclusion: "success",
+        title: "Fix 99: live status",
+        at: infraAgo(1),
+      },
+      {
+        name: "security",
+        status: "completed",
+        conclusion: "success",
+        title: "Fix 99: live status",
+        at: infraAgo(1),
+      },
+    ],
+  },
+  deployment: {
+    environment: "Production",
+    ref: "abc",
+    state: "success",
+    at: infraAgo(2),
+    description: "",
+  },
+  issues: { issues: [{ number: 161, title: "CI platform check" }] },
+  checked_at: infraAgo(0),
+};
+/** The mocked /api/infra-status; returns what was asked with. */
+const infraApi = async (p, data = INFRA) => {
+  const seen = [];
+  await p.route(
+    (u) => new URL(u).pathname === "/api/infra-status",
+    (route) => {
+      seen.push(route.request().headers()["authorization"]);
+      return route.fulfill({ json: data });
+    },
+  );
+  return seen;
+};
+
+test("INFRASTRUCTURE in the phone popup shows the live lines and markers in large type", async ({
+  page: p,
+}) => {
+  await start(p, null, INFRA);
+  await rubric(p, "INFRASTRUCTURE").click();
+  const dialog = p.getByRole("dialog", { name: "INFRASTRUCTURE" });
+  const vercel = dialog.locator('[data-link="Vercel"]');
+  await expect(vercel).toContainText("Platform: Minor Service Outage");
+  await expect(vercel).toContainText("Production: deployed 2 hours ago");
+  await expect(vercel.getByRole("img", { name: "Stale" })).toBeVisible();
+  await expect(dialog.locator('[data-link="GitHub Actions"]')).toContainText(
+    "Latest on main: passed 1 hour ago",
+  );
+  expect(await size(vercel.getByText("Platform: Minor Service Outage"))).toBeGreaterThanOrEqual(20);
+  expect(await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(true);
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
 });
