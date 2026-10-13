@@ -26,7 +26,7 @@ const said = (spy) => spy.mock.calls.map((c) => c.arguments);
 const logged = (spy, label) => said(spy).filter((a) => a[0] === label);
 
 // ---- claude.js
-claudeDeps.verify = async () => ({ uid: "u1" }); // signed in (the token check has its own tests)
+claudeDeps.verify = async () => ({ uid: "u1", email_verified: true }); // signed in (the token check has its own tests)
 const SIGNED_IN = { authorization: "Bearer good" };
 test("claude: refuses other methods and a missing key with their messages", async () => {
   const get = res();

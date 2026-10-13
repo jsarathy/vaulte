@@ -32,7 +32,11 @@ export const db = () => getFirestore();
 
 // Fake Vercel response object: records status, JSON body and redirects.
 export function res() {
-  const r = { statusCode: 200, body: undefined };
+  const r = { statusCode: 200, body: undefined, headers: {} };
+  r.setHeader = (k, v) => {
+    r.headers[String(k).toLowerCase()] = v;
+    return r;
+  };
   r.status = (c) => {
     r.statusCode = c;
     return r;

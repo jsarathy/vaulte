@@ -11,6 +11,7 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   GoogleAuthProvider,
+  sendEmailVerification,
   signInWithPopup,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
@@ -35,6 +36,11 @@ export async function createAccount(form) {
   const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
   const profile = profileFromSignup(form, cred.user.uid);
   await saveProfile(cred.user.uid, profile);
+  // the confirmation email (Fix 126); the account exists either way, and Claude asks again if it fails
+  // (Firebase's own page confirms it and sends the person back; the app does not handle the code)
+  await sendEmailVerification(cred.user, { url: VERCEL_URL }).catch((err) =>
+    console.warn("confirmation email not sent:", err.message),
+  );
   return profile;
 }
 

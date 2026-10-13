@@ -10,7 +10,7 @@ const realVerify = deps.verify; // what the proxy checks tokens with, before the
 // The token check stands in for Google's keys: "tok-<uid>" is a good token for that user.
 deps.verify = async (token) => {
   if (!token.startsWith("tok-")) throw new Error("bad token");
-  return { uid: token.slice(4) };
+  return { uid: token.slice(4), email_verified: true };
 };
 const AS = (uid) => ({ authorization: `Bearer tok-${uid}` });
 
@@ -105,7 +105,7 @@ test("the Bearer word is case-insensitive and the token is what is verified", as
   const seen = [];
   deps.verify = async (t) => {
     seen.push(t);
-    return { uid: "u9" };
+    return { uid: "u9", email_verified: true };
   };
   globalThis.fetch = async () => ({ status: 200, json: async () => ({ content: [] }) });
   const out = res();
@@ -119,4 +119,47 @@ test("the Bearer word is case-insensitive and the token is what is verified", as
 
 test("the proxy checks tokens with the real verifyIdToken (Google's keys), not a stand-in", () => {
   assert.equal(realVerify, verifyIdToken);
+});
+
+test("a person whose email address is not confirmed is a 403 with a reason, before the key is looked at and without calling Anthropic", async () => {
+  let reached = false;
+  globalThis.fetch = async () => {
+    reached = true;
+    return { status: 200, json: async () => ({}) };
+  };
+  delete process.env.ANTHROPIC_API_KEY; // the refusal comes first
+  for (const claims of [
+    { uid: "u1", email_verified: false },
+    { uid: "u1" },
+    { uid: "u1", email_verified: "true" }, // only the real true counts
+    { uid: "u1", email_verified: 1 },
+    { uid: "u1", email_verified: null },
+  ]) {
+    deps.verify = async () => claims;
+    const out = res();
+    await handler({ method: "POST", headers: AS("u1"), body: { model: "m", messages: [] } }, out);
+    assert.equal(out.statusCode, 403, JSON.stringify(claims));
+    assert.deepEqual(out.body, {
+      error: "Confirm your email address to use Claude.",
+      code: "email_not_confirmed",
+    });
+    assert.equal(out.headers["x-vaulte-reason"], "email_not_confirmed");
+  }
+  assert.equal(reached, false);
+});
+
+test("a confirmed email is let through (a Google or emailed-link sign-in is confirmed already)", async () => {
+  deps.verify = async () => ({ uid: "u1", email_verified: true });
+  globalThis.fetch = async () => ({ status: 200, json: async () => ({ content: [] }) });
+  const out = res();
+  await handler({ method: "POST", headers: AS("u1"), body: {} }, out);
+  assert.equal(out.statusCode, 200);
+  assert.equal(out.headers["x-vaulte-reason"], undefined);
+});
+
+test("a person who is not signed in still gets the 401, not the email message", async () => {
+  const out = res();
+  await handler({ method: "POST", body: {} }, out);
+  assert.equal(out.statusCode, 401);
+  assert.equal(out.headers["x-vaulte-reason"], undefined);
 });
