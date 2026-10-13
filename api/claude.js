@@ -1,10 +1,17 @@
 // api/claude.js — server-side proxy to the Anthropic Messages API, so the API key never
 // reaches the browser. It also keeps a record of each call's size and cost (Fix 41): the browser
-// adds a `_usage: { feature, userId }` field, which is taken off before the request is forwarded.
+// adds a `_usage: { feature }` field, which is taken off before the request is forwarded. Only a
+// signed-in person may call it (their Firebase ID token, Fix 118), and the usage is recorded for
+// the user in that token.
+import { callerOf } from "./_admin/caller.js";
+import { verifyIdToken } from "./_admin/verify.js";
 import { cleanMeta, usageRecord } from "./_usage/record.js";
 import { saveUsage } from "./_usage/store.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+
+// The token check; a test replaces it (as in infra-status.js).
+export const deps = { verify: verifyIdToken };
 
 // Each web search result carries an `encrypted_content` blob, needed only to
 // resume a multi-turn conversation that includes that search. This app makes
@@ -54,6 +61,8 @@ async function logUsage({ meta, request, response, data, started }) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  const caller = await callerOf(req, deps.verify);
+  if (caller.error) return res.status(caller.error.status).json(caller.error.body);
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   try {
@@ -61,7 +70,8 @@ export default async function handler(req, res) {
     const started = Date.now();
     const response = await forwardToAnthropic(request, apiKey);
     const data = await response.json();
-    await logUsage({ meta: cleanMeta(_usage), request, response, data, started });
+    const meta = { ...cleanMeta(_usage), userId: caller.uid }; // who, from the token
+    await logUsage({ meta, request, response, data, started });
     return res.status(response.status).json(stripSearchBlobs(data));
   } catch (err) {
     return res.status(500).json({ error: err.message });

@@ -6,6 +6,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { setTokenSource } from "./api/authToken.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC_L5NoFXe-WVZdy9NBqkb4YI8vmLQxe2M",
@@ -18,6 +19,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+setTokenSource(() => auth.currentUser?.getIdToken()); // the sign-in proof for server functions
 export const db = getFirestore(app);
 // If photos show 404, explicitly set your bucket here:
 // export const storage = getStorage(app, "vaulte-1ea20.firebasestorage.app");

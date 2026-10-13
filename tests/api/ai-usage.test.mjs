@@ -3,7 +3,10 @@
 import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, db } from "./setup.mjs";
-import handler from "../../api/claude.js";
+import handler, { deps } from "../../api/claude.js";
+
+// A good token for any user: "tok-<uid>".
+deps.verify = async (token) => ({ uid: token.slice(4) });
 
 const realFetch = globalThis.fetch;
 let sent;
@@ -15,9 +18,9 @@ const stub = (status, body) => {
     return { status, json: async () => body };
   };
 };
-const call = async (body) => {
+const call = async (body, uid = "u1") => {
   const out = res();
-  await handler({ method: "POST", body }, out);
+  await handler({ method: "POST", headers: { authorization: `Bearer tok-${uid}` }, body }, out);
   return out;
 };
 const records = async (path) => (await db().collection(path).get()).docs.map((d) => d.data());
@@ -83,19 +86,19 @@ test("web searches are counted and priced", async () => {
   assert.equal(rec.cost_usd, 0.0242); // 400 in + 200 out + two searches at a cent
 });
 
-test("a call with no readable user id is kept as unattributed; a bad feature name becomes unknown", async () => {
+test("the call is recorded for the user in the token, whatever user id the request names; a bad feature name becomes unknown", async () => {
   stub(200, { content: [], usage: USAGE });
-  await call({ model: "claude-sonnet-4-6" });
-  await call({ model: "claude-sonnet-4-6", _usage: { feature: "Bad Name!", userId: "x/y" } });
-  const loose = await records("ai_usage_unattributed");
-  assert.equal(loose.length, 2);
-  assert.deepEqual(
-    loose.map((r) => [r.feature, r.user_id]),
-    [
-      ["unknown", null],
-      ["unknown", null],
-    ],
+  await call(
+    { model: "claude-sonnet-4-6", _usage: { feature: "chat", userId: "someone-else" } },
+    "u7",
   );
+  await call({ model: "claude-sonnet-4-6", _usage: { feature: "Bad Name!", userId: "x/y" } }, "u7");
+  await call({ model: "claude-sonnet-4-6" }, "u7");
+  const mine = await records("users/u7/ai_usage");
+  assert.equal(mine.length, 3);
+  assert.deepEqual(mine.map((r) => r.feature).sort(), ["chat", "unknown", "unknown"]);
+  assert.deepEqual(await records("users/someone-else/ai_usage"), []);
+  assert.deepEqual(await records("ai_usage_unattributed"), []);
 });
 
 test("an error reply from Anthropic has no usage: it is passed on and nothing is recorded", async () => {
