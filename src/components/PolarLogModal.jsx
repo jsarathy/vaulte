@@ -1,10 +1,12 @@
 // src/components/PolarLogModal.jsx — "log a Polar session": the session's stats and heart rate,
-// a meal slot, and Log session. Render only; state and logging in usePolarLog.
+// a meal slot, and Log session. Double-click anywhere on the box (not on a control) to expand it to
+// fill the window; double-click or Esc to collapse. Render only; state and logging in usePolarLog.
 import { C, FONT, border } from "../constants/design.jsx";
 import { useState } from "react";
 import { sessionStats, sessionWhen, sportName, loggedPlace } from "../lib/polarLog.js";
 import { canFetchHeartRate, hasHeartRate } from "../lib/polarDetail.js";
 import { useHeartRateFetch } from "../hooks/usePolarDetail.js";
+import { useExpandBox } from "../hooks/useExpandBox.js";
 import NoHeartRate from "./NoHeartRate";
 import { usePolarLog } from "../hooks/usePolarLog";
 import PolarHRSparkline from "./PolarHRSparkline";
@@ -32,6 +34,16 @@ const S = {
     maxWidth: "95vw",
     border: `0.5px solid ${C.border}`,
     fontFamily: FONT.sans,
+  },
+  boxFull: {
+    width: "100%",
+    maxWidth: "100%",
+    height: "100dvh",
+    borderRadius: 0,
+    border: "none",
+    boxSizing: "border-box",
+    overflowY: "auto",
+    cursor: "zoom-out",
   },
   header: {
     padding: "14px 16px",
@@ -171,8 +183,8 @@ function Actions({ log, logged, onClose }) {
 
 // The heart-rate chart, or (Fix 60) a button to fetch it from Polar; Polar finds a session by its
 // start time, so any session with one can be tried
-function HeartRate({ session, hr }) {
-  if (hasHeartRate(session)) return <PolarHRSparkline session={session} />;
+function HeartRate({ session, hr, large }) {
+  if (hasHeartRate(session)) return <PolarHRSparkline session={session} large={large} />;
   const canFetch = Boolean(session.start_time) || canFetchHeartRate(session);
   return (
     <div style={{ marginBottom: "14px" }}>
@@ -187,13 +199,14 @@ function LogBox(props) {
   const { onClose, allDays, userId } = props;
   const session = fetched || props.session;
   const hr = useHeartRateFetch(session, userId, setFetched);
+  const { full, boxProps } = useExpandBox();
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()} style={S.backdrop}>
-      <div style={S.box}>
+      <div {...boxProps} style={full ? { ...S.box, ...S.boxFull } : S.box}>
         <Header session={session} onClose={onClose} />
         <div style={{ padding: "14px 16px" }}>
           <Stats session={session} />
-          <HeartRate session={session} hr={hr} />
+          <HeartRate session={session} hr={hr} large={full} />
           {session.logged ? (
             <LoggedNote session={session} allDays={allDays} />
           ) : (

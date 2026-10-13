@@ -1,5 +1,6 @@
 // src/components/PolarHRSparkline.jsx — a Polar session's heart-rate line, range and time in
-// zones (in the "log a Polar session" box). Render only; figures from lib/polarHeartRate.
+// zones (in the "log a Polar session" box); `large` is the version for the expanded box. Render
+// only; figures from lib/polarHeartRate.
 import { C, FONT } from "../constants/design.jsx";
 import { CHART, heartRateChart } from "../lib/polarHeartRate.js";
 
@@ -43,11 +44,23 @@ const S = {
     flexShrink: 0,
   }),
 };
+// The larger variant: the line as wide as the box (it keeps its shape), bigger type and zones.
+const L = {
+  title: { fontSize: "16px" },
+  range: { fontSize: "20px" },
+  svg: { width: "100%", height: "auto", maxHeight: "60vh", display: "block" },
+  bar: { height: "14px", borderRadius: "7px", marginTop: "14px" },
+  legend: { gap: "14px", marginTop: "10px", flexWrap: "wrap" },
+  item: { fontSize: "16px", gap: "6px" },
+};
+const big = (large, base, extra) => (large ? { ...base, ...extra } : base);
 const LABEL = { fontSize: "8", fill: C.hint, fontFamily: "DM Mono, monospace" };
 
-function Line({ session, chart }) {
+const SMALL_SVG = { width: "100%", height: "70px", display: "block" };
+
+function Line({ session, chart, large }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "70px", display: "block" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={big(large, SMALL_SVG, L.svg)}>
       {/* dashed line at the average */}
       {session.hr_avg && (
         <line
@@ -78,10 +91,10 @@ function Line({ session, chart }) {
   );
 }
 
-function Zones({ chart }) {
+function Zones({ chart, large }) {
   return (
     <>
-      <div style={S.bar}>
+      <div style={big(large, S.bar, L.bar)}>
         {chart.zones.map((z, i) => (
           <div
             key={i}
@@ -93,11 +106,11 @@ function Zones({ chart }) {
           />
         ))}
       </div>
-      <div style={{ display: "flex", gap: "8px", marginTop: "5px" }}>
+      <div style={big(large, { display: "flex", gap: "8px", marginTop: "5px" }, L.legend)}>
         {chart.zones.map(
           (z, i) =>
             z.secs > 0 && (
-              <div key={i} style={S.legendItem}>
+              <div key={i} style={big(large, S.legendItem, L.item)}>
                 <div style={S.swatch(z.color)} />
                 <span>
                   {z.label} {Math.round(z.secs / 60)}m
@@ -110,20 +123,20 @@ function Zones({ chart }) {
   );
 }
 
-export default function PolarHRSparkline({ session }) {
+export default function PolarHRSparkline({ session, large = false }) {
   const chart = heartRateChart(session);
   if (!chart) return null;
   return (
     <div style={{ marginBottom: "14px" }}>
-      <div style={S.title}>
+      <div style={big(large, S.title, L.title)}>
         <span>Heart rate · {chart.minutes} min recorded</span>
-        <span style={{ fontFamily: FONT.mono }}>
+        <span style={big(large, { fontFamily: FONT.mono }, L.range)}>
           {chart.low}–{chart.high} bpm
         </span>
       </div>
       <div style={S.frame}>
-        <Line session={session} chart={chart} />
-        <Zones chart={chart} />
+        <Line session={session} chart={chart} large={large} />
+        <Zones chart={chart} large={large} />
       </div>
     </div>
   );
