@@ -2,7 +2,14 @@
 // profile (api/_admin/users.js, Fix 104). No Firebase calls: these are the pure functions.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adminEmails, isAdmin, mergeUsers, restUserToAuth, userRow } from "../api/_admin/users.js";
+import {
+  adminEmails,
+  isAdmin,
+  isAdminEmail,
+  mergeUsers,
+  restUserToAuth,
+  userRow,
+} from "../api/_admin/users.js";
 
 test("adminEmails: a comma separated list, trimmed and lower-cased; empty or unset gives nobody", () => {
   assert.deepEqual(
@@ -166,4 +173,15 @@ test("restUserToAuth: an Identity Toolkit user as the shape userRow reads (times
   );
   assert.equal(row.created, "2026-10-01T08:05:00.000Z");
   assert.equal(row.email, "a@b.c");
+});
+
+test("isAdminEmail: an address in ADMIN_EMAILS, any case, whoever holds it; nothing else", () => {
+  const env = { ADMIN_EMAILS: "Boss@Example.com, second@example.com" };
+  assert.equal(isAdminEmail("boss@example.com", env), true);
+  assert.equal(isAdminEmail("BOSS@EXAMPLE.COM", env), true);
+  assert.equal(isAdminEmail("second@example.com", env), true);
+  assert.equal(isAdminEmail("jane@example.com", env), false);
+  for (const none of [undefined, null, "", 0]) assert.equal(isAdminEmail(none, env), false);
+  assert.equal(isAdminEmail("boss@example.com", {}), false); // no list: nobody
+  assert.equal(isAdminEmail("boss@example.com", { ADMIN_EMAILS: "" }), false);
 });

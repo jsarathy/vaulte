@@ -6,14 +6,14 @@ import { getFirestore } from "firebase-admin/firestore";
 import { mergeUsers, restUserToAuth } from "./users.js";
 import { projectId } from "./verify.js";
 
-function adminApp() {
+export function adminApp() {
   if (!getApps().length) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
     initializeApp({ credential: cert(serviceAccount) });
   }
 }
 
-async function accessToken() {
+export async function accessToken() {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
   return (await cert(serviceAccount).getAccessToken()).access_token;
 }

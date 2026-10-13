@@ -323,15 +323,24 @@ const USERS = [
   },
 ];
 /** The mocked /api/admin-users: `admin` says who the caller is; the token must be sent. */
-const adminApi = async (p, { admin = true, users = USERS, fail = false } = {}) => {
+const adminApi = async (p, { admin = true, users = USERS, fail = false, deleteReply } = {}) => {
   const seen = [];
   await p.route(
     (u) => new URL(u).pathname === "/api/admin-users",
     async (route) => {
       const req = route.request();
-      const { action } = req.postDataJSON();
-      seen.push({ action, auth: req.headers()["authorization"] });
+      const { action, uid } = req.postDataJSON();
+      seen.push({
+        action,
+        auth: req.headers()["authorization"],
+        ...(action === "delete" && { uid }),
+      });
       if (action === "check") return route.fulfill({ json: { admin } });
+      if (action === "delete") {
+        const reply = deleteReply ?? { json: { ok: true } };
+        await new Promise((res) => setTimeout(res, reply.delay ?? 0));
+        return route.fulfill(reply);
+      }
       if (fail) return route.fulfill({ status: 500, json: { error: "Could not list the users" } });
       return route.fulfill({ json: { users } });
     },
@@ -391,6 +400,7 @@ test("the Users table lists the users with their account details and ids", async
     "Sign-in",
     "Member ID",
     "User ID",
+    "", // the column of Delete buttons
   ]);
   const rows = dialog.getByRole("row");
   await expect(rows).toHaveCount(3); // header + 2 users
@@ -404,6 +414,7 @@ test("the Users table lists the users with their account details and ids", async
     "Google, Email and password",
     "USR-ABC123",
     "FbUid123abcDEF456ghiJKL789", // the user id string
+    "Delete", // the button of the last column (Fix 127)
   ]);
   const bob = await rows.nth(2).getByRole("cell").allTextContents();
   expect(bob.slice(0, 3)).toEqual(["", "bob@test.org", ""]);
@@ -452,7 +463,7 @@ test("the Users table looks like the usage table: as wide as its content, border
   expect(await size(dialog.getByRole("cell").first())).toBeGreaterThanOrEqual(16);
   const heads = dialog.getByRole("columnheader");
   expect(await heads.evaluateAll((hs) => hs.map((h) => getComputedStyle(h).textAlign))).toEqual(
-    Array(8).fill("center"),
+    Array(9).fill("center"), // the eight columns and the one for the Delete button
   );
   expect(
     await dialog
@@ -800,4 +811,91 @@ test("the status is asked for with the sign-in token", async ({ page: p }) => {
   await startInfra(p);
   await expect(link(p, "Firebase")).toContainText("no ongoing incidents");
   expect(infraSeen[0]).toBe("Bearer mock-id-token");
+});
+
+// ---- deleting a user (Fix 127)
+const ADMIN_ROW = {
+  uid: "FbUidAdmin",
+  member_id: "USR-ADM",
+  name: "Boss",
+  email: "boss@example.com",
+  phone: "",
+  address: "",
+  created: new Date(2026, 8, 1).toISOString(),
+  last_sign_in: null,
+  providers: ["google.com"],
+  disabled: false,
+  admin: true,
+};
+const dialogs = (p, accept = true) => {
+  const seen = [];
+  p.on("dialog", (d) => {
+    seen.push([d.type(), d.message()]);
+    return accept ? d.accept() : d.dismiss();
+  });
+  return seen;
+};
+
+test("the Users table offers Delete for each user except an admin", async ({ page: p }) => {
+  await startAdmin(p, { users: [...USERS, ADMIN_ROW] });
+  const dialog = await openUsers(p);
+  await expect(dialog.getByRole("button", { name: /^Delete / })).toHaveCount(2);
+  await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Delete bob@test.org" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Delete boss@example.com" })).toHaveCount(0);
+  const heads = await dialog.locator("th").allTextContents();
+  expect(heads.length).toBe(9); // the eight columns and the empty one for the button
+});
+
+test("Delete asks first, naming the user; Cancel changes nothing and sends nothing", async ({
+  page: p,
+}) => {
+  const seen = await startAdmin(p);
+  const asked = dialogs(p, false);
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Delete bob@test.org" }).click();
+  await expect.poll(() => asked.length).toBe(1);
+  expect(asked[0][0]).toBe("confirm");
+  expect(asked[0][1]).toMatch(/^Delete bob@test\.org\?/);
+  expect(asked[0][1]).toMatch(/It cannot be undone\.$/);
+  await expect(dialog.getByText("2 users")).toBeVisible();
+  expect(seen.filter((s) => s.action === "delete")).toEqual([]);
+});
+
+test("Delete, confirmed: the server is asked with the sign-in token, the row goes and the table says so", async ({
+  page: p,
+}) => {
+  const seen = await startAdmin(p);
+  dialogs(p, true);
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Delete bob@test.org" }).click();
+  await expect(dialog.getByText("Deleted bob@test.org.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Delete bob@test.org" })).toHaveCount(0);
+  await expect(dialog.getByText("jane@example.com")).toBeVisible(); // the others are still there
+  await expect(dialog.getByText("1 user", { exact: true })).toBeVisible();
+  expect(seen.filter((s) => s.action === "delete")).toEqual([
+    { action: "delete", auth: "Bearer mock-id-token", uid: "FbUid999xyz" },
+  ]);
+});
+
+test("Delete refused or failed: the reason is shown and the user stays", async ({ page: p }) => {
+  await startAdmin(p, {
+    deleteReply: { status: 403, json: { error: "That is an admin account" } },
+  });
+  dialogs(p, true);
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Delete jane@example.com" }).click();
+  await expect(dialog.getByText("Could not delete: That is an admin account")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeVisible();
+  await expect(dialog.getByText("2 users")).toBeVisible();
+});
+
+test("while a delete runs the Delete buttons are disabled", async ({ page: p }) => {
+  await startAdmin(p, { deleteReply: { json: { ok: true }, delay: 600 } });
+  dialogs(p, true);
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Delete bob@test.org" }).click();
+  await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeDisabled();
+  await expect(dialog.getByText("Deleted bob@test.org.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeEnabled();
 });
