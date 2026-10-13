@@ -46,3 +46,17 @@ export function filterUsers(users, query) {
 
 /** "1 user" or "3 users". */
 export const usersCount = (n) => `${n} user${n === 1 ? "" : "s"}`;
+
+/** Whether the Users table offers to delete this user: not an admin, and not the person looking. */
+export const canDelete = (u, myUid) => !u.admin && u.uid !== myUid;
+
+/** What the confirmation says before a user is deleted. */
+export function deleteConfirmText(u) {
+  const who = u.email || u.name || u.uid;
+  return (
+    `Delete ${who}?
+
+This removes their login, their profile photo and everything they saved ` +
+    "(food log, weights, recipes, chat, Polar and Renpho data). It cannot be undone."
+  );
+}

@@ -11,6 +11,10 @@ export const adminEmails = (env = process.env) =>
       .filter(Boolean),
   );
 
+/** True when an address (any case) is in ADMIN_EMAILS, whoever holds it. */
+export const isAdminEmail = (email, env = process.env) =>
+  adminEmails(env).has(String(email || "").toLowerCase());
+
 /** True for a verified-email sign-in whose address is in ADMIN_EMAILS. */
 export const isAdmin = (decoded, env = process.env) =>
   decoded?.email_verified === true &&

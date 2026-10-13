@@ -4,6 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   USER_COLUMNS,
+  canDelete,
+  deleteConfirmText,
   filterUsers,
   providersText,
   userCells,
@@ -110,4 +112,29 @@ test("usersCount: singular and plural", () => {
   assert.equal(usersCount(0), "0 users");
   assert.equal(usersCount(1), "1 user");
   assert.equal(usersCount(2), "2 users");
+});
+
+test("canDelete: not an admin, and not the person looking", () => {
+  assert.equal(canDelete({ uid: "u1" }, "me"), true);
+  assert.equal(canDelete({ uid: "u1", admin: false }, "me"), true);
+  assert.equal(canDelete({ uid: "u1", admin: true }, "me"), false);
+  assert.equal(canDelete({ uid: "me" }, "me"), false);
+  assert.equal(canDelete({ uid: "u1" }, undefined), true); // nobody signed in: the check is the server's
+});
+
+test("deleteConfirmText: names the user and says what goes and that it cannot be undone", () => {
+  const text = deleteConfirmText({ uid: "u1", email: "bob@test.org", name: "Bob" });
+  assert.match(text, /^Delete bob@test\.org\?/);
+  assert.match(text, /login, their profile photo and everything they saved/);
+  assert.match(text, /food log, weights, recipes, chat, Polar and Renpho data/);
+  assert.match(text, /It cannot be undone\.$/);
+  assert.match(deleteConfirmText({ uid: "u1", name: "Bob" }), /^Delete Bob\?/); // no email: the name
+  assert.match(deleteConfirmText({ uid: "u1" }), /^Delete u1\?/); // neither: the id
+});
+
+test("filterUsers: a user with no address matches only what is really in the row", () => {
+  const users = [{ uid: "u1", name: "Jane", email: "jane@example.com" }];
+  assert.deepEqual(filterUsers(users, "stryker was here"), []);
+  assert.deepEqual(filterUsers(users, "was here"), []);
+  assert.deepEqual(filterUsers(users, "jane   example"), users); // extra spaces between words are fine
 });

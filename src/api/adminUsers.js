@@ -2,13 +2,13 @@
 // carries the signed-in user's Firebase ID token; the server decides who is an admin.
 import { auth } from "../firebase";
 
-async function call(action) {
+async function call(action, extra = {}) {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Not signed in");
   const res = await fetch("/api/admin-users", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, ...extra }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -20,3 +20,9 @@ export const checkAdmin = async () => (await call("check")).admin === true;
 
 /** Every user: { uid, member_id, name, email, phone, address, created, last_sign_in, providers, disabled }. */
 export const loadUsers = async () => (await call("list")).users || [];
+
+/** Deletes a user (admins only): their login, photo and everything they saved. Never your own or an admin's. */
+export const deleteUser = async (uid) => (await call("delete", { uid })).ok === true;
+
+/** The signed-in person's own user id (the table does not offer to delete it). */
+export const myUid = () => auth.currentUser?.uid;
