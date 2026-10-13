@@ -171,7 +171,7 @@ function PanelHeader({ openEdit }) {
   );
 }
 
-export default function AccountPanel({ profile, photo, openEdit }) {
+export default function AccountPanel({ profile, photo, openEdit, admin }) {
   const phone = useIsPhone();
   return (
     <div>
@@ -182,14 +182,16 @@ export default function AccountPanel({ profile, photo, openEdit }) {
           <Collapsible title="DETAILS">
             <ContactCards profile={profile} />
           </Collapsible>
-          <Collapsible title="CONNECTED SERVICES">
-            <LinkedAccounts phone />
-          </Collapsible>
+          {admin && (
+            <Collapsible title="CONNECTED SERVICES">
+              <LinkedAccounts phone />
+            </Collapsible>
+          )}
         </>
       ) : (
         <>
           <ContactCards profile={profile} />
-          <LinkedAccounts />
+          {admin && <LinkedAccounts />}
         </>
       )}
     </div>

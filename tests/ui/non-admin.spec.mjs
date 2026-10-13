@@ -105,3 +105,16 @@ test("the real check decides: an admin answer shows the Dashboard", async ({ pag
   await expect(labels(p)).toHaveText(["Home", "My Account", "Nutrition", "Dashboard"]);
   expect(asked[0]).toEqual({ body: { action: "check" }, auth: "Bearer mock-id-token" });
 });
+
+test("My Account lists the accounts Vaulte uses for an admin only, on desktop and phone", async ({
+  page: p,
+}) => {
+  await start(p, { __admin: false });
+  await p.locator(".app-sidebar button", { hasText: "My Account" }).click();
+  await expect(p.getByText("jane@example.com").first()).toBeVisible();
+  await expect(p.getByText("ACCOUNTS USED BY VAULTE")).toHaveCount(0);
+  await expect(p.getByText("Renpho")).toHaveCount(0);
+  await p.setViewportSize({ width: 390, height: 800 });
+  await expect(p.getByRole("button", { name: /CONNECTED SERVICES/ })).toHaveCount(0);
+  await expect(p.getByRole("button", { name: /DETAILS/ })).toBeVisible();
+});
