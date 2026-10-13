@@ -200,15 +200,15 @@ test("dayUrl and dayUrls: one day with samples; the session's day, then the day 
     url.origin + url.pathname,
     "https://www.polaraccesslink.com/v4/data/training-sessions/list",
   );
-  assert.equal(url.searchParams.get("from"), "2026-09-25");
-  assert.equal(url.searchParams.get("to"), "2026-09-26");
+  assert.equal(url.searchParams.get("from"), "2026-09-25T00:00:00Z");
+  assert.equal(url.searchParams.get("to"), "2026-09-26T00:00:00Z");
   assert.equal(url.searchParams.get("features"), "samples");
-  const days = dayUrls(session).map((u) => new URL(u).searchParams.get("from"));
+  const days = dayUrls(session).map((u) => new URL(u).searchParams.get("from").slice(0, 10));
   assert.deepEqual(days, ["2026-09-25", "2026-09-24", "2026-09-26"]);
   const edge = dayUrls({ start_time: "2026-12-31T23:30:00" }).map((u) =>
     new URL(u).searchParams.get("to"),
   );
-  assert.deepEqual(edge, ["2027-01-01", "2026-12-31", "2027-01-02"]);
+  assert.deepEqual(edge, ["2027-01-01T00:00:00Z", "2026-12-31T00:00:00Z", "2027-01-02T00:00:00Z"]);
 });
 
 test("matchV4: the session that started at the same time, as Polar's local time or as given, within 2 minutes", () => {

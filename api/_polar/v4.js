@@ -79,10 +79,13 @@ const dayOf = (session) => String(session.start_time).slice(0, 10);
 const shiftDay = (day, days) =>
   new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 
+// Polar wants a full date-time ("2026-09-25T00:00:00Z"); a bare date is a 400 "could not be parsed".
+const midnight = (day) => `${day}T00:00:00Z`;
+
 /** The list URL for one day, with heart-rate samples (with `features` Polar allows one day). */
 export const dayUrl = (day) =>
   `${DATA}/training-sessions/list?` +
-  new URLSearchParams({ from: day, to: shiftDay(day, 1), features: "samples" });
+  new URLSearchParams({ from: midnight(day), to: midnight(shiftDay(day, 1)), features: "samples" });
 
 /** The session's own day, then the day before and after (the clock may be in another zone). */
 export function dayUrls(session) {
