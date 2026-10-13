@@ -38,7 +38,7 @@ function Panel({ activePanel, profile, userId, account, admin }) {
         </IntegrationsProvider>
       </div>
     );
-  return <AccountPanel profile={profile} {...account} />;
+  return <AccountPanel profile={profile} admin={admin} {...account} />;
 }
 
 export default function AccountPage({ profile, toast, userId, page, nav, edit }) {
