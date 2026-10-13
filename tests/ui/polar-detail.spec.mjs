@@ -289,3 +289,43 @@ test("fetching heart rate after the sync", async ({ page: p }) => {
   expect(requests.length).toBe(5);
   expect(w.errs).toEqual([]);
 });
+
+test("the heart-rate chart expands to fill the window on a double-click; a double-click or Esc collapses it", async ({
+  page: p,
+}) => {
+  const w = watch(p);
+  await start(p);
+  await link(p, "Run · Polar").click();
+  const frame = p.getByTitle("Double-click to expand");
+  const full = p.getByTitle("Double-click or press Esc to collapse");
+  await expect(frame).toBeVisible();
+  await expect(full).toHaveCount(0);
+  const small = await frame.boundingBox();
+
+  await frame.dblclick();
+  await expect(full).toBeVisible();
+  await expect(frame).toHaveCount(0);
+  const { width, height } = p.viewportSize();
+  expect(await full.boundingBox()).toMatchObject({ x: 0, y: 0, width, height });
+  const chart = await full.locator("svg").boundingBox();
+  expect(chart.width).toBeGreaterThan(small.width * 1.8); // as wide as the window, not the box
+  await expect(full.getByText(/^Heart rate · \d+ min recorded$/)).toBeVisible();
+  await expect(full.getByText("Esc or double-click to collapse")).toBeVisible();
+  await expect(full.getByText(/^Z\d /).first()).toBeVisible(); // the zones come with it
+
+  await full.click({ position: { x: 300, y: 300 } }); // one click does nothing
+  await expect(full).toBeVisible();
+  await full.dblclick({ position: { x: 300, y: 300 } });
+  await expect(full).toHaveCount(0);
+  await expect(frame).toBeVisible();
+  await expect(box(p)).toBeVisible(); // still in the session box
+
+  await frame.dblclick();
+  await expect(full).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(full).toHaveCount(0);
+  await expect(box(p)).toBeVisible();
+  await p.keyboard.press("Escape"); // Esc with nothing expanded changes nothing
+  await expect(box(p)).toBeVisible();
+  expect(w.errs).toEqual([]);
+});

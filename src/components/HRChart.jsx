@@ -1,6 +1,8 @@
 // src/components/HRChart.jsx — a Polar session's heart-rate line, range and time in zones (in the
-// Daily log's Polar session box). Render only; figures from lib/hrChart.
+// Daily log's Polar session box). Double-click it to expand it to fill the screen (Esc or
+// double-click to collapse). Render only; figures from lib/hrChart.
 import { C, FONT } from "../constants/design.jsx";
+import { useFullView } from "../hooks/useFullView.js";
 import { HR_CHART, hrChart } from "../lib/hrChart.js";
 
 const { width: W, height: H, pad: PAD } = HR_CHART;
@@ -25,6 +27,7 @@ const S = {
     borderRadius: "6px",
     border: `0.5px solid ${C.border}`,
     padding: "8px 10px",
+    cursor: "zoom-in",
   },
   svg: { width: "100%", height: "80px", display: "block" },
   bar: {
@@ -46,10 +49,31 @@ const S = {
   minutes: { fontFamily: FONT.mono, color: C.text, fontWeight: "500" },
 };
 
+// The expanded view: the whole window; the chart is as wide as the window and keeps its shape.
+const F = {
+  wrap: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 4000,
+    background: "#fff",
+    padding: "20px 24px",
+    overflowY: "auto",
+    cursor: "zoom-out",
+    fontFamily: FONT.sans,
+  },
+  head: { display: "flex", justifyContent: "space-between", alignItems: "baseline" },
+  title: { fontSize: "24px", fontWeight: "bold", color: C.blue },
+  hint: { fontSize: "16px", color: C.hint },
+  range: { fontFamily: FONT.mono, fontSize: "20px", color: C.muted, margin: "6px 0 14px" },
+  svg: { width: "100%", height: "auto", maxHeight: "62vh", display: "block" },
+  bar: { height: "14px", borderRadius: "7px", marginTop: "14px" },
+  item: { fontSize: "16px", gap: "6px" },
+};
+
 // Labels: the scale's top (max + 5) and the lowest reading (5 bpm in from the scale's bottom)
-function Line({ chart, avg }) {
+function Line({ chart, avg, svgStyle = S.svg }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={S.svg}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle}>
       {chart.avgY !== null && (
         <line
           x1={PAD}
@@ -84,10 +108,10 @@ function Line({ chart, avg }) {
   );
 }
 
-function Zones({ chart }) {
+function Zones({ chart, large }) {
   return (
     <>
-      <div style={S.bar}>
+      <div style={large ? { ...S.bar, ...F.bar } : S.bar}>
         {chart.zones.map((z, i) => (
           <div
             key={i}
@@ -103,7 +127,7 @@ function Zones({ chart }) {
         {chart.zones.map(
           (z, i) =>
             z.secs > 0 && (
-              <div key={i} style={S.item}>
+              <div key={i} style={large ? { ...S.item, ...F.item } : S.item}>
                 <div style={S.swatch(z.color)} />
                 <span>{z.label}</span>
                 <span style={S.minutes}>{Math.round(z.secs / 60)}m</span>
@@ -115,9 +139,27 @@ function Zones({ chart }) {
   );
 }
 
+function Expanded({ chart, session, collapse }) {
+  return (
+    <div onDoubleClick={collapse} title="Double-click or press Esc to collapse" style={F.wrap}>
+      <div style={F.head}>
+        <span style={F.title}>Heart rate · {chart.minutes} min recorded</span>
+        <span style={F.hint}>Esc or double-click to collapse</span>
+      </div>
+      <div style={F.range}>
+        {chart.low}–{chart.high} bpm
+      </div>
+      <Line chart={chart} avg={session.hr_avg} svgStyle={F.svg} />
+      <Zones chart={chart} large />
+    </div>
+  );
+}
+
 export default function HRChart({ session }) {
   const chart = hrChart(session);
+  const [full, setFull] = useFullView();
   if (!chart) return null;
+  if (full) return <Expanded chart={chart} session={session} collapse={() => setFull(false)} />;
   return (
     <div>
       <div style={S.head}>
@@ -126,7 +168,7 @@ export default function HRChart({ session }) {
           {chart.low}–{chart.high} bpm
         </span>
       </div>
-      <div style={S.frame}>
+      <div style={S.frame} onDoubleClick={() => setFull(true)} title="Double-click to expand">
         <Line chart={chart} avg={session.hr_avg} />
         <Zones chart={chart} />
       </div>
