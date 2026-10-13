@@ -1,10 +1,8 @@
 // tests/ui/firestore-api.spec.mjs — src/api/firestore.js over the harness's Firestore mock
 // (Fix 26 PR 43): recipes and days read / saved / deleted at their paths, read failures
-// logged and empty, and the seed data for a new account (pinned to fixtures/seed-days.json).
+// logged and empty, and the data a new account starts with (an empty day for today, and the starter recipes).
 import { test, expect } from "./cover.mjs";
-import { readFileSync } from "node:fs";
 
-const GOLDEN = JSON.parse(readFileSync(new URL("./fixtures/seed-days.json", import.meta.url)));
 const U = (x) => `users/u/${x}`;
 
 const start = async (p, init = {}) => {
@@ -93,43 +91,34 @@ test("days: load newest first, save, load one; a failed load logs and gives []",
   expect(err).toBe("Mock setDoc failure"); // save failures propagate
 });
 
-test("seedInitialData: the two example days and every starter recipe, newest day first", async ({
+test("seedInitialData: today as an empty day with the standard meal slots, and every starter recipe", async ({
   page: p,
 }) => {
+  await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
   await start(p);
-  const { returned, recipes } = await api(p, async (f) => ({
+  const { returned, recipes, slots } = await api(p, async (f) => ({
     returned: await f.seedInitialData("u"),
     recipes: window.__initialRecipes,
+    slots: window.__mealSlots,
   }));
   const all = await saves(p);
   const dayWrites = all.filter((s) => s.path.startsWith(U("nutrition_days/")));
   const recipeWrites = all.filter((s) => s.path.startsWith(U("recipes/")));
   expect(all.length).toBe(dayWrites.length + recipeWrites.length);
-  expect(dayWrites.map((s) => s.path)).toEqual([
-    U("nutrition_days/2026-03-04"),
-    U("nutrition_days/2026-03-05"),
-  ]);
+  expect(dayWrites.map((s) => s.path)).toEqual([U("nutrition_days/2026-10-04")]);
   expect(recipeWrites).toEqual(recipes.map((r) => ({ path: U(`recipes/${r.id}`), data: r })));
   expect(recipes.length).toBeGreaterThan(0);
-  // each day is written as returned; returned newest first
-  expect(returned.map((d) => d.date)).toEqual(["2026-03-05", "2026-03-04"]);
-  expect(dayWrites.map((s) => s.data)).toEqual([returned[1], returned[0]]);
-  // ids: one per meal and item, all distinct; the rest pinned to the golden file
-  const ids = [];
-  const strip = (v) =>
-    Array.isArray(v)
-      ? v.map(strip)
-      : v && typeof v === "object"
-        ? Object.fromEntries(
-            Object.entries(v)
-              .filter(([k, x]) => (k === "id" ? (ids.push(x), false) : true))
-              .map(([k, x]) => [k, strip(x)]),
-          )
-        : v;
-  const bare = strip([returned[1], returned[0]]);
-  expect(ids.length).toBe(13 + 33);
+  // the one day is written as returned: no entries, a card for each standard slot
+  expect(returned.length).toBe(1);
+  expect(dayWrites[0].data).toEqual(returned[0]);
+  const [day] = returned;
+  expect(day.date).toBe("2026-10-04");
+  expect(day.notes).toBe("");
+  expect(day.meals.map((m) => [m.name, m.is_exercise, m.items])).toEqual(
+    slots.map((s) => [s.name, s.is_exercise, []]),
+  );
+  const ids = day.meals.map((m) => m.id);
   expect(new Set(ids).size).toBe(ids.length);
   expect(ids.every((id) => /^[a-z0-9]{10,}$/.test(id))).toBe(true);
-  expect(bare).toEqual(GOLDEN);
-  expect(JSON.stringify(bare)).toBe(JSON.stringify(GOLDEN)); // field order too
+  expect(JSON.stringify(Object.keys(day))).toBe('["date","notes","meals"]'); // field order
 });

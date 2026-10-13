@@ -8,8 +8,10 @@
     <script type="module">
       import * as api from "../../../src/api/firestore.js";
       import { INITIAL_RECIPES } from "../../../src/constants/recipes.js";
+      import { DEFAULT_MEAL_SLOTS } from "../../../src/constants/helpers.js";
       window.firestoreApi = api;
       window.__initialRecipes = INITIAL_RECIPES;
+      window.__mealSlots = DEFAULT_MEAL_SLOTS;
     </script>
   </body>
 </html>
