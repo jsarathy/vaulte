@@ -94,20 +94,11 @@ test("claude: a failed call to Anthropic is a 500 with the error text", async ()
   assert.deepEqual([out.statusCode, out.body], [500, { error: "connection reset" }]);
 });
 
-// ---- polar-auth.js
-test("polar-auth: says what is missing", () => {
-  process.env.POLAR_CLIENT_ID = "c";
-  process.env.POLAR_REDIRECT_URI = "https://x.example/cb";
-  const noUser = res();
-  polarAuth({ query: {} }, noUser);
-  assert.deepEqual([noUser.statusCode, noUser.body], [400, { error: "Missing userId parameter" }]);
-  delete process.env.POLAR_CLIENT_ID;
-  const noEnv = res();
-  polarAuth({ query: { userId: "u" } }, noEnv);
-  assert.deepEqual(
-    [noEnv.statusCode, noEnv.body],
-    [500, { error: "Polar environment variables not configured" }],
-  );
+// ---- polar-auth.js (the full tests are in polar-auth.test.mjs)
+test("polar-auth: only POST", async () => {
+  const out = res();
+  await polarAuth({ method: "GET" }, out);
+  assert.deepEqual([out.statusCode, out.body], [405, { error: "Method not allowed" }]);
 });
 
 // The Polar functions take the user from the ID token; here the token is the user id itself.

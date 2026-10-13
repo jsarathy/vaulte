@@ -89,6 +89,18 @@ test("Polar header: not connected, connected, syncing, messages", async ({ page:
   ]);
 });
 
+/** The server's answer to "where is Polar's sign-in?": the address, and what was asked with. */
+const polarSignIn = (p, reply = { json: { url: "/polar-sign-in?state=S" } }) => {
+  const asked = [];
+  p.route("**/api/polar-auth", (r) => {
+    const q = r.request();
+    asked.push([q.method(), q.postData(), q.headers().authorization]);
+    r.fulfill(reply);
+  });
+  p.route("**/polar-sign-in**", (r) => r.fulfill({ contentType: "text/html", body: "polar" }));
+  return asked;
+};
+
 test("Polar History: asks first, then goes to Polar's v4 sign-in without disconnecting", async ({
   page: p,
 }) => {
@@ -104,9 +116,7 @@ test("Polar History: asks first, then goes to Polar's v4 sign-in without disconn
     disconnected = true;
     r.fulfill({ json: { ok: true } });
   });
-  await p.route("**/api/polar-auth**", (r) =>
-    r.fulfill({ contentType: "text/html", body: "auth" }),
-  );
+  const asked = polarSignIn(p);
   await start(p, { __polar: { connected: true, sessions: [] } });
   const history = p.getByRole("button", { name: "History" });
   await history.click(); // dismissed: stays
@@ -117,8 +127,10 @@ test("Polar History: asks first, then goes to Polar's v4 sign-in without disconn
   expect(p.url()).not.toContain("polar-auth");
   answer = true;
   await history.click();
-  await p.waitForURL("**/api/polar-auth?userId=u&v=4");
+  await p.waitForURL("**/polar-sign-in?state=S");
   expect(disconnected).toBe(false);
+  // the address was asked for by a signed-in call, for Polar's newer API; no user id in a link
+  expect(asked).toEqual([["POST", JSON.stringify({ v: "4" }), "Bearer mock-id-token"]]);
 });
 
 test("Polar Reconnect", async ({ page: p }) => {
@@ -144,9 +156,7 @@ test("Polar Reconnect", async ({ page: p }) => {
     if (fail) return r.abort();
     r.fulfill({ json: { ok: true } });
   });
-  await p.route("**/api/polar-auth**", (r) =>
-    r.fulfill({ contentType: "text/html", body: "auth" }),
-  );
+  const asked = polarSignIn(p);
   const reconnect = () => p.getByRole("button", { name: /Reconnect|Working/ });
 
   // Not confirmed: nothing happens
@@ -163,7 +173,8 @@ test("Polar Reconnect", async ({ page: p }) => {
   answer = true;
   await reconnect().click();
   await expect(reconnect()).toHaveText("Working…");
-  await p.waitForURL("**/api/polar-auth?userId=u");
+  await p.waitForURL("**/polar-sign-in?state=S");
+  expect(asked).toEqual([["POST", "{}", "Bearer mock-id-token"]]);
   expect(posted).toEqual([
     ["POST", "application/json", JSON.stringify({ userId: "u" }), "Bearer mock-id-token"],
   ]); // with the sign-in proof (Fix 119)
@@ -173,7 +184,8 @@ test("Polar Reconnect", async ({ page: p }) => {
   fail = true;
   await start(p, { __polar: { connected: true, sessions: [] } });
   await reconnect().click();
-  await p.waitForURL("**/api/polar-auth?userId=u");
+  await p.waitForURL("**/polar-sign-in?state=S");
+  expect(asked.length).toBe(2);
   expect(posted.length).toBe(2);
   expect(logs.some((l) => l.startsWith("Disconnect failed, continuing:"))).toBe(true);
 
@@ -186,4 +198,33 @@ test("Polar Reconnect", async ({ page: p }) => {
   await p.waitForTimeout(300);
   expect(posted.length).toBe(2);
   expect(p.url()).toMatch(/addentry\.html$/);
+});
+
+test("Polar sign-in: when the server cannot give the address, an alert says why and nothing moves", async ({
+  page: p,
+}) => {
+  const dialogs = [];
+  p.on("dialog", (d) => {
+    dialogs.push([d.type(), d.message()]);
+    d.accept();
+  });
+  polarSignIn(p, { status: 401, json: { error: "Not signed in" } });
+  await start(p, { __polar: { connected: true, sessions: [] } });
+  await p.getByRole("button", { name: "History" }).click(); // confirm accepted
+  await expect.poll(() => dialogs.length).toBe(2);
+  expect(dialogs[1]).toEqual(["alert", "Could not start the Polar sign-in: Not signed in"]);
+  expect(p.url()).toContain("addentry.html");
+  // a reply that is not JSON, and one with no address
+  await p.unroute("**/api/polar-auth");
+  await p.route("**/api/polar-auth", (r) =>
+    r.fulfill({ status: 502, body: "<html>bad gateway</html>" }),
+  );
+  await p.getByRole("button", { name: "History" }).click();
+  await expect.poll(() => dialogs.length).toBe(4);
+  expect(dialogs[3]).toEqual(["alert", "Could not start the Polar sign-in: Request failed (502)"]);
+  await p.unroute("**/api/polar-auth");
+  await p.route("**/api/polar-auth", (r) => r.fulfill({ json: {} }));
+  await p.getByRole("button", { name: "History" }).click();
+  await expect.poll(() => dialogs.length).toBe(6);
+  expect(dialogs[5]).toEqual(["alert", "Could not start the Polar sign-in: Request failed (200)"]);
 });

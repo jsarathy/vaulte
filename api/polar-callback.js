@@ -10,6 +10,7 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { exchangeV4Code, V4_SCOPE } from "./_polar/v4.js";
 import { saveV4 } from "./_polar/store.js";
+import { readState } from "./_polar/state.js";
 
 const TOKEN_URL = "https://polarremote.com/v2/oauth2/token";
 const POLAR_USERS = "https://www.polaraccesslink.com/v3/users";
@@ -23,16 +24,6 @@ function getAdminDb() {
 }
 
 const appUrl = () => process.env.VAULTE_APP_URL || "https://vaulte-roan.vercel.app";
-
-// The Firebase userId from the OAuth state (see polar-auth.js); null if the state is unreadable.
-function decodeState(state) {
-  try {
-    const { uid, v } = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
-    return { uid, v };
-  } catch {
-    return null;
-  }
-}
 
 function tokenRequest(code) {
   const { POLAR_CLIENT_ID: id, POLAR_CLIENT_SECRET: secret, POLAR_REDIRECT_URI } = process.env;
@@ -120,8 +111,9 @@ export default async function handler(req, res) {
   const back = (outcome) => res.redirect(302, `${appUrl()}/?polar=${outcome}`);
   if (error) return back("denied");
   if (!code || !state) return back("error&reason=missing_params");
-  const decoded = decodeState(state);
-  if (!decoded) return back("error&reason=bad_state");
+  // the state is the server's own, signed for one user (Fix 120): bad_state or state_expired if not
+  const decoded = readState(state, process.env.POLAR_CLIENT_SECRET, Date.now());
+  if (decoded.error) return back(`error&reason=${decoded.error}`);
   try {
     return back(await (decoded.v === 4 ? connectV4 : connect)(code, decoded.uid));
   } catch (err) {

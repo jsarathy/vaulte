@@ -1,5 +1,6 @@
 // src/api/polarReconnect.js — Polar "Reconnect": re-authorise with the permissions HR data needs.
 import { authHeader } from "./authToken.js";
+import { signInToPolar } from "./polarSignIn.js";
 
 const CONFIRM =
   "This will re-authorise your Polar account with updated permissions (needed for HR data). Continue?";
@@ -25,7 +26,7 @@ export async function reconnectPolar(userId, button) {
   if (!confirm(CONFIRM)) return;
   button.textContent = "Working…";
   await disconnect(userId);
-  window.location.href = `/api/polar-auth?userId=${userId}`;
+  await signInToPolar();
 }
 
 const V4_CONFIRM =
@@ -35,5 +36,5 @@ const V4_CONFIRM =
 export function connectPolarV4(userId) {
   if (!userId) return alert("Not logged in — please refresh and try again.");
   if (!confirm(V4_CONFIRM)) return;
-  window.location.href = `/api/polar-auth?userId=${userId}&v=4`;
+  return signInToPolar("4");
 }
