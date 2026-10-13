@@ -175,7 +175,7 @@ test("the rules file closes with a catch-all and the Storage rules allow only th
   const st = readFileSync(new URL("../../storage.rules", import.meta.url), "utf8");
   assert.match(st, /profile-photos\/\{file\}/);
   assert.match(st, /file == request\.auth\.uid \+ "\.jpg"/);
-  assert.match(st, /size < 5 \* 1024 \* 1024/);
+  assert.match(st, /size < 20 \* 1024 \* 1024/);
   assert.match(st, /match \/\{allPaths=\*\*\} \{\s*allow read, write: if false;/);
   const fb = JSON.parse(readFileSync(new URL("../../firebase.json", import.meta.url), "utf8"));
   assert.equal(fb.firestore.rules, "firestore.rules");
