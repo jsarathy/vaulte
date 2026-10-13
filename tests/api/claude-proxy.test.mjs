@@ -1,5 +1,5 @@
 // tests/api/claude-proxy.test.mjs — /api/claude proxy (no Firestore). Anthropic API stubbed.
-import { test, afterEach } from "node:test";
+import { test, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { res } from "./setup.mjs";
 import handler, { deps } from "../../api/claude.js";
@@ -9,6 +9,16 @@ const realVerify = deps.verify; // what the proxy checks tokens with, before the
 
 // The token check stands in for Google's keys: "tok-<uid>" is a good token for that user.
 deps.verify = async (token) => {
+  if (!token.startsWith("tok-")) throw new Error("bad token");
+  return { uid: token.slice(4), email_verified: true };
+};
+// The approval check stands in for the approvals collection: "waiting" is not approved, "broken" fails.
+deps.access = async (claims) => {
+  if (claims.uid === "waiting") return { approved: false };
+  if (claims.uid === "broken") throw new Error("firestore down");
+  return { approved: true };
+};
+const byToken = async (token) => {
   if (!token.startsWith("tok-")) throw new Error("bad token");
   return { uid: token.slice(4), email_verified: true };
 };
@@ -162,4 +172,53 @@ test("a person who is not signed in still gets the 401, not the email message", 
   await handler({ method: "POST", body: {} }, out);
   assert.equal(out.statusCode, 401);
   assert.equal(out.headers["x-vaulte-reason"], undefined);
+});
+
+test("a confirmed person the owner has not approved is turned away with its own reason, and Anthropic is not called (Fix 134)", async () => {
+  deps.verify = byToken;
+  let called = false;
+  globalThis.fetch = async () => {
+    called = true;
+    return { status: 200, json: async () => ({}) };
+  };
+  const out = res();
+  await handler(
+    { method: "POST", headers: AS("waiting"), body: { model: "m", messages: [] } },
+    out,
+  );
+  assert.equal(out.statusCode, 403);
+  assert.equal(out.headers["x-vaulte-reason"], "not_approved");
+  assert.equal(out.body.code, "not_approved");
+  assert.equal(called, false);
+});
+
+test("an unconfirmed email is still told to confirm first, before approval is looked at", async () => {
+  let asked = false;
+  const before = deps.access;
+  deps.access = async () => {
+    asked = true;
+    return { approved: true };
+  };
+  deps.verify = async () => ({ uid: "u9", email_verified: false });
+  const out = res();
+  await handler({ method: "POST", headers: AS("u9"), body: {} }, out);
+  deps.access = before;
+  deps.verify = byToken;
+  assert.equal(out.statusCode, 403);
+  assert.equal(out.headers["x-vaulte-reason"], "email_not_confirmed");
+  assert.equal(asked, false);
+});
+
+test("if approval cannot be checked the call is refused (500), not let through", async () => {
+  deps.verify = byToken;
+  const log = mock.method(console, "error", () => {});
+  globalThis.fetch = async () => {
+    throw new Error("must not be called");
+  };
+  const out = res();
+  await handler({ method: "POST", headers: AS("broken"), body: {} }, out);
+  assert.equal(out.statusCode, 500);
+  assert.equal(out.body.error, "Could not check your access");
+  assert.doesNotMatch(JSON.stringify(out.body), /firestore/);
+  assert.ok(log.mock.calls.some((c) => String(c.arguments[1]).includes("firestore down")));
 });

@@ -3,6 +3,7 @@
 // adds a `_usage: { feature }` field, which is taken off before the request is forwarded. Only a
 // signed-in person may call it (their Firebase ID token, Fix 118), and the usage is recorded for
 // the user in that token.
+import { accessOf } from "./_admin/access.js";
 import { callerOf } from "./_admin/caller.js";
 import { verifyIdToken } from "./_admin/verify.js";
 import { cleanMeta, usageRecord } from "./_usage/record.js";
@@ -10,8 +11,8 @@ import { saveUsage } from "./_usage/store.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-// The token check; a test replaces it (as in infra-status.js).
-export const deps = { verify: verifyIdToken };
+// The token check and the approval check; a test replaces them (as in infra-status.js).
+export const deps = { verify: verifyIdToken, access: accessOf };
 
 // Each web search result carries an `encrypted_content` blob, needed only to
 // resume a multi-turn conversation that includes that search. This app makes
@@ -68,11 +69,39 @@ function refuseUnconfirmed(res) {
     .json({ error: "Confirm your email address to use Claude.", code: "email_not_confirmed" });
 }
 
+/** 403 for a confirmed person the owner has not approved yet (Fix 134). */
+function refuseNotApproved(res) {
+  res.setHeader("X-Vaulte-Reason", "not_approved");
+  return res
+    .status(403)
+    .json({ error: "Your access to Claude is waiting for approval.", code: "not_approved" });
+}
+
+/** Whether this caller may use Claude; null if that could not be found out. */
+async function mayUse(claims) {
+  try {
+    return (await deps.access(claims)).approved === true;
+  } catch (err) {
+    console.error("claude: access check failed:", err.message);
+    return null;
+  }
+}
+
+/** The refusal already sent for a caller who may not use Claude (email not confirmed, not approved, or
+ *  access unknown), or null when they may. */
+async function refuseIfNotAllowed(claims, res) {
+  if (claims.email_verified !== true) return refuseUnconfirmed(res);
+  const may = await mayUse(claims);
+  if (may === null) return res.status(500).json({ error: "Could not check your access" });
+  return may ? null : refuseNotApproved(res);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const caller = await callerOf(req, deps.verify);
   if (caller.error) return res.status(caller.error.status).json(caller.error.body);
-  if (caller.claims.email_verified !== true) return refuseUnconfirmed(res);
+  const turnedAway = await refuseIfNotAllowed(caller.claims, res);
+  if (turnedAway) return turnedAway;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   try {

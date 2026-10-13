@@ -11,6 +11,7 @@ export const USER_COLUMNS = [
   "Sign-in",
   "Member ID",
   "User ID",
+  "Claude",
 ];
 
 const PROVIDERS = { "google.com": "Google", password: "Email and password", phone: "Phone" };
@@ -18,6 +19,11 @@ const PROVIDERS = { "google.com": "Google", password: "Email and password", phon
 /** "Google, Email and password": the sign-in methods of a user, named for people. */
 export const providersText = (providers) =>
   (providers || []).map((p) => PROVIDERS[p] || p).join(", ");
+
+const APPROVAL = { approved: "Approved", pending: "Waiting" };
+
+/** Whether a user may use Claude, in words: "Approved", "Waiting", or "" when they have not asked yet. */
+export const approvalText = (approval) => APPROVAL[approval] || "";
 
 /** A user as the cells of one row, in the order of USER_COLUMNS. */
 export const userCells = (u) => [
@@ -29,6 +35,7 @@ export const userCells = (u) => [
   providersText(u.providers) + (u.disabled ? " (disabled)" : ""),
   u.member_id || "",
   u.uid || "",
+  approvalText(u.approval),
 ];
 
 /** The users whose row (name, email, phone, address, dates, ids…) contains every word typed, in any case. */
@@ -49,6 +56,9 @@ export const usersCount = (n) => `${n} user${n === 1 ? "" : "s"}`;
 
 /** Whether the Users table offers to delete this user: not an admin, and not the person looking. */
 export const canDelete = (u, myUid) => !u.admin && u.uid !== myUid;
+
+/** Whether the table offers Approve: only for a person who is waiting. */
+export const canApprove = (u) => u.approval === "pending";
 
 /** What the confirmation says before a user is deleted. */
 export function deleteConfirmText(u) {

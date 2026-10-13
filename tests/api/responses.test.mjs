@@ -27,6 +27,7 @@ const logged = (spy, label) => said(spy).filter((a) => a[0] === label);
 
 // ---- claude.js
 claudeDeps.verify = async () => ({ uid: "u1", email_verified: true }); // signed in (the token check has its own tests)
+claudeDeps.access = async () => ({ approved: true }); // the approval check has its own tests (Fix 134)
 const SIGNED_IN = { authorization: "Bearer good" };
 test("claude: refuses other methods and a missing key with their messages", async () => {
   const get = res();

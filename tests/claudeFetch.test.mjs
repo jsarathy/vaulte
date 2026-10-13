@@ -2,7 +2,7 @@
 // when the proxy says the person's email address is not confirmed yet.
 import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { claudeFetch, UNCONFIRMED_MESSAGE } from "../src/api/claudeFetch.js";
+import { claudeFetch, NOT_APPROVED_MESSAGE, UNCONFIRMED_MESSAGE } from "../src/api/claudeFetch.js";
 import {
   setAuthTools,
   setTokenSource,
@@ -18,6 +18,10 @@ const ok = { status: 200, headers: { get: () => null }, json: async () => ({ ok:
 const refused = {
   status: 403,
   headers: { get: (k) => (k === "x-vaulte-reason" ? "email_not_confirmed" : null) },
+};
+const waiting = {
+  status: 403,
+  headers: { get: (k) => (k === "x-vaulte-reason" ? "not_approved" : null) },
 };
 const otherRefusal = { status: 403, headers: { get: () => null } };
 
@@ -135,4 +139,19 @@ test("auth tools: nothing set does nothing; a refresh returns; the resend report
   });
   assert.equal(await resendConfirmationOnce(), false); // a failed send is not "sent"
   assert.equal(await resendConfirmationOnce(), false); // and is not tried a second time either
+});
+
+test("not approved yet: the person is told, in words, with no refresh and no email (Fix 134)", async () => {
+  replies = [waiting];
+  await assert.rejects(claudeFetch({ a: 1 }), { message: NOT_APPROVED_MESSAGE });
+  assert.deepEqual(steps, []);
+  assert.equal(sent.length, 1);
+  assert.match(NOT_APPROVED_MESSAGE, /^Claude is waiting for approval\./);
+});
+
+test("confirmed on the retry but not approved: told that, after one refresh", async () => {
+  replies = [refused, waiting];
+  await assert.rejects(claudeFetch({}), { message: NOT_APPROVED_MESSAGE });
+  assert.deepEqual(steps, ["refresh"]);
+  assert.equal(sent.length, 2);
 });

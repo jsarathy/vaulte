@@ -134,12 +134,15 @@ test("the Polar link: the person reads whether it is connected, never writes it,
 test("everything not listed is closed: other top-level collections, unattributed usage, the list of users, unknown folders", async () => {
   await seed("ai_usage_unattributed/a1");
   await seed("somewhere/else");
+  await seed("approvals/u1");
   await seed("users/u1/surprise/x");
   for (const who of ["u1", "u2", null]) {
     for (const path of [
       "ai_usage_unattributed/a1",
       "somewhere/else",
+      "approvals/u1", // who may use Claude: only the server reads or writes it (Fix 134)
       "ai_usage_unattributed",
+      "approvals",
       "users",
     ]) {
       assert.equal(await act("get", path, who), 403, `${who} reads ${path}`);
