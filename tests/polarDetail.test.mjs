@@ -111,6 +111,27 @@ test("heart rate: shown, fetchable, errors", () => {
   );
 });
 
+test("fetchError: Polar's v4 requests show their query (the date format matters); a token refresh is shown as it is", () => {
+  const text = fetchError({
+    message: "m",
+    attempts: [
+      {
+        url: "https://www.polaraccesslink.com/v4/data/training-sessions/list?from=2026-09-25T00%3A00%3A00&to=2026-09-26T00%3A00%3A00&features=samples",
+        auth: "v4",
+        status: 400,
+        ok: false,
+        detail: "bad date",
+        matched: false,
+      },
+      { url: "token refresh", auth: "v4", status: 400, ok: false, detail: "invalid_grant" },
+    ],
+  });
+  assert.equal(
+    text,
+    "m\nPolar answered:\n/v4/data/training-sessions/list?from=2026-09-25T00:00:00&to=2026-09-26T00:00:00&features=samples: 400 bad date (no session at that time)\ntoken refresh: 400 invalid_grant",
+  );
+});
+
 test("chart: scale, line, average and zones", () => {
   assert.equal(hrChart(null), null);
   assert.equal(hrChart({}), null);

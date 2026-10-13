@@ -48,9 +48,20 @@ export const canFetchHeartRate = (s) => Boolean(s.exercise_url || s.polar_user_i
 const seenLines = (a) =>
   a.seen ? [`Polar listed ${a.listed}:`, ...a.seen.map((line) => "  " + line)] : [];
 
+/** The request as shown: its path, and for Polar's newer API the query too (the date format matters
+ *  there); text that is not a URL (a token refresh) as it is. */
+function where(a) {
+  try {
+    const url = new URL(a.url);
+    return url.pathname + (a.auth === "v4" ? decodeURIComponent(url.search) : "");
+  } catch {
+    return a.url;
+  }
+}
+
 const attemptLine = (a) =>
   [
-    `${new URL(a.url).pathname}: ${a.status}${a.detail ? " " + a.detail : ""}${
+    `${where(a)}: ${a.status}${a.detail ? " " + a.detail : ""}${
       a.matched === false ? " (no session at that time)" : ""
     }`,
     ...seenLines(a),
