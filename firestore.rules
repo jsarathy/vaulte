@@ -1,0 +1,49 @@
+// firestore.rules — who may read and write what in Vaulte's Firestore (Fix 122).
+// Everything a person owns lives under users/{uid}. A signed-in person may use only their own
+// branch, and only the way the app uses it; the server (Firebase Admin, which these rules do not
+// apply to) writes what arrives from devices and from Claude. Anything not listed is closed.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      // the profile document (name, phone, address, photo link)
+      allow read, write: if owner(uid);
+
+      // what the person keeps in the app: read, create, change and delete their own
+      match /nutrition_days/{doc} { allow read, write: if owner(uid); }
+      match /recipes/{doc} { allow read, write: if owner(uid); }
+      match /weight_log/{doc} { allow read, write: if owner(uid); }
+      match /body_log/{doc} { allow read, write: if owner(uid); }
+      match /weight_plan/{doc} { allow read, write: if owner(uid); }
+      match /monthly_targets/{doc} { allow read, write: if owner(uid); }
+      match /routine_log/{doc} { allow read, write: if owner(uid); }
+      match /settings/{doc} { allow read, write: if owner(uid); }
+      match /claude_chat/{doc} { allow read, write: if owner(uid); }
+      match /polar_sessions/{doc} { allow read, write: if owner(uid); }
+
+      // the error log: the app adds entries and reads them back; they are never changed
+      match /app_errors/{doc} {
+        allow read, create: if owner(uid);
+      }
+
+      // written only by the server; the person may read them
+      match /apple_activity/{doc} { allow read: if owner(uid); }
+      match /ai_usage/{doc} { allow read: if owner(uid); }
+
+      // the Polar link: the page reads whether it is connected; the tokens in it are the server's,
+      // and the newer-API connection (connection_v4) is not readable from the page at all
+      match /polar/{doc} {
+        allow read: if owner(uid) && doc == "connection";
+      }
+    }
+
+    // everything else (including ai_usage_unattributed) is closed to the app
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
