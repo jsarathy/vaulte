@@ -4,12 +4,13 @@
 import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
-import auth from "../../api/polar-auth.js";
+import auth, { deps as authDeps } from "../../api/polar-auth.js";
+import { readState, signState } from "../../api/_polar/state.js";
 import callback from "../../api/polar-callback.js";
 import fetchHr, { deps } from "../../api/polar-fetch-hr.js";
 
 // A good token for any user: "tok-<uid>".
-deps.verify = async (token) => ({ uid: token.slice(4) });
+deps.verify = authDeps.verify = async (token) => ({ uid: token.slice(4) });
 
 const APP = "https://vaulte.example";
 const UID = "user-1";
@@ -41,7 +42,7 @@ const stubPolar = (routes) => {
     };
   };
 };
-const state = (extra) => Buffer.from(JSON.stringify({ uid: UID, ...extra })).toString("base64url");
+const state = (extra) => signState({ uid: UID, ...extra }, "secret-456", Date.now());
 const call = async (handler, req) => {
   const out = res();
   await handler(req, out);
@@ -91,19 +92,19 @@ afterEach(() => {
   mock.restoreAll();
 });
 
-test("polar-auth with v=4 goes to Polar's v4 sign-in with the new scope; the state says v4", async () => {
-  const out = await call(auth, { query: { userId: UID, v: "4" } });
-  assert.equal(out.statusCode, 302);
-  const url = new URL(out.location);
+test("polar-auth with v 4 gives Polar's v4 sign-in address with the new scope; the state says v4", async () => {
+  const headers = { authorization: `Bearer tok-${UID}` };
+  const out = await call(auth, { method: "POST", headers, body: { v: "4" } });
+  assert.equal(out.statusCode, 200);
+  const url = new URL(out.body.url);
   assert.equal(url.origin + url.pathname, "https://auth.polar.com/oauth/authorize");
   assert.equal(url.searchParams.get("client_id"), "client-123");
   assert.equal(url.searchParams.get("redirect_uri"), `${APP}/api/polar-callback`);
   assert.equal(url.searchParams.get("scope"), "training_sessions:read");
-  const sent = JSON.parse(Buffer.from(url.searchParams.get("state"), "base64url").toString());
+  const sent = readState(url.searchParams.get("state"), "secret-456", Date.now());
   assert.deepEqual(sent, { uid: UID, v: 4 });
-  // any other v (or none) is the existing v3 sign-in
-  const old = new URL((await call(auth, { query: { userId: UID, v: "3" } })).location);
-  assert.equal(old.origin, "https://flow.polar.com");
+  const old = await call(auth, { method: "POST", headers, body: { v: "3" } });
+  assert.equal(new URL(old.body.url).origin, "https://flow.polar.com");
 });
 
 test("polar-callback with a v4 state exchanges the code at Polar's v4 token page and stores the tokens apart from v3", async () => {

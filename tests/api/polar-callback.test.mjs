@@ -4,11 +4,14 @@ import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read } from "./setup.mjs";
 import handler from "../../api/polar-callback.js";
+import { signState } from "../../api/_polar/state.js";
 
 const APP = "https://vaulte.example";
 const UID = "user-1";
 const PATH = `users/${UID}/polar/connection`;
-const state = Buffer.from(JSON.stringify({ uid: UID })).toString("base64url");
+const SECRET = "secret-456";
+// A state the server would have made for this user a moment ago.
+const state = signState({ uid: UID }, SECRET, Date.now());
 const realFetch = globalThis.fetch;
 let calls;
 
@@ -189,4 +192,42 @@ test("without VAULTE_APP_URL the redirect goes to the live app", async () => {
   } finally {
     process.env.VAULTE_APP_URL = APP;
   }
+});
+
+test("a state that was not signed by the server, or was changed, is refused with bad_state and nothing is saved", async () => {
+  stubPolar();
+  const forged = Buffer.from(JSON.stringify({ uid: "victim" })).toString("base64url"); // the old unsigned form
+  const other = signState({ uid: "victim" }, "someone-elses-secret", Date.now());
+  const real = signState({ uid: UID }, SECRET, Date.now());
+  const body = Buffer.from(JSON.stringify({ uid: "victim", exp: Date.now() + 60000 })).toString(
+    "base64url",
+  );
+  const swapped = `${body}.${real.split(".")[1]}`;
+  for (const bad of [forged, other, swapped, `${real}.extra`]) {
+    const out = await call({ code: "c", state: bad });
+    assert.equal(out.location, `${APP}/?polar=error&reason=bad_state`);
+  }
+  assert.equal(calls.length, 0); // Polar was not even asked
+  assert.equal(await read("users/victim/polar/connection"), undefined);
+  assert.equal(await read(PATH), undefined);
+});
+
+test("an expired state is refused with state_expired", async () => {
+  stubPolar();
+  const old = signState({ uid: UID }, SECRET, Date.now() - 11 * 60 * 1000);
+  const out = await call({ code: "c", state: old });
+  assert.equal(out.location, `${APP}/?polar=error&reason=state_expired`);
+  assert.equal(calls.length, 0);
+  assert.equal(await read(PATH), undefined);
+});
+
+test("with no Polar secret configured no state is accepted", async () => {
+  stubPolar();
+  const good = signState({ uid: UID }, SECRET, Date.now());
+  delete process.env.POLAR_CLIENT_SECRET;
+  const out = await call({ code: "c", state: good });
+  assert.equal(out.location, `${APP}/?polar=error&reason=bad_state`);
+  const forged = signState({ uid: UID }, "undefined", Date.now()); // what an unset variable would stringify to
+  const again = await call({ code: "c", state: forged });
+  assert.equal(again.location, `${APP}/?polar=error&reason=bad_state`);
 });

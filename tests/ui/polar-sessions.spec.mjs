@@ -42,11 +42,18 @@ const start = async (p, polar) => {
 const logged = (p) => p.evaluate(() => window.__polarLog?.id ?? null);
 
 test("not connected: connect button goes to Polar sign-in", async ({ page: p }) => {
-  await p.route("**/api/polar-auth**", (r) => r.fulfill({ body: "auth page" }));
+  const asked = [];
+  await p.route("**/api/polar-auth", (r) => {
+    const q = r.request();
+    asked.push([q.method(), q.postData(), q.headers().authorization]);
+    r.fulfill({ json: { url: "/polar-sign-in?state=S" } });
+  });
+  await p.route("**/polar-sign-in**", (r) => r.fulfill({ body: "polar" }));
   await start(p, { connected: false });
   await expect(p.getByText("Connect your Polar device")).toBeVisible();
   await p.getByRole("button", { name: "Connect Polar Account" }).click();
-  await p.waitForURL("**/api/polar-auth?userId=u");
+  await p.waitForURL("**/polar-sign-in?state=S");
+  expect(asked).toEqual([["POST", "{}", "Bearer mock-id-token"]]); // asked by a signed-in call
 });
 
 test("unlogged sessions: count, rows, click to log", async ({ page: p }) => {

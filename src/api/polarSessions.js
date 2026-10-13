@@ -1,6 +1,7 @@
 // src/api/polarSessions.js — Polar sessions in Firestore, and the Polar sign-in redirect.
 import { getDocs, collection, orderBy, query } from "firebase/firestore";
 import { db } from "../firebase";
+import { signInToPolar } from "./polarSignIn.js";
 
 /** All of the user's synced sessions, newest first. */
 export async function loadPolarSessions(userId) {
@@ -15,5 +16,5 @@ export function connectPolar(userId) {
     alert("Not logged in — please refresh and try again.");
     return;
   }
-  window.location.href = `/api/polar-auth?userId=${userId}`;
+  return signInToPolar();
 }

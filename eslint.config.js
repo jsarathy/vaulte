@@ -166,6 +166,7 @@ export const CLEAN_FILES = [
   "api/_polar/client.js",
   "api/_polar/samples.js",
   "api/_polar/sessions.js",
+  "api/_polar/state.js",
   "api/_polar/store.js",
   "api/_polar/v4.js",
   "src/lib/authProfile.js",
