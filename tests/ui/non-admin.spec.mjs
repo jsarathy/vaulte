@@ -148,3 +148,60 @@ test("the real answer decides the notice: approved false shows it", async ({ pag
   await p.goto("/app.html");
   await expect(p.getByText("Claude is waiting for approval.")).toBeVisible({ timeout: 15_000 });
 });
+
+test("a waiting person is checked again: the notice goes when approved, on focus and on a timer (Fix 136)", async ({
+  page: p,
+}) => {
+  await p.route(
+    (u) => new URL(u).pathname.startsWith("/api/"),
+    (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+  );
+  await p.clock.install({ time: new Date("2026-10-04T10:00:00") });
+  await p.addInitScript((i) => Object.assign(window, i), {
+    __authUser: { uid: "u", email: "jane@example.com" },
+    __docs: { "users/u": PROFILE },
+    __admin: false,
+    __approved: false,
+  });
+  await p.goto("/app.html");
+  await p.clock.runFor(2000);
+  const notice = p.getByText("Claude is waiting for approval.");
+  await expect(notice).toBeVisible();
+  // still waiting after a minute: still shown, and asked again each half minute
+  await p.clock.runFor(61_000);
+  await expect(notice).toBeVisible();
+  // approved: the next timer tick takes the notice away
+  await p.evaluate(() => (window.__approved = true));
+  await p.clock.runFor(31_000);
+  await expect(notice).toHaveCount(0);
+  await expect(p.getByText("Welcome, Jane.")).toBeVisible();
+});
+
+test("a waiting person who comes back to the window is checked at once", async ({ page: p }) => {
+  await start(p, { __admin: false, __approved: false });
+  await expect(p.getByText("Claude is waiting for approval.")).toBeVisible();
+  await p.evaluate(() => (window.__approved = true));
+  await p.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(p.getByText("Claude is waiting for approval.")).toHaveCount(0);
+});
+
+test("a failed re-check keeps the notice", async ({ page: p }) => {
+  await p.addInitScript(() => (window.__adminNetwork = true));
+  let calls = 0;
+  await p.route(
+    (u) => new URL(u).pathname === "/api/admin-users",
+    (r) =>
+      ++calls === 1
+        ? r.fulfill({ json: { admin: false, approved: false } })
+        : r.fulfill({ status: 500, json: { error: "down" } }),
+  );
+  await p.addInitScript((i) => Object.assign(window, i), {
+    __authUser: { uid: "u", email: "jane@example.com" },
+    __docs: { "users/u": PROFILE },
+  });
+  await p.goto("/app.html");
+  await expect(p.getByText("Claude is waiting for approval.")).toBeVisible({ timeout: 15_000 });
+  await p.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect.poll(() => calls).toBeGreaterThan(1);
+  await expect(p.getByText("Claude is waiting for approval.")).toBeVisible();
+});
