@@ -4,7 +4,7 @@
 // to collapse). Render only; detail = usePolarDetail().
 import { C, FONT, border } from "../constants/design.jsx";
 import { useEffect } from "react";
-import { useFullView } from "../hooks/useFullView.js";
+import { useExpandBox } from "../hooks/useExpandBox.js";
 import { useHeartRateFetch } from "../hooks/usePolarDetail.js";
 import {
   canFetchHeartRate,
@@ -114,16 +114,11 @@ function Stats({ session }) {
   );
 }
 
-/** Toggles the expanded box on a double-click anywhere on it except on a button. */
-const toggleOn = (full, setFull) => (e) => {
-  if (!e.target.closest("button")) setFull(!full);
-};
-
 // Always mounted, so a fetch's state outlives the box (as before)
 export default function PolarDetailModal({ detail, userId }) {
   const session = detail.session;
   const hr = useHeartRateFetch(session, userId, detail.setSession);
-  const [full, setFull] = useFullView();
+  const { full, setFull, boxProps } = useExpandBox();
   useEffect(() => {
     if (!session) setFull(false); // a box opened again starts at its normal size
   }, [session, setFull]);
@@ -133,11 +128,7 @@ export default function PolarDetailModal({ detail, userId }) {
       onClick={(e) => e.target === e.currentTarget && detail.close()}
       style={full ? { ...S.backdrop, ...S.backdropFull } : S.backdrop}
     >
-      <div
-        onDoubleClick={toggleOn(full, setFull)}
-        title={full ? "Double-click or press Esc to collapse" : "Double-click to expand"}
-        style={full ? { ...S.box, ...S.boxFull } : S.box}
-      >
+      <div {...boxProps} style={full ? { ...S.box, ...S.boxFull } : S.box}>
         <Header session={session} onClose={detail.close} />
         <div style={S.body}>
           <Stats session={session} />

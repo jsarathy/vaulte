@@ -386,3 +386,65 @@ test("an unlogged session without heart rate offers the fetch too; none without 
   await expect(box(p).getByText("Heart rate data wasn't captured at sync time.")).toBeVisible();
   await expect(box(p).getByRole("button", { name: "Fetch HR data" })).toHaveCount(0);
 });
+
+test("a double-click anywhere on the log box expands it with its plot; a double-click or Esc collapses it", async ({
+  page: p,
+}) => {
+  const errs = [];
+  p.on("pageerror", (e) => errs.push(e.message));
+  await start(p, [RIDE]);
+  await row(p, "Indoor Cycling").click();
+  const full = p.getByTitle("Double-click or press Esc to collapse");
+  const normal = p.getByTitle("Double-click to expand");
+  await expect(normal).toBeVisible();
+  const small = await normal.boundingBox();
+  const smallChart = await box(p).locator("svg").boundingBox();
+  const { width, height } = p.viewportSize();
+
+  await box(p).getByText("Duration").dblclick(); // on the stats, not the plot
+  await expect(full).toBeVisible();
+  expect(await full.boundingBox()).toMatchObject({ x: 0, y: 0, width, height });
+  expect(small.width).toBeLessThan(width / 2);
+  expect((await box(p).locator("svg").boundingBox()).width).toBeGreaterThan(smallChart.width * 2);
+  await expect(box(p).getByText("Heart rate · 5 min recorded")).toBeVisible();
+  await expect(box(p).getByText("Z1 1m")).toBeVisible();
+
+  await full.click({ position: { x: 300, y: 300 } }); // one click does nothing
+  await expect(full).toBeVisible();
+  await slot(p).dblclick(); // a control: no collapse
+  await expect(full).toBeVisible();
+  await box(p).getByText("Duration").dblclick(); // anywhere else: collapse
+  await expect(full).toHaveCount(0);
+  expect((await normal.boundingBox()).width).toBe(small.width);
+
+  await box(p).locator("svg").dblclick(); // on the plot too
+  await expect(full).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(full).toHaveCount(0);
+  await expect(box(p)).toBeVisible();
+  await slot(p).dblclick(); // a control in the normal size: no expand
+  await expect(full).toHaveCount(0);
+
+  await box(p).getByText("Duration").dblclick();
+  await box(p).getByRole("button", { name: "Cancel" }).click(); // closing, then opening again
+  await expect(box(p)).toHaveCount(0);
+  await row(p, "Indoor Cycling").click();
+  await expect(normal).toBeVisible();
+  expect((await normal.boundingBox()).width).toBe(small.width);
+  expect(errs).toEqual([]);
+});
+
+test("a log box without heart rate expands too; a double-click on Fetch HR data does not", async ({
+  page: p,
+}) => {
+  await start(p, [{ ...WALK, hr_samples: undefined }]);
+  await row(p, "Walking").click();
+  const full = p.getByTitle("Double-click or press Esc to collapse");
+  await box(p).getByRole("button", { name: "Fetch HR data" }).dblclick();
+  await p.waitForTimeout(300);
+  await expect(full).toHaveCount(0);
+  await box(p).getByText("Duration").dblclick();
+  await expect(full).toBeVisible();
+  await p.keyboard.press("Escape");
+  await expect(full).toHaveCount(0);
+});
