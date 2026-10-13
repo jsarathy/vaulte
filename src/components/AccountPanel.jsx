@@ -65,6 +65,7 @@ const LINKED_ACCOUNTS = [
     url: "https://console.firebase.google.com/project/vaulte-1ea20",
   },
   { name: "Anthropic (Claude API)" },
+  { name: "Resend", url: "https://resend.com/emails" },
   { name: "Polar", url: "https://flow.polar.com/diary" },
   { name: "Renpho" },
   { name: "Apple Health (iOS Shortcuts)" },

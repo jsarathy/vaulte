@@ -2,7 +2,7 @@
 // up, what the latest CI run on main did, the state of the latest Production deployment, and the open
 // issues. All from public sources (see _infra/status.js), so there is no token to keep. Any signed-in
 // user may ask (the Firebase ID token is checked); answers are kept for 5 minutes so the public
-// APIs are not hammered. An optional GITHUB_TOKEN environment variable raises GitHub's rate limit.
+// APIs are not hammered. (Vercel, GitHub and Resend publish a Statuspage status.json.) An optional GITHUB_TOKEN environment variable raises GitHub's rate limit.
 import { verifyIdToken } from "./_admin/verify.js";
 import {
   canaryRuns,
@@ -51,10 +51,11 @@ const safe = (promise) => promise.catch(() => ({ error: true }));
 
 export async function gather() {
   const gh = githubHeaders();
-  const [vercel, github, firebase, ci, canary, deployment, issues] = await Promise.all([
+  const [vercel, github, firebase, resend, ci, canary, deployment, issues] = await Promise.all([
     safe(deps.getJson("https://www.vercel-status.com/api/v2/status.json").then(statuspage)),
     safe(deps.getJson("https://www.githubstatus.com/api/v2/status.json").then(statuspage)),
     safe(deps.getJson("https://status.firebase.google.com/incidents.json").then(firebaseIncidents)),
+    safe(deps.getJson("https://resend-status.com/api/v2/status.json").then(statuspage)),
     safe(deps.getJson(`${GITHUB}/actions/runs?branch=main&per_page=6`, gh).then(latestRuns)),
     safe(
       deps
@@ -64,7 +65,7 @@ export async function gather() {
     safe(productionDeployment()),
     safe(deps.getJson(`${GITHUB}/issues?state=open&per_page=20`, gh).then(openIssues)),
   ]);
-  return { vercel, github, firebase, ci, canary, deployment, issues };
+  return { vercel, github, firebase, resend, ci, canary, deployment, issues };
 }
 
 let cache = null;

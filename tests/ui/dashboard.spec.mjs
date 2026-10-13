@@ -167,7 +167,7 @@ test("on a monitor: three framed boxes side by side, apps left, Claude in the mi
   ).toBeVisible();
 });
 
-test("the infrastructure box links to Vercel, Firebase and GitHub, each in a new tab", async ({
+test("the infrastructure box links to Vercel, Firebase, Resend and GitHub, each in a new tab", async ({
   page: p,
 }) => {
   await start(p, {
@@ -181,6 +181,7 @@ test("the infrastructure box links to Vercel, Firebase and GitHub, each in a new
   await expect(links).toHaveText([
     "Vercel",
     "Firebase",
+    "Resend",
     "GitHub",
     "GitHub Actions",
     "GitHub issues",
@@ -648,6 +649,7 @@ const infraAgo = (h) =>
 const INFRA = {
   vercel: { indicator: "minor", description: "Minor Service Outage" },
   github: { indicator: "none", description: "All Systems Operational" },
+  resend: { indicator: "none", description: "All Systems Operational" },
   firebase: { ongoing: [] },
   ci: {
     runs: [
@@ -734,6 +736,8 @@ test("each infrastructure link shows a marker and live lines: platform, deployme
   await expect(link(p, "Vercel")).toContainText("Production: deployed 2 hours ago");
   await expect(link(p, "Firebase")).toContainText("Platform: no ongoing incidents");
   await expect(link(p, "GitHub")).toContainText("Platform: All Systems Operational");
+  await expect(link(p, "Resend")).toContainText("Platform: All Systems Operational"); // Fix 137
+  await expect(link(p, "Resend").getByRole("img", { name: "Up to date" })).toBeVisible();
   await expect(link(p, "GitHub Actions")).toContainText(
     "Latest on main: passed 1 hour ago · Fix 99: live status",
   );
@@ -808,8 +812,9 @@ test("when the status cannot be loaded every link says it is unavailable, and th
   }); // the generic mock answers {}
   await expect(link(p, "Vercel")).toContainText("Platform status unavailable");
   await expect(link(p, "Firebase")).toContainText("Platform status unavailable");
+  await expect(link(p, "Resend")).toContainText("Platform status unavailable");
   await expect(link(p, "GitHub issues")).toContainText("Issues unavailable");
-  await expect(p.getByRole("region", { name: "INFRASTRUCTURE" }).getByRole("link")).toHaveCount(5);
+  await expect(p.getByRole("region", { name: "INFRASTRUCTURE" }).getByRole("link")).toHaveCount(6);
 });
 
 test("the status is asked for with the sign-in token", async ({ page: p }) => {

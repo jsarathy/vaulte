@@ -19,6 +19,9 @@ const ANSWERS = {
   "https://www.githubstatus.com/api/v2/status.json": {
     status: { indicator: "minor", description: "Minor Service Outage" },
   },
+  "https://resend-status.com/api/v2/status.json": {
+    status: { indicator: "major", description: "Partial Outage" },
+  },
   "https://status.firebase.google.com/incidents.json": [
     { external_desc: "Old", end: "2026-10-09T02:06:00+00:00" },
     { external_desc: "Auth is failing" },
@@ -128,6 +131,7 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
   assert.deepEqual(out.body.vercel, { indicator: "none", description: "All Systems Operational" });
   assert.deepEqual(out.body.github, { indicator: "minor", description: "Minor Service Outage" });
   assert.deepEqual(out.body.firebase, { ongoing: ["Auth is failing"] });
+  assert.deepEqual(out.body.resend, { indicator: "major", description: "Partial Outage" }); // Fix 137
   assert.deepEqual(out.body.ci, {
     runs: [
       {
@@ -160,7 +164,7 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
   });
   assert.equal(out.body.checked_at, new Date(1_000_000).toISOString());
   assert.equal(out.headers["Cache-Control"], "private, max-age=60");
-  assert.equal(urls.length, 8); // 3 status pages and feeds, runs, the canary, the deployment and its status, issues
+  assert.equal(urls.length, 9); // 4 status pages and feeds (Resend's too), runs, the canary, the deployment and its status, issues
 });
 
 test("a source that fails is { error: true } and the others still come back", async () => {

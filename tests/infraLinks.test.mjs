@@ -3,10 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CLAUDE_LINK, INFRA_LINKS } from "../src/constants/infraLinks.js";
 
-test("the infrastructure links: Vercel, Firebase, GitHub, GitHub Actions, GitHub issues", () => {
+test("the infrastructure links: Vercel, Firebase, Resend, GitHub, GitHub Actions, GitHub issues", () => {
   assert.deepEqual(
     INFRA_LINKS.map((l) => l.name),
-    ["Vercel", "Firebase", "GitHub", "GitHub Actions", "GitHub issues"],
+    ["Vercel", "Firebase", "Resend", "GitHub", "GitHub Actions", "GitHub issues"],
   );
 });
 

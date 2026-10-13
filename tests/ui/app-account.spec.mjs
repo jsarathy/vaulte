@@ -98,12 +98,14 @@ test("My Account: the profile card, info cards and linked accounts", async ({ pa
     "github.com/jsarathy/vaulte",
     "vercel.com/jsarathys-projects/vaulte",
     "console.firebase.google.com/project/vaulte-1ea20",
+    "resend.com/emails",
     "flow.polar.com/diary",
   ]);
   await expect(links.first()).toHaveAttribute("target", "_blank");
   await expect(links.first()).toHaveAttribute("rel", "noopener noreferrer");
-  await expect(linked.locator(".info-card")).toHaveCount(7);
+  await expect(linked.locator(".info-card")).toHaveCount(8);
   await expect(linked).toContainText("Anthropic (Claude API)");
+  await expect(linked).toContainText("Resend");
   await expect(linked).toContainText("Apple Health (iOS Shortcuts)");
 });
 
