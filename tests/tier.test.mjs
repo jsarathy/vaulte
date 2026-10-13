@@ -85,7 +85,14 @@ test("the app shell is tier 3 whatever the graph says", () => {
 });
 
 test("api, config, dependencies and security files are tier 4", () => {
-  for (const f of ["api/polar-sync.js", "package.json", "package-lock.json", "firebase.json"]) {
+  for (const f of [
+    "api/polar-sync.js",
+    "package.json",
+    "package-lock.json",
+    "firebase.json",
+    "firestore.rules",
+    "storage.rules",
+  ]) {
     assert.equal(tierOf([f], GRAPH).tier, 4, f);
   }
   assert.equal(tierOf([".github/workflows/ci.yml", "vercel.json"], GRAPH).tier, 4);

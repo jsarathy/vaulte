@@ -3,7 +3,7 @@
 const RULES = [
   [/^(api|security|\.github)\//, 4, "API, security or CI file"],
   [
-    /^(package(-lock)?\.json|firebase\.json|firestore\.rules|vercel\.json)$/,
+    /^(package(-lock)?\.json|firebase\.json|firestore\.rules|storage\.rules|vercel\.json)$/,
     4,
     "dependency or deploy config",
   ],

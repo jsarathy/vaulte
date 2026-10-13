@@ -1,7 +1,17 @@
 {
   "emulators": {
     "singleProjectMode": true,
-    "firestore": { "port": 8085 },
-    "ui": { "enabled": false }
+    "firestore": {
+      "port": 8085
+    },
+    "ui": {
+      "enabled": false
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }
