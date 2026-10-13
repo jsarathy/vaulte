@@ -3,12 +3,42 @@
 // Tests read/drive it through window.__* (calls recorded, failures switchable).
 
 import { setTokenSource } from "../../../src/api/authToken.js";
+import firestoreRulesText from "../../../firestore.rules?raw";
+import storageRulesText from "../../../storage.rules?raw";
+import {
+  firestoreAllows,
+  parseFirestoreRules,
+  parseStorageRules,
+  storageAllowsAccess,
+  storageAllowsUpload,
+} from "./rulesGuard.js";
 
 // Signed in: the sign-in proof that src/firebase.js arranges for calls to server functions.
 setTokenSource(async () => "mock-id-token");
 
 // ── firebase / firebase/firestore ────────────────────────────────────────────
 export const db = {};
+// The rules the app has to live by (Fix 124): every Firestore and Storage call below is checked
+// against the real firestore.rules and storage.rules. A call they do not allow throws, and is
+// reported to the test (page.rulesViolations, see tests/ui/cover.mjs), which then fails even when
+// the app catches the error and carries on.
+const FIRESTORE_RULES = parseFirestoreRules(firestoreRulesText);
+const STORAGE_RULES = parseStorageRules(storageRulesText);
+const rulesViolation = (message) => {
+  window.__reportRulesViolation?.(message);
+  throw new Error(message);
+};
+const checkFirestore = (op, path) => {
+  if (typeof path !== "string") return;
+  const verdict = firestoreAllows(FIRESTORE_RULES, op, path);
+  if (!verdict.ok) rulesViolation(`firestore.rules: ${op} ${path}: ${verdict.why}`);
+};
+// a path with an even number of parts is a document, an odd number a collection
+const readOp = (path) => (String(path).split("/").length % 2 === 0 ? "get" : "list");
+const checkStorage = (path, verdict) => {
+  if (!verdict.ok) rulesViolation(`storage.rules: ${path}: ${verdict.why}`);
+};
+
 export const auth = { currentUser: null }; // set by the auth mocks below
 export const storage = {};
 export const doc = (...a) => ({ path: a.slice(1).join("/") });
@@ -21,6 +51,8 @@ window.__failSetDoc = false;
 const hasUndefined = (v) =>
   v === undefined || (v !== null && typeof v === "object" && Object.values(v).some(hasUndefined));
 export const setDoc = async (ref, data, opts) => {
+  // a document the test has seeded is changed, any other is created
+  checkFirestore(window.__docs?.[ref.path] !== undefined ? "update" : "create", ref.path);
   if (window.__failSetDoc) throw new Error("Mock setDoc failure");
   if (hasUndefined(data)) throw new Error("Unsupported field value: undefined");
   const saved = { path: ref.path, data: JSON.parse(JSON.stringify(data)) };
@@ -28,6 +60,7 @@ export const setDoc = async (ref, data, opts) => {
 };
 // deleteDoc: paths recorded in window.__deletedDocs; window.__failDeleteDoc makes it throw
 export const deleteDoc = async (ref) => {
+  checkFirestore("delete", ref.path);
   if (window.__failDeleteDoc) throw new Error("Mock deleteDoc failure");
   (window.__deletedDocs ||= []).push(ref.path);
 };
@@ -37,6 +70,7 @@ const held = (key) =>
   window.__hold?.[key] ? new Promise((res) => ((window.__release ||= {})[key] = res)) : null;
 // reads can be slowed per path (window.__getDocDelays), held (window.__hold) or made to fail (window.__failGetDoc)
 export const getDoc = async (ref) => {
+  checkFirestore("get", ref.path);
   (window.__getDocPaths ||= []).push(ref.path);
   await held(ref.path);
   const delay = window.__getDocDelays?.[ref.path];
@@ -60,6 +94,7 @@ const cut = (all, constraints = []) => {
   return max ? sorted.slice(0, max) : sorted;
 };
 export const getDocs = async (ref) => {
+  checkFirestore("list", ref?.path);
   await new Promise((res) => setTimeout(res, window.__polarDelay || 0));
   if (window.__failGetDocs) throw new Error("Mock getDocs failure");
   const own = window.__collections?.[ref?.path];
@@ -80,6 +115,12 @@ export const where = (field, op, value) => ({ where: [field, op, value] });
 // onSnapshot: one reply, from window.__docs like getDoc, after any window.__getDocDelays delay;
 // a path in window.__failPaths errors instead
 export const onSnapshot = (ref, cb, onError) => {
+  try {
+    checkFirestore(readOp(ref?.path), ref?.path);
+  } catch (err) {
+    onError?.(err);
+    return () => {};
+  }
   const reply = () => {
     if (window.__failPaths?.includes(ref?.path))
       return onError?.(new Error("Mock onSnapshot failure"));
@@ -372,10 +413,21 @@ const storageCall = (fn, args) => {
   if (fail) throw new Error(fail);
 };
 export const ref = (_s, path) => ({ path });
-export const uploadBytes = async (r, file) =>
-  storageCall("upload", { path: r.path, name: file?.name, size: file?.size, type: file?.type });
+export const uploadBytes = async (r, file) => {
+  checkStorage(r.path, storageAllowsUpload(STORAGE_RULES, r.path, file));
+  return storageCall("upload", {
+    path: r.path,
+    name: file?.name,
+    size: file?.size,
+    type: file?.type,
+  });
+};
 export const getDownloadURL = async (r) => {
+  checkStorage(r.path, storageAllowsAccess(STORAGE_RULES, r.path));
   storageCall("url", { path: r.path });
   return `https://cdn.test/${r.path}`;
 };
-export const deleteObject = async (r) => storageCall("delete", { path: r.path });
+export const deleteObject = async (r) => {
+  checkStorage(r.path, storageAllowsAccess(STORAGE_RULES, r.path));
+  return storageCall("delete", { path: r.path });
+};
