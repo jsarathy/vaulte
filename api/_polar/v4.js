@@ -79,18 +79,21 @@ const dayOf = (session) => String(session.start_time).slice(0, 10);
 const shiftDay = (day, days) =>
   new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 
-// Polar wants a full date-time ("2026-09-25T00:00:00Z"); a bare date is a 400 "could not be parsed".
-const midnight = (day) => `${day}T00:00:00Z`;
+// Polar's from/to are "ISO 8601" dates; a bare date is a 400 "could not be parsed as datetime". Its own
+// sample times have no zone, so the plain form goes first; the others are tried only when Polar
+// still cannot parse the date, and the one that works is kept for the rest of the lookup.
+export const DATE_TAILS = ["T00:00:00", "T00:00:00.000", "T00:00:00Z", "T00:00:00.000Z"];
 
-/** The list URL for one day, with heart-rate samples (with `features` Polar allows one day). */
-export const dayUrl = (day) =>
+/** The list URL for one day (`tail` makes the date a date-time), with heart-rate samples (with
+ *  `features` Polar allows one day at a time). */
+export const dayUrl = (day, tail = DATE_TAILS[0]) =>
   `${DATA}/training-sessions/list?` +
-  new URLSearchParams({ from: midnight(day), to: midnight(shiftDay(day, 1)), features: "samples" });
+  new URLSearchParams({ from: day + tail, to: shiftDay(day, 1) + tail, features: "samples" });
 
 /** The session's own day, then the day before and after (the clock may be in another zone). */
-export function dayUrls(session) {
+export function candidateDays(session) {
   const day = dayOf(session);
-  return [day, shiftDay(day, -1), shiftDay(day, 1)].map(dayUrl);
+  return [day, shiftDay(day, -1), shiftDay(day, 1)];
 }
 
 const ZONED = /(Z|[+-]\d\d:?\d\d)$/i;
@@ -135,6 +138,21 @@ async function getList(url, token, fetcher) {
   return { ok: true, status: r.status, list: json.trainingSessions || [] };
 }
 
+const badDate = (got) => got.status === 400 && /datetime/i.test(got.detail);
+
+/** One day's list; while Polar cannot parse the date, the next date format is tried (`state.fmt`
+ *  moves on and stays). { url, got, rejected }: the last request and those Polar refused. */
+async function listDay(day, state, ctx) {
+  const rejected = [];
+  for (;;) {
+    const url = dayUrl(day, DATE_TAILS[state.fmt]);
+    const got = await getList(url, ctx.token, ctx.fetcher);
+    if (!badDate(got) || state.fmt >= DATE_TAILS.length - 1) return { url, got, rejected };
+    rejected.push(attemptOf(url, got));
+    state.fmt += 1;
+  }
+}
+
 /** One request as reported back, like the v3 attempts. */
 const attemptOf = (url, got, extra = {}) => ({
   url,
@@ -151,8 +169,13 @@ export async function fetchV4Hr({ conn, session }, deps) {
   const access = await freshAccess(conn, deps);
   if (access.error) return { hr: null, attempts: [attemptOf("token refresh", access.error)] };
   const attempts = [];
-  for (const url of dayUrls(session)) {
-    const got = await getList(url, access.access_token, deps.fetcher);
+  const state = { fmt: 0 };
+  for (const day of candidateDays(session)) {
+    const { url, got, rejected } = await listDay(day, state, {
+      token: access.access_token,
+      fetcher: deps.fetcher,
+    });
+    attempts.push(...rejected);
     const ts = got.ok && matchV4(got.list, session);
     const hr = ts && hrFromV4(ts);
     attempts.push(attemptOf(url, got, { matched: !!ts, hr: !!hr }));

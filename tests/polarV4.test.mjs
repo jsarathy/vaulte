@@ -4,8 +4,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   V4_SCOPE,
+  DATE_TAILS,
+  candidateDays,
   dayUrl,
-  dayUrls,
   exchangeV4Code,
   fetchV4Hr,
   freshAccess,
@@ -194,21 +195,32 @@ test("freshAccess: with no refresh token, or when the refresh is refused, it say
   assert.equal(noExpiry.error.status, 400); // an unknown expiry counts as expired
 });
 
-test("dayUrl and dayUrls: one day with samples; the session's day, then the day before and after", () => {
+test("dayUrl: one day with samples, from and to as plain date-times (no zone) first", () => {
   const url = new URL(dayUrl("2026-09-25"));
   assert.equal(
     url.origin + url.pathname,
     "https://www.polaraccesslink.com/v4/data/training-sessions/list",
   );
-  assert.equal(url.searchParams.get("from"), "2026-09-25T00:00:00Z");
-  assert.equal(url.searchParams.get("to"), "2026-09-26T00:00:00Z");
+  assert.equal(url.searchParams.get("from"), "2026-09-25T00:00:00");
+  assert.equal(url.searchParams.get("to"), "2026-09-26T00:00:00");
   assert.equal(url.searchParams.get("features"), "samples");
-  const days = dayUrls(session).map((u) => new URL(u).searchParams.get("from").slice(0, 10));
-  assert.deepEqual(days, ["2026-09-25", "2026-09-24", "2026-09-26"]);
-  const edge = dayUrls({ start_time: "2026-12-31T23:30:00" }).map((u) =>
-    new URL(u).searchParams.get("to"),
-  );
-  assert.deepEqual(edge, ["2027-01-01T00:00:00Z", "2026-12-31T00:00:00Z", "2027-01-02T00:00:00Z"]);
+  assert.deepEqual(DATE_TAILS, ["T00:00:00", "T00:00:00.000", "T00:00:00Z", "T00:00:00.000Z"]);
+  const z = new URL(dayUrl("2026-12-31", "T00:00:00Z")).searchParams;
+  assert.deepEqual([z.get("from"), z.get("to")], ["2026-12-31T00:00:00Z", "2027-01-01T00:00:00Z"]);
+});
+
+test("candidateDays: the session's day, then the day before and after, across a month and a year", () => {
+  assert.deepEqual(candidateDays(session), ["2026-09-25", "2026-09-24", "2026-09-26"]);
+  assert.deepEqual(candidateDays({ start_time: "2026-12-31T23:30:00" }), [
+    "2026-12-31",
+    "2026-12-30",
+    "2027-01-01",
+  ]);
+  assert.deepEqual(candidateDays({ start_time: "2026-03-01T00:10:00" }), [
+    "2026-03-01",
+    "2026-02-28",
+    "2026-03-02",
+  ]);
 });
 
 test("matchV4: the session that started at the same time, as Polar's local time or as given, within 2 minutes", () => {
@@ -432,4 +444,80 @@ test("matchV4: a stored start time that carries a zone or fraction is compared b
     start_time: "2026-09-25T10:42:00+03:00",
   });
   assert.notEqual(found, null);
+});
+
+const fromOf = (url) => new URL(url).searchParams.get("from");
+const BAD = {
+  status: 400,
+  text: '{"error":"Value for key \'from\' could not be parsed as datetime"}',
+};
+
+test("fetchV4Hr: while Polar cannot parse the date the next format is tried; the one that works is kept for the other days", async () => {
+  const calls = [];
+  const f = async (url) => {
+    calls.push(fromOf(url));
+    const ok = fromOf(url).endsWith("Z");
+    return {
+      ok,
+      status: ok ? 200 : BAD.status,
+      text: async () => BAD.text,
+      json: async () => ({ trainingSessions: [] }),
+    };
+  };
+  const out = await fetchV4Hr({ conn: goodConn, session }, { env: ENV, fetcher: f, now: NOW });
+  assert.deepEqual(calls, [
+    "2026-09-25T00:00:00",
+    "2026-09-25T00:00:00.000",
+    "2026-09-25T00:00:00Z", // the first day finds the format
+    "2026-09-24T00:00:00Z",
+    "2026-09-26T00:00:00Z", // the others start from it
+  ]);
+  assert.equal(out.attempts.length, 5);
+  assert.deepEqual(
+    out.attempts.map((a) => a.status),
+    [400, 400, 200, 200, 200],
+  );
+  assert.equal(out.attempts[0].detail.includes("could not be parsed as datetime"), true);
+  assert.equal(out.attempts[0].matched, undefined); // a refused format is not a lookup
+  assert.equal(out.attempts[2].matched, false);
+});
+
+test("fetchV4Hr: if every format is refused each is reported once, and later days use the last", async () => {
+  const calls = [];
+  const f = async (url) => {
+    calls.push(fromOf(url));
+    return { ok: false, status: BAD.status, text: async () => BAD.text };
+  };
+  const out = await fetchV4Hr({ conn: goodConn, session }, { env: ENV, fetcher: f, now: NOW });
+  assert.deepEqual(calls, [
+    "2026-09-25T00:00:00",
+    "2026-09-25T00:00:00.000",
+    "2026-09-25T00:00:00Z",
+    "2026-09-25T00:00:00.000Z",
+    "2026-09-24T00:00:00.000Z",
+    "2026-09-26T00:00:00.000Z",
+  ]);
+  assert.equal(out.hr, null);
+  assert.equal(out.attempts.length, 6);
+});
+
+test("fetchV4Hr: another 400 (not about the date) does not move to the next format", async () => {
+  const calls = [];
+  const f = async (url) => {
+    calls.push(fromOf(url));
+    return { ok: false, status: 400, text: async () => "scope not allowed" };
+  };
+  const out = await fetchV4Hr({ conn: goodConn, session }, { env: ENV, fetcher: f, now: NOW });
+  assert.deepEqual(calls, ["2026-09-25T00:00:00", "2026-09-24T00:00:00", "2026-09-26T00:00:00"]);
+  assert.equal(out.attempts[0].detail, "scope not allowed");
+});
+
+test("fetchV4Hr: a date error that comes with a different status is not retried either", async () => {
+  const calls = [];
+  const f = async (url) => {
+    calls.push(fromOf(url));
+    return { ok: false, status: 422, text: async () => "could not be parsed as datetime" };
+  };
+  await fetchV4Hr({ conn: goodConn, session }, { env: ENV, fetcher: f, now: NOW });
+  assert.equal(calls.length, 3);
 });
