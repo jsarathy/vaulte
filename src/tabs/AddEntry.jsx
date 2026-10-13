@@ -8,6 +8,7 @@ import FoodLookupModal from "../components/FoodLookupModal";
 import SavedRecipesModal from "../components/SavedRecipesModal";
 import PolarCard from "../components/PolarCard";
 import PolarBrowseModal from "../components/PolarBrowseModal";
+import { useIntegrations } from "../context/IntegrationsContext.js";
 import AddFoodCard from "../components/AddFoodCard";
 import PhotoLogCard from "../components/PhotoLogCard";
 import ExerciseLogModal from "../components/ExerciseLogModal";
@@ -75,20 +76,23 @@ const polarOf = (p) => ({
 });
 
 function ExerciseColumn({ p, h, phone }) {
+  const integrations = useIntegrations(); // Polar and the Apple Watch are the owner's own (Fix 128)
   return (
     <div style={column(phone, 35)}>
       <div style={S.heading}>🏋️ Exercise</div>
       <button onClick={h.exercise.show} style={S.exerciseButton}>
         🏋️ Log Manual Exercise
       </button>
-      <PolarCard
-        userId={p.userId}
-        polar={polarOf(p)}
-        browse={h.browse}
-        onLog={p.setPolarLogModal}
-      />
+      {integrations && (
+        <PolarCard
+          userId={p.userId}
+          polar={polarOf(p)}
+          browse={h.browse}
+          onLog={p.setPolarLogModal}
+        />
+      )}
       {/* Apple Watch steps by hour, for the Add Entry date */}
-      <HourlyStepsCard userId={p.userId} date={p.addDate} />
+      {integrations && <HourlyStepsCard userId={p.userId} date={p.addDate} />}
     </div>
   );
 }

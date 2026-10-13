@@ -10,7 +10,7 @@ import { ago, dashboardRows } from "../lib/dashboard.js";
 import { loadErrors } from "../api/errorLog.js";
 import { countSince } from "../lib/errorLog.js";
 import { CLAUDE_LINK, INFRA_LINKS } from "../constants/infraLinks.js";
-import { checkAdmin } from "../api/adminUsers.js";
+import { useIsAdmin } from "../hooks/useIsAdmin.js";
 import { loadInfraStatus } from "../api/infraStatus.js";
 import { infraStatusFor } from "../lib/infraStatus.js";
 import AiUsageCard from "./AiUsageCard.jsx";
@@ -194,21 +194,6 @@ function useInfraStatus(userId) {
     };
   }, [userId]);
   return status;
-}
-
-/** True once the server says the signed-in user is an admin (the Users card is only for admins). */
-function useIsAdmin(userId) {
-  const [admin, setAdmin] = useState(false);
-  useEffect(() => {
-    let live = true;
-    checkAdmin()
-      .then((a) => live && setAdmin(a))
-      .catch(() => live && setAdmin(false));
-    return () => {
-      live = false;
-    };
-  }, [userId]);
-  return admin;
 }
 
 /** How many errors are logged for the last 7 days, and when the latest was (read once). */

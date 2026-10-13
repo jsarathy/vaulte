@@ -21,6 +21,27 @@ setAuthTools({
   resend: async () => window.__authCalls?.push({ fn: "resendConfirmation" }),
 });
 
+// The admin check (Fix 128): the page asks the server who is an admin (the Dashboard and the owner's
+// integrations are for admins). Here the answer comes from window.__admin (true unless a spec says
+// false) so every spec that goes through the real app page is signed in as the owner. A spec that
+// tests the real call (its token, its answers) sets window.__adminNetwork and routes /api/admin-users.
+const realFetch = window.fetch.bind(window);
+window.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input?.url;
+  const asks = String(init?.body || "").includes('"action":"check"');
+  if (
+    asks &&
+    new URL(url, location.href).pathname === "/api/admin-users" &&
+    !window.__adminNetwork
+  ) {
+    const body = JSON.stringify({ admin: window.__admin !== false });
+    return Promise.resolve(
+      new Response(body, { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+  }
+  return realFetch(input, init);
+};
+
 // ── firebase / firebase/firestore ────────────────────────────────────────────
 export const db = {};
 // The rules the app has to live by (Fix 124): every Firestore and Storage call below is checked

@@ -10,6 +10,8 @@ import HomePanel from "./HomePanel.jsx";
 import AccountPanel from "./AccountPanel.jsx";
 import DashboardPanel from "./DashboardPanel.jsx";
 import { useErrorLog } from "../hooks/useErrorLog.js";
+import { useIsAdmin } from "../hooks/useIsAdmin.js";
+import { IntegrationsProvider } from "../context/IntegrationsContext.js";
 
 const pageStyle = {
   background: "radial-gradient(ellipse at 20% 50%,#1a1508 0%,#0d0d0f 60%,#080810 100%)",
@@ -25,13 +27,15 @@ const mainStyle = (activePanel) => ({
   position: "relative",
 });
 
-function Panel({ activePanel, profile, userId, account }) {
+function Panel({ activePanel, profile, userId, account, admin }) {
   if (activePanel === "home") return <HomePanel profile={profile} />;
-  if (activePanel === "dashboard") return <DashboardPanel userId={userId} />;
+  if (activePanel === "dashboard" && admin) return <DashboardPanel userId={userId} />;
   if (activePanel === "nutrition")
     return (
       <div className="fade-up nt-wrap" style={{ margin: "-24px" }}>
-        <NutritionTracker userId={userId} />
+        <IntegrationsProvider value={admin}>
+          <NutritionTracker userId={userId} />
+        </IntegrationsProvider>
       </div>
     );
   return <AccountPanel profile={profile} {...account} />;
@@ -39,6 +43,7 @@ function Panel({ activePanel, profile, userId, account }) {
 
 export default function AccountPage({ profile, toast, userId, page, nav, edit }) {
   useErrorLog(userId);
+  const admin = useIsAdmin(userId); // the Dashboard and the owner's integrations are for admins (Fix 128)
   return (
     <div className="app-page" style={pageStyle}>
       <style>{globalStyle}</style>
@@ -49,13 +54,14 @@ export default function AccountPage({ profile, toast, userId, page, nav, edit })
         className="app-body"
         style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}
       >
-        <AccountSidebar {...nav} handleDeleteAccount={page.handleDeleteAccount} />
+        <AccountSidebar {...nav} admin={admin} handleDeleteAccount={page.handleDeleteAccount} />
         <div className={`app-main app-main-${nav.activePanel}`} style={mainStyle(nav.activePanel)}>
           <Panel
             activePanel={nav.activePanel}
             profile={profile}
             userId={userId}
             account={page.account}
+            admin={admin}
           />
         </div>
       </div>

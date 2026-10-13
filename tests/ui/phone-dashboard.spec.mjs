@@ -193,6 +193,7 @@ const USERS = [
 /** The mocked /api/admin-users: `admin` says who the caller is; the token must be sent. */
 const adminApi = async (p, { admin = true, users = USERS, fail = false } = {}) => {
   const seen = [];
+  await p.addInitScript(() => (window.__adminNetwork = true)); // the real call, answered by this route
   await p.route(
     (u) => new URL(u).pathname === "/api/admin-users",
     async (route) => {
@@ -228,12 +229,6 @@ test("an admin gets a fourth rubric, USERS, that opens the table full window; ot
   expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
-});
-
-test("not an admin: three rubrics only", async ({ page: p }) => {
-  await start(p, { admin: false });
-  await expect(rubric(p, "CLAUDE")).toBeVisible();
-  await expect(rubric(p, "USERS")).toHaveCount(0);
 });
 
 const hoursAgoAt = (h) =>

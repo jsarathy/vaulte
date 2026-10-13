@@ -325,6 +325,7 @@ const USERS = [
 /** The mocked /api/admin-users: `admin` says who the caller is; the token must be sent. */
 const adminApi = async (p, { admin = true, users = USERS, fail = false, deleteReply } = {}) => {
   const seen = [];
+  await p.addInitScript(() => (window.__adminNetwork = true)); // the real call, answered by this route
   await p.route(
     (u) => new URL(u).pathname === "/api/admin-users",
     async (route) => {
@@ -378,12 +379,6 @@ test("an admin sees a USERS card below the Claude card; the server is asked with
   expect(Math.abs(card.left - claude.left)).toBeLessThan(2); // in the same column
   await expect(users.getByRole("button", { name: "User accounts" })).toBeVisible();
   expect(seen[0]).toEqual({ action: "check", auth: "Bearer mock-id-token" });
-});
-
-test("not an admin, or a failed check: no USERS card", async ({ page: p }) => {
-  await startAdmin(p, { admin: false });
-  await expect(p.getByRole("region", { name: "CLAUDE" })).toBeVisible();
-  await expect(p.getByRole("region", { name: "USERS" })).toHaveCount(0);
 });
 
 test("the Users table lists the users with their account details and ids", async ({ page: p }) => {

@@ -48,6 +48,8 @@ export const CLEAN_FILES = [
   "src/firebase.js",
   "src/hooks/useMonthlyTargets.js",
   "src/hooks/useDeleteUser.js",
+  "src/hooks/useIsAdmin.js",
+  "src/context/IntegrationsContext.js",
   "src/lib/monthlyTargets.js",
   "src/components/MonthlyTargetsCard.jsx",
   "src/constants/design.jsx",

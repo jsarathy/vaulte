@@ -6,6 +6,7 @@ import PillButton from "./PillButton.jsx";
 import PhonePopup from "./PhonePopup.jsx";
 import WeightLogTable from "./WeightLogTable.jsx";
 import { columnStyle } from "../lib/phoneLayout.js";
+import { useIntegrations } from "../context/IntegrationsContext.js";
 
 const S = {
   heading: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" },
@@ -43,17 +44,20 @@ const S = {
 
 // title: the heading text (a pill on a phone); after: what sits right of Sync Renpho (the Plan pill)
 function Heading({ log, renpho, phone, title, after }) {
+  const integrations = useIntegrations(); // Renpho is the owner's own (Fix 128)
   const wrap = phone ? { flexWrap: "wrap", gap: "8px 10px" } : null;
   return (
     <div style={{ ...S.heading, ...wrap }}>
       {title}
-      <button
-        onClick={renpho.sync}
-        disabled={renpho.syncing}
-        style={{ ...S.sync(renpho.syncing), ...(phone ? S.syncPill : null) }}
-      >
-        {renpho.syncing ? "Syncing…" : "⟳ Sync Renpho"}
-      </button>
+      {integrations && (
+        <button
+          onClick={renpho.sync}
+          disabled={renpho.syncing}
+          style={{ ...S.sync(renpho.syncing), ...(phone ? S.syncPill : null) }}
+        >
+          {renpho.syncing ? "Syncing…" : "⟳ Sync Renpho"}
+        </button>
+      )}
       {after}
       {log.stale > 0 && (
         <button onClick={log.purge} style={S.purge}>
