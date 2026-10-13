@@ -19,6 +19,9 @@ const ANSWERS = {
   "https://www.githubstatus.com/api/v2/status.json": {
     status: { indicator: "minor", description: "Minor Service Outage" },
   },
+  "https://resend-status.com/api/v2/status.json": {
+    status: { indicator: "major", description: "Partial Outage" },
+  },
   "https://status.firebase.google.com/incidents.json": [
     { external_desc: "Old", end: "2026-10-09T02:06:00+00:00" },
     { external_desc: "Auth is failing" },
@@ -128,6 +131,7 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
   assert.deepEqual(out.body.vercel, { indicator: "none", description: "All Systems Operational" });
   assert.deepEqual(out.body.github, { indicator: "minor", description: "Minor Service Outage" });
   assert.deepEqual(out.body.firebase, { ongoing: ["Auth is failing"] });
+  assert.deepEqual(out.body.resend, { indicator: "major", description: "Partial Outage" }); // Fix 137
   assert.deepEqual(out.body.ci, {
     runs: [
       {

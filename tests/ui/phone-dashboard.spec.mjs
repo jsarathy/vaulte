@@ -107,6 +107,7 @@ test("INFRASTRUCTURE opens as a popup with the links in large type", async ({ pa
   await expect(links).toHaveText([
     "Vercel",
     "Firebase",
+    "Resend",
     "GitHub",
     "GitHub Actions",
     "GitHub issues",
@@ -284,6 +285,7 @@ const infraAgo = (h) =>
 const INFRA = {
   vercel: { indicator: "minor", description: "Minor Service Outage" },
   github: { indicator: "none", description: "All Systems Operational" },
+  resend: { indicator: "none", description: "All Systems Operational" },
   firebase: { ongoing: [] },
   ci: {
     runs: [

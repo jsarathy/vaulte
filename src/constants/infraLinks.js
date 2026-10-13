@@ -12,6 +12,11 @@ export const INFRA_LINKS = [
     note: "Sign-in, Firestore data, storage",
     url: "https://console.firebase.google.com/project/vaulte-1ea20",
   },
+  {
+    name: "Resend",
+    note: "The emails to the owner about people waiting",
+    url: "https://resend.com/emails",
+  },
   { name: "GitHub", note: "The code and pull requests", url: "https://github.com/jsarathy/vaulte" },
   {
     name: "GitHub Actions",

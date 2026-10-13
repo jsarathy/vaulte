@@ -112,6 +112,7 @@ export function infraStatusFor(data, now = new Date()) {
   return {
     Vercel: merged([platform(data.vercel), deployment(data.deployment, now)]),
     Firebase: merged([firebase(data.firebase)]),
+    Resend: merged([platform(data.resend)]),
     GitHub: merged([platform(data.github)]),
     "GitHub Actions": merged([ci(data.ci, now), canary(data.canary, now)]),
     "GitHub issues": merged([issues(data.issues)]),
