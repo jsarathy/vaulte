@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { verifyIdToken } from "../../api/_admin/verify.js";
+import { accessOf } from "../../api/_admin/access.js";
 import { deps as claude } from "../../api/claude.js";
 import { deps as polarSync } from "../../api/polar-sync.js";
 import { deps as polarFetchHr } from "../../api/polar-fetch-hr.js";
@@ -15,4 +16,8 @@ test("the five functions verify the caller with the real verifyIdToken", () => {
   for (const [name, deps] of Object.entries(all)) {
     assert.equal(deps.verify, verifyIdToken, name);
   }
+});
+
+test("the proxy checks approval with the real accessOf unless a test replaces it (Fix 134)", () => {
+  assert.equal(claude.access, accessOf);
 });

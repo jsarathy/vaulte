@@ -1,6 +1,6 @@
 // api/_admin/remove.js — removes one person completely (Fix 127), for an admin deleting a user from
 // the Users card: their login (Identity Toolkit REST), their profile photo (Cloud Storage JSON API)
-// and everything under users/{uid} in Firestore. No firebase-admin/auth: see verify.js.
+// and everything under users/{uid} in Firestore, and their approval record. No firebase-admin/auth: see verify.js.
 import { getFirestore } from "firebase-admin/firestore";
 import { accessToken, adminApp } from "./store.js";
 import { projectId } from "./verify.js";
@@ -43,6 +43,7 @@ async function deleteData(uid) {
   adminApp();
   const db = getFirestore();
   await db.recursiveDelete(db.doc(`users/${uid}`));
+  await db.doc(`approvals/${uid}`).delete(); // their approval record (Fix 134)
 }
 
 /** The three steps; `token` and `fetchJson` are replaceable for tests. */

@@ -16,13 +16,16 @@ const ROWS = [
   { uid: "boss", email: "BOSS@example.com" },
 ];
 const FLAGGED = [
-  { uid: "u1", email: "jane@example.com", admin: false },
-  { uid: "boss", email: "BOSS@example.com", admin: true },
+  { uid: "u1", email: "jane@example.com", admin: false, approval: "" },
+  { uid: "boss", email: "BOSS@example.com", admin: true, approval: "approved" },
 ];
 let tokens;
 let verifyCalls;
 let listCalls;
 let removed;
+let approved;
+let records;
+let accessAnswer;
 
 const call = async (body, token = "good", method = "POST") => {
   const out = res();
@@ -36,8 +39,19 @@ beforeEach(() => {
   verifyCalls = [];
   listCalls = 0;
   removed = [];
+  approved = [];
+  records = {};
+  accessAnswer = { approved: true };
   deps.remove = async (uid) => {
     removed.push(uid);
+  };
+  deps.access = async () => {
+    if (accessAnswer instanceof Error) throw accessAnswer;
+    return accessAnswer;
+  };
+  deps.approvals = async () => records;
+  deps.approve = async (uid, by) => {
+    approved.push([uid, by]);
   };
   deps.verify = async (t) => {
     verifyCalls.push(t);
@@ -85,17 +99,48 @@ test("the Bearer prefix is any case and may have more than one space", async () 
     { method: "POST", headers: { authorization: "bearer   good" }, body: { action: "check" } },
     out,
   );
-  assert.deepEqual(out.body, { admin: true });
+  assert.deepEqual(out.body, { admin: true, approved: true });
   assert.deepEqual(verifyCalls, ["good"]);
 });
 
 test("check: true for a listed address (any case), false for anyone else, and for an unverified email", async () => {
-  assert.deepEqual((await call({ action: "check" })).body, { admin: true });
-  assert.deepEqual((await call({ action: "check" }, "other")).body, { admin: false });
+  assert.deepEqual((await call({ action: "check" })).body, { admin: true, approved: true });
+  assert.deepEqual((await call({ action: "check" }, "other")).body, {
+    admin: false,
+    approved: true,
+  });
   tokens.unverified = { ...BOSS, email_verified: false };
-  assert.deepEqual((await call({ action: "check" }, "unverified")).body, { admin: false });
+  accessAnswer = { approved: false }; // what the access check says of anyone who is not an admin
+  assert.deepEqual((await call({ action: "check" }, "unverified")).body, {
+    admin: false,
+    approved: false,
+  });
   delete process.env.ADMIN_EMAILS; // not configured: nobody
-  assert.deepEqual((await call({ action: "check" })).body, { admin: false });
+  assert.deepEqual((await call({ action: "check" })).body, { admin: false, approved: false });
+});
+
+test("check: a person who is waiting is told approved false; an admin never asks the access check (Fix 134)", async () => {
+  const asked = [];
+  deps.access = async (decoded) => {
+    asked.push(decoded.uid);
+    return { approved: false };
+  };
+  assert.deepEqual((await call({ action: "check" }, "other")).body, {
+    admin: false,
+    approved: false,
+  });
+  assert.deepEqual((await call({ action: "check" })).body, { admin: true, approved: true });
+  assert.deepEqual(asked, ["u2"]); // the person's own token went to the check, the admin's did not
+});
+
+test("check: if the access cannot be worked out the answer still says who is an admin, and logs it", async () => {
+  const err = mock.method(console, "error", () => {});
+  accessAnswer = new Error("firestore down");
+  const out = await call({ action: "check" }, "other");
+  assert.equal(out.statusCode, 200);
+  assert.equal(out.body.admin, false);
+  assert.equal(out.body.approved, undefined); // unknown: not claimed either way
+  assert.ok(err.mock.calls.some((c) => String(c.arguments[1]).includes("firestore down")));
 });
 
 test("list: an admin gets the users", async () => {
@@ -103,6 +148,33 @@ test("list: an admin gets the users", async () => {
   assert.equal(out.statusCode, 200);
   assert.deepEqual(out.body, { users: FLAGGED }); // each row says whether it is an admin address
   assert.equal(listCalls, 1);
+});
+
+test("list: each row says approved, pending or nothing from the approval records (Fix 134)", async () => {
+  records = {
+    u1: { status: "pending" },
+    boss: { status: "pending" },
+    ghost: { status: "approved" },
+  };
+  const out = await call({ action: "list" });
+  assert.deepEqual(
+    out.body.users.map((u) => [u.uid, u.approval]),
+    [
+      ["u1", "pending"],
+      ["boss", "approved"], // an admin is always approved, whatever the record says
+    ],
+  );
+  records = { u1: { status: "approved" } };
+  assert.equal((await call({ action: "list" })).body.users[0].approval, "approved");
+});
+
+test("list: if the approval records cannot be read the list still comes, with no approval shown", async () => {
+  deps.approvals = async () => {
+    throw new Error("nope");
+  };
+  const out = await call({ action: "list" });
+  assert.equal(out.statusCode, 200);
+  assert.equal(out.body.users[0].approval, "");
 });
 
 test("list: not an admin is 403 and nothing is read", async () => {
@@ -225,4 +297,43 @@ test("list: a user with no email address is not an admin (and does not break the
     out.body.users.map((u) => u.admin),
     [false, false, false],
   );
+});
+
+// ---- approve (Fix 134)
+test("approve: an admin lets a listed user in, and it is logged", async () => {
+  const log = mock.method(console, "log", () => {});
+  const out = await call({ action: "approve", uid: "u1" });
+  assert.equal(out.statusCode, 200);
+  assert.deepEqual(out.body, { ok: true });
+  assert.deepEqual(approved, [["u1", "boss"]]); // the user, and who approved (from the token)
+  assert.ok(log.mock.calls.some((c) => c.arguments.join(" ").includes("approved a user: u1")));
+});
+
+test("approve: not an admin is 403 and nothing is approved", async () => {
+  const out = await call({ action: "approve", uid: "u1" }, "other");
+  assert.equal(out.statusCode, 403);
+  assert.deepEqual(approved, []);
+});
+
+test("approve: a missing or odd user id is 400, an unknown one 404, and nothing is approved", async () => {
+  for (const uid of [undefined, "", "a/b", "x".repeat(200), 7, null]) {
+    const out = await call({ action: "approve", uid });
+    assert.equal(out.statusCode, 400, String(uid));
+    assert.equal(out.body.error, "Missing or invalid user id");
+  }
+  const ghost = await call({ action: "approve", uid: "ghost" });
+  assert.equal(ghost.statusCode, 404);
+  assert.equal(ghost.body.error, "No such user");
+  assert.deepEqual(approved, []);
+});
+
+test("approve: a failure is a 500 that says nothing about why", async () => {
+  mock.method(console, "error", () => {});
+  deps.approve = async () => {
+    throw new Error("secret detail");
+  };
+  const out = await call({ action: "approve", uid: "u1" });
+  assert.equal(out.statusCode, 500);
+  assert.equal(out.body.error, "Could not approve the user");
+  assert.doesNotMatch(JSON.stringify(out.body), /secret/);
 });

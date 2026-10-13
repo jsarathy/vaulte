@@ -323,7 +323,10 @@ const USERS = [
   },
 ];
 /** The mocked /api/admin-users: `admin` says who the caller is; the token must be sent. */
-const adminApi = async (p, { admin = true, users = USERS, fail = false, deleteReply } = {}) => {
+const adminApi = async (
+  p,
+  { admin = true, users = USERS, fail = false, deleteReply, approveReply } = {},
+) => {
   const seen = [];
   await p.addInitScript(() => (window.__adminNetwork = true)); // the real call, answered by this route
   await p.route(
@@ -334,9 +337,14 @@ const adminApi = async (p, { admin = true, users = USERS, fail = false, deleteRe
       seen.push({
         action,
         auth: req.headers()["authorization"],
-        ...(action === "delete" && { uid }),
+        ...((action === "delete" || action === "approve") && { uid }),
       });
       if (action === "check") return route.fulfill({ json: { admin } });
+      if (action === "approve") {
+        const reply = approveReply ?? { json: { ok: true } };
+        await new Promise((res) => setTimeout(res, reply.delay ?? 0));
+        return route.fulfill(reply);
+      }
       if (action === "delete") {
         const reply = deleteReply ?? { json: { ok: true } };
         await new Promise((res) => setTimeout(res, reply.delay ?? 0));
@@ -395,7 +403,8 @@ test("the Users table lists the users with their account details and ids", async
     "Sign-in",
     "Member ID",
     "User ID",
-    "", // the column of Delete buttons
+    "Claude",
+    "", // the column of Approve and Delete buttons
   ]);
   const rows = dialog.getByRole("row");
   await expect(rows).toHaveCount(3); // header + 2 users
@@ -409,6 +418,7 @@ test("the Users table lists the users with their account details and ids", async
     "Google, Email and password",
     "USR-ABC123",
     "FbUid123abcDEF456ghiJKL789", // the user id string
+    "", // Claude: no record yet (Fix 134)
     "Delete", // the button of the last column (Fix 127)
   ]);
   const bob = await rows.nth(2).getByRole("cell").allTextContents();
@@ -458,7 +468,7 @@ test("the Users table looks like the usage table: as wide as its content, border
   expect(await size(dialog.getByRole("cell").first())).toBeGreaterThanOrEqual(16);
   const heads = dialog.getByRole("columnheader");
   expect(await heads.evaluateAll((hs) => hs.map((h) => getComputedStyle(h).textAlign))).toEqual(
-    Array(9).fill("center"), // the eight columns and the one for the Delete button
+    Array(10).fill("center"), // the nine columns and the one for the buttons
   );
   expect(
     await dialog
@@ -839,7 +849,7 @@ test("the Users table offers Delete for each user except an admin", async ({ pag
   await expect(dialog.getByRole("button", { name: "Delete bob@test.org" })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Delete boss@example.com" })).toHaveCount(0);
   const heads = await dialog.locator("th").allTextContents();
-  expect(heads.length).toBe(9); // the eight columns and the empty one for the button
+  expect(heads.length).toBe(10); // the nine columns and the empty one for the buttons
 });
 
 test("Delete asks first, naming the user; Cancel changes nothing and sends nothing", async ({
@@ -893,4 +903,67 @@ test("while a delete runs the Delete buttons are disabled", async ({ page: p }) 
   await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeDisabled();
   await expect(dialog.getByText("Deleted bob@test.org.")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeEnabled();
+});
+
+// ---- Approve (Fix 134)
+const WAITING = { ...USERS[1], approval: "pending" };
+const SEEN = { ...USERS[0], approval: "approved" };
+
+test("the Claude column says Approved, Waiting or nothing; only a waiting person has Approve", async ({
+  page: p,
+}) => {
+  await startAdmin(p, { users: [SEEN, WAITING, { ...ADMIN_ROW, approval: "approved" }] });
+  const dialog = await openUsers(p);
+  const claude = dialog.getByRole("row").locator("td:nth-child(9)");
+  await expect(claude).toHaveText(["Approved", "Waiting", "Approved"]);
+  await expect(dialog.getByRole("button", { name: /^Approve / })).toHaveCount(1);
+  await expect(dialog.getByRole("button", { name: "Approve bob@test.org" })).toBeVisible();
+});
+
+test("Approve: the server is asked with the sign-in token, the row turns Approved and the table says so", async ({
+  page: p,
+}) => {
+  const seen = await startAdmin(p, { users: [SEEN, WAITING] });
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Approve bob@test.org" }).click();
+  await expect(dialog.getByText("Approved bob@test.org.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /^Approve / })).toHaveCount(0);
+  await expect(dialog.getByRole("row").locator("td:nth-child(9)")).toHaveText([
+    "Approved",
+    "Approved",
+  ]);
+  expect(seen.filter((s) => s.action === "approve")).toEqual([
+    { action: "approve", auth: "Bearer mock-id-token", uid: "FbUid999xyz" },
+  ]);
+});
+
+test("Approve refused or failed: the reason is shown and the person stays waiting", async ({
+  page: p,
+}) => {
+  await startAdmin(p, {
+    users: [WAITING],
+    approveReply: { status: 500, json: { error: "Could not approve the user" } },
+  });
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Approve bob@test.org" }).click();
+  await expect(dialog.getByText("Could not approve: Could not approve the user")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Approve bob@test.org" })).toBeEnabled();
+  await expect(dialog.getByRole("row").locator("td:nth-child(9)")).toHaveText(["Waiting"]);
+});
+
+test("while an approve runs the buttons are disabled, and the note shown is the latest action's", async ({
+  page: p,
+}) => {
+  await startAdmin(p, {
+    users: [SEEN, WAITING],
+    approveReply: { json: { ok: true }, delay: 600 },
+  });
+  dialogs(p, true);
+  const dialog = await openUsers(p);
+  await dialog.getByRole("button", { name: "Approve bob@test.org" }).click();
+  await expect(dialog.getByRole("button", { name: "Delete jane@example.com" })).toBeDisabled();
+  await expect(dialog.getByText("Approved bob@test.org.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Delete jane@example.com" }).click();
+  await expect(dialog.getByText("Deleted jane@example.com.")).toBeVisible();
+  await expect(dialog.getByText("Approved bob@test.org.")).toHaveCount(0);
 });

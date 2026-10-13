@@ -7,6 +7,7 @@ import handler, { deps } from "../../api/claude.js";
 
 // A good token for any user: "tok-<uid>".
 deps.verify = async (token) => ({ uid: token.slice(4), email_verified: true });
+deps.access = async () => ({ approved: true }); // the approval check has its own tests (Fix 134)
 
 const realFetch = globalThis.fetch;
 let sent;

@@ -118,3 +118,33 @@ test("My Account lists the accounts Vaulte uses for an admin only, on desktop an
   await expect(p.getByRole("button", { name: /CONNECTED SERVICES/ })).toHaveCount(0);
   await expect(p.getByRole("button", { name: /DETAILS/ })).toBeVisible();
 });
+
+test("a confirmed person who is waiting for approval is told on Home; an approved one is not (Fix 134)", async ({
+  page: p,
+}) => {
+  await start(p, { __admin: false, __approved: false });
+  await expect(p.getByText("Claude is waiting for approval.")).toBeVisible();
+  await expect(p.getByText("the rest of Vaulte works now", { exact: false })).toBeVisible();
+});
+
+test("no notice for an approved person, an admin, or while the answer is unknown", async ({
+  page: p,
+}) => {
+  await start(p, { __admin: false });
+  await expect(p.getByText("Welcome, Jane.")).toBeVisible();
+  await expect(p.getByText("Claude is waiting for approval.")).toHaveCount(0);
+});
+
+test("the real answer decides the notice: approved false shows it", async ({ page: p }) => {
+  await p.addInitScript(() => (window.__adminNetwork = true)); // the real call, answered below
+  await p.route(
+    (u) => new URL(u).pathname === "/api/admin-users",
+    (r) => r.fulfill({ json: { admin: false, approved: false } }),
+  );
+  await p.addInitScript((i) => Object.assign(window, i), {
+    __authUser: { uid: "u", email: "jane@example.com" },
+    __docs: { "users/u": PROFILE },
+  });
+  await p.goto("/app.html");
+  await expect(p.getByText("Claude is waiting for approval.")).toBeVisible({ timeout: 15_000 });
+});

@@ -10,7 +10,7 @@ import HomePanel from "./HomePanel.jsx";
 import AccountPanel from "./AccountPanel.jsx";
 import DashboardPanel from "./DashboardPanel.jsx";
 import { useErrorLog } from "../hooks/useErrorLog.js";
-import { useIsAdmin } from "../hooks/useIsAdmin.js";
+import { useAccess } from "../hooks/useIsAdmin.js";
 import { IntegrationsProvider } from "../context/IntegrationsContext.js";
 
 const pageStyle = {
@@ -27,8 +27,8 @@ const mainStyle = (activePanel) => ({
   position: "relative",
 });
 
-function Panel({ activePanel, profile, userId, account, admin }) {
-  if (activePanel === "home") return <HomePanel profile={profile} />;
+function Panel({ activePanel, profile, userId, account, admin, approved }) {
+  if (activePanel === "home") return <HomePanel profile={profile} waiting={approved === false} />;
   if (activePanel === "dashboard" && admin) return <DashboardPanel userId={userId} />;
   if (activePanel === "nutrition")
     return (
@@ -43,7 +43,7 @@ function Panel({ activePanel, profile, userId, account, admin }) {
 
 export default function AccountPage({ profile, toast, userId, page, nav, edit }) {
   useErrorLog(userId);
-  const admin = useIsAdmin(userId); // the Dashboard and the owner's integrations are for admins (Fix 128)
+  const { admin, approved } = useAccess(userId); // the Dashboard and the owner's integrations are for admins (Fix 128)
   return (
     <div className="app-page" style={pageStyle}>
       <style>{globalStyle}</style>
@@ -62,6 +62,7 @@ export default function AccountPage({ profile, toast, userId, page, nav, edit })
             userId={userId}
             account={page.account}
             admin={admin}
+            approved={approved}
           />
         </div>
       </div>

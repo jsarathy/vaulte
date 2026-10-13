@@ -102,9 +102,13 @@ test("deleteData: the profile and every collection under it go; another user's d
     "users/u2/recipes/r1",
     "users/u10/recipes/r1",
     "ai_usage_unattributed/a1",
+    "approvals/u1",
+    "approvals/u2",
   ])
     await seed(p);
   await removalSteps({ token: "t" }).deleteData("u1");
+  assert.equal((await db().doc("approvals/u1").get()).exists, false); // their approval record goes too (Fix 134)
+  assert.equal((await db().doc("approvals/u2").get()).exists, true);
   for (const p of [
     "users/u1",
     "users/u1/recipes/r1",

@@ -34,7 +34,10 @@ window.fetch = (input, init) => {
     new URL(url, location.href).pathname === "/api/admin-users" &&
     !window.__adminNetwork
   ) {
-    const body = JSON.stringify({ admin: window.__admin !== false });
+    const body = JSON.stringify({
+      admin: window.__admin !== false,
+      approved: window.__approved !== false,
+    });
     return Promise.resolve(
       new Response(body, { status: 200, headers: { "Content-Type": "application/json" } }),
     );

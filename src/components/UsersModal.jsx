@@ -6,11 +6,19 @@ import { useEffect, useState } from "react";
 import { useIsPhone } from "../hooks/useIsPhone.js";
 import { loadUsers, myUid } from "../api/adminUsers.js";
 import { useDeleteUser } from "../hooks/useDeleteUser.js";
-import { USER_COLUMNS, canDelete, filterUsers, userCells, usersCount } from "../lib/userTable.js";
+import { useApproveUser } from "../hooks/useApproveUser.js";
+import {
+  USER_COLUMNS,
+  canApprove,
+  canDelete,
+  filterUsers,
+  userCells,
+  usersCount,
+} from "../lib/userTable.js";
 import { S, TYPE } from "./tableStyles.js";
 
 // Long values (an email, the user id) wrap inside their cell instead of making the table very wide
-const WRAP = { whiteSpace: "normal", wordBreak: "break-all", maxWidth: "18ch" };
+const WRAP = { whiteSpace: "normal", wordBreak: "break-all", maxWidth: "13ch" };
 const WRAPPED = new Set([1, 7]); // Email, User ID
 
 function DeleteButton({ user, onDelete, disabled }) {
@@ -32,7 +40,27 @@ function DeleteButton({ user, onDelete, disabled }) {
   );
 }
 
-function Rows({ users, pad, onDelete, busy }) {
+function ApproveButton({ user, onApprove, disabled }) {
+  if (!canApprove(user)) return null;
+  return (
+    <button
+      aria-label={`Approve ${user.email || user.uid}`}
+      disabled={disabled}
+      onClick={() => onApprove(user)}
+      style={{
+        ...S.close,
+        fontSize: "inherit",
+        color: "#15803d",
+        marginRight: "10px",
+        cursor: disabled ? "default" : "pointer",
+      }}
+    >
+      Approve
+    </button>
+  );
+}
+
+function Rows({ users, pad, actions, busy }) {
   return (
     <table style={{ borderCollapse: "collapse", width: "100%", minWidth: "max-content" }}>
       <thead>
@@ -53,7 +81,8 @@ function Rows({ users, pad, onDelete, busy }) {
               </td>
             ))}
             <td style={{ ...S.td, padding: pad, textAlign: "center" }}>
-              <DeleteButton user={u} onDelete={onDelete} disabled={busy} />
+              <ApproveButton user={u} onApprove={actions.onApprove} disabled={busy} />
+              <DeleteButton user={u} onDelete={actions.onDelete} disabled={busy} />
             </td>
           </tr>
         ))}
@@ -62,12 +91,12 @@ function Rows({ users, pad, onDelete, busy }) {
   );
 }
 
-function Body({ state, shown, pad, onDelete, busy }) {
+function Body({ state, shown, pad, actions, busy }) {
   if (state.status === "loading") return <div style={S.note}>Loading…</div>;
   if (state.status === "error")
     return <div style={S.note}>Could not load users: {state.error}</div>;
   if (!shown.length) return <div style={S.note}>No users match.</div>;
-  return <Rows users={shown} pad={pad} onDelete={onDelete} busy={busy} />;
+  return <Rows users={shown} pad={pad} actions={actions} busy={busy} />;
 }
 
 export default function UsersModal({ onClose }) {
@@ -90,6 +119,13 @@ export default function UsersModal({ onClose }) {
   }, []);
   const shown = filterUsers(state.users, query);
   const del = useDeleteUser(setState);
+  const approve = useApproveUser(setState);
+  const [last, setLast] = useState("delete"); // whose note to show: the action done most recently
+  const note = last === "approve" ? approve.note : del.note;
+  const actions = {
+    onDelete: (u) => (setLast("delete"), del.onDelete(u)),
+    onApprove: (u) => (setLast("approve"), approve.onApprove(u)),
+  };
   return (
     <div style={S.backdrop} onClick={onClose}>
       <div
@@ -119,11 +155,11 @@ export default function UsersModal({ onClose }) {
             state={state}
             shown={shown}
             pad={type.pad}
-            onDelete={del.onDelete}
-            busy={del.busy}
+            actions={actions}
+            busy={del.busy || approve.busy}
           />
         </div>
-        {del.note && <div style={{ ...S.note, fontSize: type.total }}>{del.note}</div>}
+        {note && <div style={{ ...S.note, fontSize: type.total }}>{note}</div>}
         <div style={{ ...S.total, fontSize: type.total }}>{usersCount(shown.length)}</div>
       </div>
     </div>

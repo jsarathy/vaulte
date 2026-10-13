@@ -4,6 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   USER_COLUMNS,
+  approvalText,
+  canApprove,
   canDelete,
   deleteConfirmText,
   filterUsers,
@@ -47,6 +49,7 @@ test("the columns", () => {
     "Sign-in",
     "Member ID",
     "User ID",
+    "Claude",
   ]);
 });
 
@@ -70,7 +73,10 @@ test("userCells: a row in column order, dates as dd-MMM-yyyy hh:mm, a disabled u
     "Google, Email and password",
     "USR-ABC123",
     "FbUid123abc",
+    "",
   ]);
+  assert.deepEqual(userCells({ ...JANE, approval: "approved" }).at(-1), "Approved");
+  assert.deepEqual(userCells({ ...JANE, approval: "pending" }).at(-1), "Waiting");
   assert.deepEqual(userCells(BOB), [
     "",
     "bob@test.org",
@@ -80,9 +86,10 @@ test("userCells: a row in column order, dates as dd-MMM-yyyy hh:mm, a disabled u
     "Phone, apple.com (disabled)",
     "",
     "FbUid999xyz",
+    "",
   ]);
   assert.equal(userCells(JANE).length, USER_COLUMNS.length);
-  assert.deepEqual(userCells({}), ["", "", "", "", "", "", "", ""]);
+  assert.deepEqual(userCells({}), ["", "", "", "", "", "", "", "", ""]);
 });
 
 test("filterUsers: every word must be somewhere in the row, in any case", () => {
@@ -137,4 +144,21 @@ test("filterUsers: a user with no address matches only what is really in the row
   assert.deepEqual(filterUsers(users, "stryker was here"), []);
   assert.deepEqual(filterUsers(users, "was here"), []);
   assert.deepEqual(filterUsers(users, "jane   example"), users); // extra spaces between words are fine
+});
+
+test("approvalText and canApprove: only a waiting person is offered Approve (Fix 134)", () => {
+  assert.equal(approvalText("approved"), "Approved");
+  assert.equal(approvalText("pending"), "Waiting");
+  assert.equal(approvalText(""), "");
+  assert.equal(approvalText(undefined), "");
+  assert.equal(approvalText("something else"), "");
+  assert.equal(canApprove({ approval: "pending" }), true);
+  assert.equal(canApprove({ approval: "approved" }), false);
+  assert.equal(canApprove({ approval: "" }), false);
+  assert.equal(canApprove({}), false);
+});
+
+test("filterUsers finds the waiting people by the word Waiting", () => {
+  const waiting = { ...JANE, approval: "pending" };
+  assert.deepEqual(filterUsers([waiting, BOB], "waiting"), [waiting]);
 });

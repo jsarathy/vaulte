@@ -64,7 +64,20 @@ const today = () =>
     year: "numeric",
   });
 
-export default function HomePanel({ profile }) {
+const waitingStyle = {
+  color: "#d4af37",
+  fontSize: "14px",
+  letterSpacing: "0.5px",
+  marginTop: "18px",
+  maxWidth: "460px",
+  border: "1px solid rgba(212,175,55,0.35)",
+  borderRadius: "6px",
+  padding: "10px 14px",
+  background: "rgba(212,175,55,0.08)",
+};
+
+/** `waiting`: the person's email is confirmed but the owner has not yet let them use Claude (Fix 134). */
+export default function HomePanel({ profile, waiting }) {
   return (
     <div className="fade-up" style={panelStyle}>
       {profile.photoURL && <div style={photoStyle(profile.photoURL)} />}
@@ -72,6 +85,12 @@ export default function HomePanel({ profile }) {
         <div style={dateStyle}>{today()}</div>
         <h1 style={titleStyle}>Welcome, {profile.firstName}.</h1>
         <p style={taglineStyle}>Good to have you back.</p>
+        {waiting && (
+          <p style={waitingStyle}>
+            Claude is waiting for approval. The owner has been told and will let you in; the rest of
+            Vaulte works now.
+          </p>
+        )}
       </div>
     </div>
   );
