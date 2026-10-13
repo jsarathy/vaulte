@@ -426,6 +426,7 @@ test("infraStatusFor: a state and lines for each link; Vercel joins its platform
     {
       vercel: { indicator: "minor", description: "Minor Service Outage" },
       github: { indicator: "none", description: "All Systems Operational" },
+      resend: { indicator: "major", description: "Partial Outage" },
       firebase: { ongoing: [] },
       ci: {
         runs: [
@@ -447,6 +448,7 @@ test("infraStatusFor: a state and lines for each link; Vercel joins its platform
   assert.deepEqual(Object.keys(all), [
     "Vercel",
     "Firebase",
+    "Resend",
     "GitHub",
     "GitHub Actions",
     "GitHub issues",
@@ -456,6 +458,7 @@ test("infraStatusFor: a state and lines for each link; Vercel joins its platform
     lines: ["Platform: Minor Service Outage", "Production: deployed 2 hours ago"],
   });
   assert.deepEqual(all.Firebase, { state: "ok", lines: ["Platform: no ongoing incidents"] });
+  assert.deepEqual(all.Resend, { state: "error", lines: ["Platform: Partial Outage"] });
   assert.deepEqual(all.GitHub, { state: "ok", lines: ["Platform: All Systems Operational"] });
   assert.deepEqual(all["GitHub Actions"], {
     state: "ok",

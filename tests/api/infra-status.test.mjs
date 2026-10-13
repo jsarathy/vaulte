@@ -164,7 +164,7 @@ test("gathers the platform statuses, Firebase's ongoing incidents, CI, the deplo
   });
   assert.equal(out.body.checked_at, new Date(1_000_000).toISOString());
   assert.equal(out.headers["Cache-Control"], "private, max-age=60");
-  assert.equal(urls.length, 8); // 3 status pages and feeds, runs, the canary, the deployment and its status, issues
+  assert.equal(urls.length, 9); // 4 status pages and feeds (Resend's too), runs, the canary, the deployment and its status, issues
 });
 
 test("a source that fails is { error: true } and the others still come back", async () => {
