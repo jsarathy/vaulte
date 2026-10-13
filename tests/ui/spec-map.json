@@ -1,6 +1,8 @@
 {
   "tests/ui/add-entry-layout.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/polarReconnect.js",
+    "src/api/polarSignIn.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
     "src/components/FoldTitle.jsx",
@@ -31,6 +33,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/add-food.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/foodLookup.js",
     "src/api/usageContext.js",
@@ -73,6 +76,7 @@
     "src/api/adminUsers.js",
     "src/api/aiUsage.js",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/dashboard.js",
     "src/api/errorLog.js",
     "src/api/infraStatus.js",
@@ -104,6 +108,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/errorLog.js",
     "src/api/medsLog.js",
     "src/api/profilePhoto.js",
@@ -155,6 +160,8 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -184,6 +191,7 @@
   "tests/ui/app-auth-history.spec.mjs": [
     "src/App.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/components/AccountPage.jsx",
     "src/components/AccountSidebar.jsx",
     "src/components/AccountTopbar.jsx",
@@ -209,6 +217,7 @@
   "tests/ui/app-auth.spec.mjs": [
     "src/App.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/components/AccountPage.jsx",
     "src/components/AccountSidebar.jsx",
     "src/components/AccountTopbar.jsx",
@@ -236,6 +245,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -281,6 +291,8 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -309,6 +321,7 @@
   ],
   "tests/ui/apple-activity-card.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -342,6 +355,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -367,6 +382,7 @@
   ],
   "tests/ui/body-anatomy.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -409,6 +425,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -441,6 +459,7 @@
   ],
   "tests/ui/body-log-table.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/bodyLog.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -484,6 +503,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -516,6 +537,7 @@
   ],
   "tests/ui/body-trajectory.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -558,6 +580,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -590,6 +614,7 @@
   ],
   "tests/ui/calendar-logged-days.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -622,6 +647,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -647,6 +674,7 @@
   ],
   "tests/ui/calendar-weight-entry.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -690,6 +718,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -727,6 +757,7 @@
   ],
   "tests/ui/chat-window.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/chatHistory.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -766,6 +797,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -793,6 +826,7 @@
   ],
   "tests/ui/compare-tab.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -840,7 +874,9 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -884,6 +920,7 @@
     "src/api/adminUsers.js",
     "src/api/aiUsage.js",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/dashboard.js",
     "src/api/errorLog.js",
     "src/api/infraStatus.js",
@@ -919,6 +956,7 @@
   ],
   "tests/ui/day-summary.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -951,6 +989,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -977,6 +1017,7 @@
   "tests/ui/error-log.spec.mjs": [
     "src/App.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/errorLog.js",
     "src/components/AccountPage.jsx",
     "src/components/AccountSidebar.jsx",
@@ -997,6 +1038,7 @@
     "src/styles/authStyles.js"
   ],
   "tests/ui/exercise-log.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -1031,12 +1073,14 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/firestore-api.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/firestore.js",
     "src/constants/helpers.js",
     "src/constants/recipes.js",
     "src/constants/seedDays.js"
   ],
   "tests/ui/food-lookup.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/foodLookup.js",
     "src/api/recipeWeights.js",
@@ -1076,6 +1120,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/hourly-steps.spec.mjs": [
+    "src/api/authToken.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
     "src/components/FoldTitle.jsx",
@@ -1111,6 +1156,7 @@
   ],
   "tests/ui/meal-cards.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -1147,6 +1193,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -1174,6 +1222,7 @@
   ],
   "tests/ui/meds-panel.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -1206,6 +1255,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -1231,6 +1282,7 @@
   ],
   "tests/ui/monthly-targets.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -1263,6 +1315,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -1289,6 +1343,7 @@
   "tests/ui/no-motion.spec.mjs": [
     "src/App.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/components/AuthBits.jsx",
     "src/components/AuthCard.jsx",
     "src/components/GoogleButton.jsx",
@@ -1303,6 +1358,7 @@
   "tests/ui/phone-account.spec.mjs": [
     "src/App.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/components/AccountPage.jsx",
     "src/components/AccountPanel.jsx",
     "src/components/AccountSidebar.jsx",
@@ -1328,6 +1384,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/errorLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -1384,7 +1441,9 @@
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePhoneFold.js",
@@ -1427,6 +1486,7 @@
     "src/api/adminUsers.js",
     "src/api/aiUsage.js",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/dashboard.js",
     "src/api/infraStatus.js",
     "src/components/AccountPage.jsx",
@@ -1457,6 +1517,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
     "src/api/usageContext.js",
@@ -1506,6 +1567,8 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePolarDetail.js",
     "src/hooks/usePolarSync.js",
@@ -1538,6 +1601,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
     "src/api/usageContext.js",
@@ -1582,6 +1646,8 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePolarDetail.js",
     "src/hooks/usePolarSync.js",
@@ -1611,6 +1677,7 @@
     "src/api/adminUsers.js",
     "src/api/aiUsage.js",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/dashboard.js",
     "src/api/errorLog.js",
     "src/api/infraStatus.js",
@@ -1643,6 +1710,7 @@
   ],
   "tests/ui/phone-log.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
     "src/api/usageContext.js",
@@ -1671,6 +1739,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePolarDetail.js",
     "src/hooks/usePolarSync.js",
@@ -1694,6 +1764,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -1765,7 +1836,9 @@
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -1822,6 +1895,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
     "src/api/usageContext.js",
@@ -1899,7 +1973,9 @@
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePhoneFold.js",
@@ -1957,6 +2033,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
     "src/api/usageContext.js",
@@ -2012,6 +2089,8 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePlanEditing.js",
     "src/hooks/usePlanForm.js",
@@ -2051,6 +2130,7 @@
     "src/App.jsx",
     "src/NutritionTracker.jsx",
     "src/api/authAccount.js",
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
     "src/api/usageContext.js",
@@ -2105,6 +2185,8 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useErrorLog.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/usePlanEditing.js",
     "src/hooks/usePlanForm.js",
@@ -2139,6 +2221,7 @@
     "src/tabs/WeightTracker.jsx"
   ],
   "tests/ui/photo-log.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/photoLog.js",
     "src/api/usageContext.js",
@@ -2182,6 +2265,7 @@
   ],
   "tests/ui/polar-detail.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/polarDetail.js",
     "src/api/recipeWeights.js",
@@ -2218,6 +2302,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -2245,6 +2331,7 @@
   ],
   "tests/ui/polar-log.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/medsLog.js",
     "src/api/polarDetail.js",
@@ -2277,6 +2364,7 @@
     "src/components/PolarHRSparkline.jsx",
     "src/components/PolarLogModal.jsx",
     "src/components/PolarSessionsPanel.jsx",
+    "src/components/PolarZoneTable.jsx",
     "src/components/RecipeModal.jsx",
     "src/components/SidebarStats.jsx",
     "src/components/StartSkeleton.jsx",
@@ -2296,7 +2384,9 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -2338,6 +2428,7 @@
     "src/tabs/LogTab.jsx"
   ],
   "tests/ui/polar-sessions.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/polarSessions.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2370,6 +2461,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-builder.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/foodLookup.js",
     "src/api/photoLog.js",
     "src/api/recipeWeights.js",
@@ -2417,6 +2509,7 @@
     "src/utils/imageUtils.js"
   ],
   "tests/ui/recipe-by-weight.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2461,6 +2554,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-delete-cascade.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2501,6 +2595,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-duplicates.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/foodLookup.js",
     "src/api/recipeWeights.js",
     "src/api/usageContext.js",
@@ -2545,6 +2640,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-edit.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2585,6 +2681,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-form.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2623,6 +2720,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-links.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2663,6 +2761,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-modal.spec.mjs": [
+    "src/api/authToken.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
     "src/components/FoldTitle.jsx",
@@ -2696,6 +2795,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-portion-modal.spec.mjs": [
+    "src/api/authToken.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
     "src/components/FoldTitle.jsx",
@@ -2730,6 +2830,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-propagation.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2770,6 +2871,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-weight-estimates.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2814,6 +2916,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/recipe-weight-guards.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2846,6 +2949,7 @@
     "src/tabs/AddEntry.jsx"
   ],
   "tests/ui/saved-recipes.spec.mjs": [
+    "src/api/authToken.js",
     "src/api/recipeWeights.js",
     "src/components/AddFoodCard.jsx",
     "src/components/BrowseByDate.jsx",
@@ -2887,6 +2991,7 @@
   ],
   "tests/ui/tracker-actions.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -2960,7 +3065,9 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -3021,6 +3128,7 @@
   ],
   "tests/ui/tracker-chat.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/chatHistory.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -3092,7 +3200,9 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -3153,6 +3263,7 @@
   ],
   "tests/ui/tracker-lazy-start.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/dayForEdit.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -3210,7 +3321,9 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -3262,6 +3375,7 @@
   ],
   "tests/ui/tracker-startup.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/chatHistory.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
@@ -3335,7 +3449,9 @@
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
     "src/hooks/useExerciseLog.js",
+    "src/hooks/useExpandBox.js",
     "src/hooks/useFoodLookup.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useHourlySteps.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
@@ -3396,6 +3512,7 @@
   ],
   "tests/ui/weight-log-table.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerActions.js",
@@ -3440,6 +3557,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -3477,6 +3596,7 @@
   ],
   "tests/ui/weight-plan-edit.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerActions.js",
@@ -3523,6 +3643,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -3560,6 +3682,7 @@
   ],
   "tests/ui/weight-plan-view.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerActions.js",
@@ -3606,6 +3729,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
@@ -3643,6 +3768,7 @@
   ],
   "tests/ui/weight-trajectory.spec.mjs": [
     "src/NutritionTracker.jsx",
+    "src/api/authToken.js",
     "src/api/medsLog.js",
     "src/api/recipeWeights.js",
     "src/api/trackerData.js",
@@ -3685,6 +3811,8 @@
     "src/hooks/useChat.js",
     "src/hooks/useChatWindow.js",
     "src/hooks/useCollapsedMeals.js",
+    "src/hooks/useExpandBox.js",
+    "src/hooks/useFullView.js",
     "src/hooks/useIsPhone.js",
     "src/hooks/useMeds.js",
     "src/hooks/useMonthlyTargets.js",
