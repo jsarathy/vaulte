@@ -4,7 +4,7 @@
 import { C, FONT } from "../constants/design.jsx";
 import { CHART, heartRateChart } from "../lib/polarHeartRate.js";
 
-const { width: W, height: H, pad: PAD } = CHART;
+const { width: W, height: H, pad: PAD, left: LEFT } = CHART;
 const S = {
   title: {
     fontSize: "10px",
@@ -55,16 +55,30 @@ const L = {
 };
 const big = (large, base, extra) => (large ? { ...base, ...extra } : base);
 const LABEL = { fontSize: "8", fill: C.hint, fontFamily: "DM Mono, monospace" };
+const AXIS_LABEL = { ...LABEL, textAnchor: "end" };
 
 const SMALL_SVG = { width: "100%", height: "70px", display: "block" };
+
+/** The y-axis: a faint line and a bpm label at each tick; the highest label carries the unit. */
+function Axis({ ticks }) {
+  return ticks.map((t, i) => (
+    <g key={t.bpm}>
+      <line x1={LEFT} y1={t.y} x2={W - PAD} y2={t.y} stroke={C.border} strokeWidth="0.4" />
+      <text x={LEFT - 3} y={t.y + 2.5} {...AXIS_LABEL}>
+        {i === ticks.length - 1 ? `${t.bpm} bpm` : t.bpm}
+      </text>
+    </g>
+  ));
+}
 
 function Line({ session, chart, large }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={big(large, SMALL_SVG, L.svg)}>
+      <Axis ticks={chart.ticks} />
       {/* dashed line at the average */}
       {session.hr_avg && (
         <line
-          x1={PAD}
+          x1={LEFT}
           y1={chart.avgY}
           x2={W - PAD}
           y2={chart.avgY}
@@ -81,12 +95,6 @@ function Line({ session, chart, large }) {
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      <text x={PAD + 2} y={PAD + 8} {...LABEL}>
-        {Math.round(chart.max)} bpm
-      </text>
-      <text x={PAD + 2} y={H - PAD - 2} {...LABEL}>
-        {Math.round(chart.min)} bpm
-      </text>
     </svg>
   );
 }

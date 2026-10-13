@@ -85,16 +85,28 @@ test("polar log box: header, stats, chart and zones", async ({ page: p }) => {
   await expect(box(p).getByText("90–160 bpm")).toBeVisible();
   const svg = box(p).locator("svg");
   expect(await svg.getAttribute("viewBox")).toBe("0 0 368 80");
-  expect(await svg.locator("text").allTextContents()).toEqual(["165 bpm", "85 bpm"]);
-  const avg = svg.locator("line");
+  // the y-axis: a label at each multiple of 20 bpm in the scale (85–165); the highest has the unit
+  expect(await svg.locator("text").allTextContents()).toEqual(["100", "120", "140", "160 bpm"]);
+  const grid = await svg
+    .locator("line:not([stroke-dasharray])")
+    .evaluateAll((ls) =>
+      ls.map((l) => [l.getAttribute("x1"), l.getAttribute("y1"), l.getAttribute("x2")]),
+    );
+  expect(grid).toEqual([
+    ["40", "62.5", "364"],
+    ["40", "44.5", "364"],
+    ["40", "26.5", "364"],
+    ["40", "8.5", "364"],
+  ]);
+  const avg = svg.locator("line[stroke-dasharray]");
   expect(await avg.evaluate((l) => ["x1", "y1", "x2", "y2"].map((a) => l.getAttribute(a)))).toEqual(
-    ["4", "35.5", "364", "35.5"],
+    ["40", "35.5", "364", "35.5"],
   );
   const points = (await svg.locator("polyline").getAttribute("points")).split(" ");
   expect(points.length).toBe(10); // the gap is skipped
-  expect([points[0], points[1], points.at(-1)]).toEqual(["4.0,71.5", "40.0,62.5", "364.0,67.0"]);
-  expect(points[5]).toBe("184.0,17.5"); // 150 bpm, 6th sample
-  expect(points[6]).toBe("256.0,13.0"); // 155 bpm, 8th sample (after the gap)
+  expect([points[0], points[1], points.at(-1)]).toEqual(["40.0,71.5", "72.4,62.5", "364.0,67.0"]);
+  expect(points[5]).toBe("202.0,17.5"); // 150 bpm, 6th sample
+  expect(points[6]).toBe("266.8,13.0"); // 155 bpm, 8th sample (after the gap)
   // Zones by % of max HR: bar widths and the legend (empty zones left out)
   const bar = box(p).locator('div[style*="height: 6px"] > div');
   expect(await bar.evaluateAll((es) => es.map((e) => [e.style.flex, e.style.minWidth]))).toEqual([
@@ -123,8 +135,8 @@ test("polar log box: header, stats, chart and zones", async ({ page: p }) => {
   ]);
   await expect(box(p).getByText("Heart rate · 37 min recorded")).toBeVisible();
   await expect(box(p).getByText("100–100 bpm")).toBeVisible();
-  expect(await box(p).locator("svg text").allTextContents()).toEqual(["105 bpm", "95 bpm"]);
-  await expect(box(p).locator("svg line")).toHaveCount(0);
+  expect(await box(p).locator("svg text").allTextContents()).toEqual(["95", "100", "105 bpm"]);
+  await expect(box(p).locator("svg line[stroke-dasharray]")).toHaveCount(0); // no average line
   expect((await box(p).locator("polyline").getAttribute("points")).split(" ").length).toBe(225);
   expect(await legend.allTextContents()).toEqual(["Z1 38m"]);
   await box(p).getByRole("button", { name: "Cancel" }).click();
@@ -133,7 +145,7 @@ test("polar log box: header, stats, chart and zones", async ({ page: p }) => {
   // Zone boundaries; fractional readings shown as read, scale labels rounded
   await row(p, "Rowing").click();
   await expect(box(p).getByText("59.6–100.4 bpm")).toBeVisible();
-  expect(await box(p).locator("svg text").allTextContents()).toEqual(["105 bpm", "55 bpm"]);
+  expect(await box(p).locator("svg text").allTextContents()).toEqual(["60", "80", "100 bpm"]);
   expect(await legend.allTextContents()).toEqual(["Z1 1m", "Z2 1m", "Z3 2m", "Z4 1m", "Z5 2m"]);
   await box(p).getByRole("button", { name: "Cancel" }).click();
 
@@ -328,7 +340,7 @@ test("an already-logged session shows where it went, with no slot picker (Fix 51
   await start(p, [{ ...RIDE, logged: true }], [day]);
   await p.getByRole("button", { name: "Browse all sessions" }).click();
   await p.getByText("logged", { exact: true }).click();
-  await expect(box(p).getByText("Already logged")).toBeVisible();
+  await expect(box(p).getByText("Already logged")).toHaveCount(0); // just the message
   await expect(box(p).getByText("Logged to Exercise on 2026-10-03")).toBeVisible();
   await expect(slot(p)).toHaveCount(0);
   await expect(box(p).getByRole("button", { name: "Log session" })).toHaveCount(0);
@@ -361,7 +373,7 @@ test("a session without heart rate can fetch it from the log box, logged or not 
   });
   await p.getByRole("button", { name: "Browse all sessions" }).click();
   await p.getByText("logged", { exact: true }).click();
-  await expect(box(p).getByText("Already logged")).toBeVisible();
+  await expect(box(p).getByText("Already logged")).toHaveCount(0); // just the message
   await expect(box(p).getByText("Heart rate data wasn't captured at sync time.")).toBeVisible();
   const fetchBtn = box(p).getByRole("button", { name: "Fetch HR data" });
   await fetchBtn.click();
@@ -447,4 +459,69 @@ test("a log box without heart rate expands too; a double-click on Fetch HR data 
   await expect(full).toBeVisible();
   await p.keyboard.press("Escape");
   await expect(full).toHaveCount(0);
+});
+
+test("the zones table: each zone's bpm range and meaning, from the session's max HR; it grows with the expanded box", async ({
+  page: p,
+}) => {
+  await start(p, [RIDE, { ...WALK, hr_max: undefined }]);
+  await row(p, "Indoor Cycling").click();
+  const table = box(p).locator("table");
+  await expect(
+    box(p).getByText("Zones are shares of 160 bpm (this session's highest reading)"),
+  ).toBeVisible();
+  expect(await table.locator("thead th").allTextContents()).toEqual([
+    "Zone",
+    "bpm",
+    "What it means",
+  ]);
+  const rows = await table
+    .locator("tbody tr")
+    .evaluateAll((trs) => trs.map((tr) => [...tr.children].map((c) => c.textContent)));
+  expect(rows.map((r) => r.slice(0, 2))).toEqual([
+    ["Z1 Easy", "under 96"],
+    ["Z2 Fat burn", "96–111"],
+    ["Z3 Aerobic", "112–127"],
+    ["Z4 Threshold", "128–143"],
+    ["Z5 Max", "144+"],
+  ]);
+  expect(rows[0][2]).toMatch(/^Warm-up and recovery/);
+  expect(rows[4][2]).toBe("Very hard, all-out; short bursts only.");
+  const swatches = await table
+    .locator("tbody tr td:first-child span")
+    .evaluateAll((es) => es.map((e) => e.style.background));
+  expect(swatches).toEqual([
+    "rgb(181, 212, 244)",
+    "rgb(192, 221, 151)",
+    "rgb(250, 199, 117)",
+    "rgb(240, 153, 123)",
+    "rgb(226, 75, 74)",
+  ]);
+  // it sits below the meal slot, above the buttons, and the box still fits the window
+  const tableTop = (await table.boundingBox()).y;
+  expect(tableTop).toBeGreaterThan((await slot(p).boundingBox()).y);
+  expect(tableTop).toBeLessThan(
+    (await box(p).getByRole("button", { name: "Log session" }).boundingBox()).y,
+  );
+  expect((await box(p).boundingBox()).height).toBeLessThanOrEqual(p.viewportSize().height);
+  const smallFont = await css(table, "fontSize");
+  await box(p).getByText("Duration").dblclick(); // expanded: larger type
+  expect(parseInt(await css(table, "fontSize"))).toBeGreaterThan(parseInt(smallFont));
+  await p.keyboard.press("Escape");
+  await box(p).getByRole("button", { name: "Cancel" }).click();
+
+  // no max HR from Polar: the default of 180
+  await row(p, "Walking").click();
+  await expect(
+    box(p).getByText("Zones are shares of 180 bpm (a default: Polar gave no maximum)"),
+  ).toBeVisible();
+  const walk = await box(p).locator("tbody tr td:nth-child(2)").allTextContents();
+  expect(walk).toEqual(["under 108", "108–125", "126–143", "144–161", "162+"]);
+});
+
+test("a session without heart rate has no zones table", async ({ page: p }) => {
+  await start(p, [{ ...WALK, hr_samples: undefined }]);
+  await row(p, "Walking").click();
+  await expect(box(p).getByText("Fetch HR data")).toBeVisible();
+  await expect(box(p).locator("table")).toHaveCount(0);
 });

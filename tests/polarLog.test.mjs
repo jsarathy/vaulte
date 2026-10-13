@@ -93,7 +93,7 @@ test("logged exercise entry", () => {
 });
 
 test("heart-rate chart: scale, points, average, zones", () => {
-  assert.deepEqual(CHART, { width: 368, height: 80, pad: 4 });
+  assert.deepEqual(CHART, { width: 368, height: 80, pad: 4, left: 40 });
   assert.equal(heartRateChart({}), null);
   assert.equal(heartRateChart({ hr_samples: [100] }), null);
   const c = heartRateChart({
@@ -107,7 +107,7 @@ test("heart-rate chart: scale, points, average, zones", () => {
   assert.equal(pts.length, 10);
   assert.deepEqual(
     [pts[0], pts[5], pts[6], pts[9]],
-    ["4.0,71.5", "184.0,17.5", "256.0,13.0", "364.0,67.0"],
+    ["40.0,71.5", "202.0,17.5", "266.8,13.0", "364.0,67.0"],
   );
   assert.equal(c.avgY, 35.5);
   assert.deepEqual(

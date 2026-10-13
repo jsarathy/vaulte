@@ -10,6 +10,7 @@ import { useExpandBox } from "../hooks/useExpandBox.js";
 import NoHeartRate from "./NoHeartRate";
 import { usePolarLog } from "../hooks/usePolarLog";
 import PolarHRSparkline from "./PolarHRSparkline";
+import PolarZoneTable from "./PolarZoneTable";
 
 const CAPTION = {
   fontSize: "10px",
@@ -160,7 +161,6 @@ function LoggedNote({ session, allDays }) {
   const place = loggedPlace(allDays, session);
   return (
     <div style={{ marginBottom: "14px", fontSize: "12px", color: C.greenText }}>
-      <div style={{ ...CAPTION, marginBottom: "5px" }}>Already logged</div>
       {place ? `Logged to ${place.meal} on ${place.date}` : "Logged"}
     </div>
   );
@@ -212,6 +212,7 @@ function LogBox(props) {
           ) : (
             <MealSlot log={log} />
           )}
+          {hasHeartRate(session) && <PolarZoneTable session={session} large={full} />}
           <Actions log={log} logged={session.logged} onClose={onClose} />
         </div>
       </div>
