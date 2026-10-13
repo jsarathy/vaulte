@@ -2,11 +2,14 @@
 // signed-in profile, the toast, and the Create Account / Sign In / Magic Link / Google flows.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  awaitingConfirmation,
+  checkConfirmed,
   completeMagicLink,
   createAccount,
   logOut,
   magicLinkEmail,
   openedFromMagicLink,
+  resendConfirmation,
   sendMagicLink,
   signInWithGoogle,
   signInWithPassword,
@@ -58,15 +61,29 @@ function useSession(showToast) {
   };
   const enter = (prof, toastMsg) => {
     setProfile(prof);
-    setPage("account");
+    setPage(awaitingConfirmation() ? "verify" : "account"); // an unconfirmed address waits (Fix 130)
     if (toastMsg) showToast(toastMsg);
   };
-  return { page, setPage, profile, setProfile, error, setError, go, enter };
+  return { page, setPage, profile, setProfile, error, setError, go, enter, showToast };
+}
+
+/** The confirmation link brings the person back with ?confirmed=1: say so, and clean the address. */
+function useConfirmedLanding(showToast) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("confirmed") !== "1") return;
+    params.delete("confirmed");
+    const rest = params.toString();
+    const path = window.location.pathname + (rest ? `?${rest}` : "");
+    window.history.replaceState(window.history.state, "", path);
+    showToast("EMAIL CONFIRMED");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** At start-up: finish a sign-in link, or land on the page for whoever is signed in. */
 function useStartup(session, onMagicNewUser) {
   const { enter, setPage, setError } = session;
+  useConfirmedLanding(session.showToast);
   useEffect(() => {
     if (!openedFromMagicLink()) return watchSignedIn(landFor(enter, setPage));
     finishMagicLink(enter, onMagicNewUser, (msg) => {
@@ -150,6 +167,23 @@ function useLogin(session, run) {
   };
 }
 
+/** The "check your email" page: look again, send the email again. */
+function useConfirm(session, run) {
+  const [resent, setResent] = useState(false);
+  const handleContinue = () =>
+    run(async () => {
+      if (await checkConfirmed()) session.enter(session.profile, "EMAIL CONFIRMED");
+      else session.setError("Not confirmed yet. Open the link in the email, then try again.");
+    });
+  const handleResend = () =>
+    run(async () => {
+      await resendConfirmation();
+      setResent(true);
+      session.showToast("CONFIRMATION EMAIL SENT");
+    });
+  return { resent, handleContinue, handleResend };
+}
+
 /** Google sign-in (a first visit creates the profile) and signing out. */
 function useOtherSignIns(session, run, setLoginData) {
   const handleGoogleSignIn = () =>
@@ -175,9 +209,10 @@ export function useAuthPages() {
   const signup = useSignup(session, run);
   const { login, setLoginData } = useLogin(session, run);
   const others = useOtherSignIns(session, run, setLoginData);
+  const confirm = useConfirm(session, run);
   useStartup(session, (email) => {
     signup.setSignupData((s) => ({ ...s, email }));
     session.setPage("signup");
   });
-  return { ...session, toast, showToast, toastClock, loading, ...signup, login, ...others };
+  return { ...session, toast, toastClock, loading, ...signup, login, ...others, confirm };
 }
