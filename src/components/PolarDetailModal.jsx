@@ -1,7 +1,10 @@
 // src/components/PolarDetailModal.jsx — the Daily log's Polar session box: sport and start, stats,
 // and the heart-rate chart, or a note with a button to fetch it from Polar. Closes on × or the
-// backdrop. Render only; detail = usePolarDetail().
+// backdrop. Double-click anywhere on the box to expand it to fill the window (Esc or double-click
+// to collapse). Render only; detail = usePolarDetail().
 import { C, FONT, border } from "../constants/design.jsx";
+import { useEffect } from "react";
+import { useFullView } from "../hooks/useFullView.js";
 import { useHeartRateFetch } from "../hooks/usePolarDetail.js";
 import {
   canFetchHeartRate,
@@ -56,6 +59,16 @@ const S = {
     lineHeight: 1,
     marginLeft: "12px",
   },
+  backdropFull: { padding: 0 },
+  boxFull: {
+    width: "100%",
+    height: "100dvh",
+    maxHeight: "none",
+    borderRadius: 0,
+    border: "none",
+    boxSizing: "border-box",
+    cursor: "zoom-out",
+  },
   body: { padding: "16px 18px" },
   stats: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px", marginBottom: "16px" },
   stat: {
@@ -101,19 +114,35 @@ function Stats({ session }) {
   );
 }
 
+/** Toggles the expanded box on a double-click anywhere on it except on a button. */
+const toggleOn = (full, setFull) => (e) => {
+  if (!e.target.closest("button")) setFull(!full);
+};
+
 // Always mounted, so a fetch's state outlives the box (as before)
 export default function PolarDetailModal({ detail, userId }) {
   const session = detail.session;
   const hr = useHeartRateFetch(session, userId, detail.setSession);
+  const [full, setFull] = useFullView();
+  useEffect(() => {
+    if (!session) setFull(false); // a box opened again starts at its normal size
+  }, [session, setFull]);
   if (!session) return null;
   return (
-    <div onClick={(e) => e.target === e.currentTarget && detail.close()} style={S.backdrop}>
-      <div style={S.box}>
+    <div
+      onClick={(e) => e.target === e.currentTarget && detail.close()}
+      style={full ? { ...S.backdrop, ...S.backdropFull } : S.backdrop}
+    >
+      <div
+        onDoubleClick={toggleOn(full, setFull)}
+        title={full ? "Double-click or press Esc to collapse" : "Double-click to expand"}
+        style={full ? { ...S.box, ...S.boxFull } : S.box}
+      >
         <Header session={session} onClose={detail.close} />
         <div style={S.body}>
           <Stats session={session} />
           {hasHeartRate(session) ? (
-            <HRChart session={session} />
+            <HRChart session={session} large={full} />
           ) : (
             <NoHeartRate hr={hr} canFetch={canFetchHeartRate(session)} />
           )}
