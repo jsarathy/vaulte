@@ -38,6 +38,24 @@ test("rejects non-POST and missing credentials", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("only the signed-in owner (an admin) may sync: no sign-in or a bad token is a 401, anyone else a 403", async () => {
+  stubCloud({ [LOGIN]: login(), [DEVICES]: devices([]) });
+  const anon = await call({}, "POST", null);
+  assert.deepEqual([anon.statusCode, anon.body], [401, { error: "Not signed in" }]);
+  const bad = await call({}, "POST", "nonsense");
+  assert.deepEqual([bad.statusCode, bad.body], [401, { error: "Invalid or expired sign-in" }]);
+  for (const who of ["other", "unverified"]) {
+    const out = await call({ kind: "girth" }, "POST", who);
+    assert.deepEqual([out.statusCode, out.body], [403, { error: "Not allowed" }], who);
+  }
+  assert.equal(calls.length, 0); // Renpho was never asked for the owner's data
+  delete process.env.ADMIN_EMAILS; // with the list unset nobody is an admin
+  assert.equal((await call({})).statusCode, 403);
+  assert.equal(calls.length, 0);
+  process.env.ADMIN_EMAILS = "owner@example.com";
+  assert.equal((await call({})).statusCode, 200);
+});
+
 test("logs in with the app's payload; token reused for 50 minutes", async () => {
   stubCloud({ [LOGIN]: login(), [DEVICES]: devices([]) });
   const out = await call({});

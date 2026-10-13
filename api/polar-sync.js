@@ -1,9 +1,16 @@
 // api/polar-sync.js — pulls the exercises recorded since the last sync from Polar AccessLink
 // into users/{uid}/polar_sessions. The client, HR samples, session shape and Firestore access
-// live in api/_polar/ (not deployed as functions).
+// live in api/_polar/ (not deployed as functions). Only a signed-in person may call it (their
+// Firebase ID token, Fix 119), and it syncs that person's own Polar account: the user id comes from
+// the token, not from the request.
+import { callerOf } from "./_admin/caller.js";
+import { verifyIdToken } from "./_admin/verify.js";
 import { polarClient } from "./_polar/client.js";
 import { fetchSessions, fillMissingHr } from "./_polar/sessions.js";
 import { getAdminDb, loadConnection, saveSessions, stampSync } from "./_polar/store.js";
+
+/** The token check; a test replaces it. */
+export const deps = { verify: verifyIdToken };
 
 const reply = (status, body) => ({ status, body });
 const NOTHING_NEW = { newSessions: 0, sessions: [] };
@@ -29,10 +36,10 @@ async function syncUser(userId) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: "Missing userId" });
+  const caller = await callerOf(req, deps.verify);
+  if (caller.error) return res.status(caller.error.status).json(caller.error.body);
   try {
-    const { status, body } = await syncUser(userId);
+    const { status, body } = await syncUser(caller.uid);
     return res.status(status).json(body);
   } catch (err) {
     console.error("Polar sync error:", err);

@@ -215,6 +215,7 @@ test("Renpho tape sync: merging, saving, messages", async ({ page: p }) => {
   matchGolden("syncing", await heading(p).evaluate(describe));
   expect(p.__api.calls[0].body).toEqual({ userId: "u", kind: "girth" });
   expect(p.__api.calls[0].headers["content-type"]).toBe("application/json");
+  expect(p.__api.calls[0].headers.authorization).toBe("Bearer mock-id-token"); // the sign-in proof (Fix 119)
   await expect(note(p)).toHaveText("Synced 2 days.");
   await expect(syncBtn(p)).toHaveText("⟳ Sync Renpho");
   matchGolden("synced", await heading(p).evaluate(describe));

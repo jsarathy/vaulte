@@ -3,7 +3,7 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
-import handler from "../../api/polar-disconnect.js";
+import handler, { deps } from "../../api/polar-disconnect.js";
 
 const UID = "user-1",
   PATH = `users/${UID}/polar/connection`;
@@ -17,9 +17,15 @@ const stubPolar = (impl) => {
     return impl(url, opts);
   };
 };
-const call = async (body) => {
+// A good token for any user: "tok-<uid>".
+deps.verify = async (token) => {
+  if (!token.startsWith("tok-")) throw new Error("bad token");
+  return { uid: token.slice(4) };
+};
+const call = async (body, uid = UID) => {
   const out = res();
-  await handler({ method: "POST", body }, out);
+  const headers = uid ? { authorization: `Bearer tok-${uid}` } : {};
+  await handler({ method: "POST", headers, body }, out);
   return out;
 };
 
@@ -30,11 +36,28 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-test("rejects non-POST and a missing userId", async () => {
+test("rejects non-POST, no sign-in and a bad token", async () => {
   const out = res();
   await handler({ method: "GET", body: {} }, out);
   assert.equal(out.statusCode, 405);
-  assert.equal((await call({})).statusCode, 400);
+  const anon = await call({ userId: UID }, null);
+  assert.deepEqual([anon.statusCode, anon.body], [401, { error: "Not signed in" }]);
+  const bad = res();
+  await handler({ method: "POST", headers: { authorization: "Bearer nonsense" }, body: {} }, bad);
+  assert.deepEqual([bad.statusCode, bad.body], [401, { error: "Invalid or expired sign-in" }]);
+});
+
+test("it acts on the person in the token, whatever user id the request names", async () => {
+  await db()
+    .doc(`users/${UID}/polar/connection`)
+    .set({ connected: true, access_token: "t", polar_user_id: 1 });
+  stubPolar(async () => {
+    throw new Error("should not be called");
+  });
+  const out = await call({ userId: UID }, "intruder"); // names user-1, is someone else
+  assert.deepEqual(out.body, { ok: true, action: "cleared" });
+  assert.equal((await read(`users/${UID}/polar/connection`)).connected, true); // user-1 untouched
+  assert.equal((await read("users/intruder/polar/connection")).connected, false);
 });
 
 test("not connected: just records connected:false, no Polar calls", async () => {

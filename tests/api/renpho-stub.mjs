@@ -6,7 +6,7 @@ import { beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { res } from "./setup.mjs";
-import handler from "../../api/renpho-sync.js";
+import handler, { deps } from "../../api/renpho-sync.js";
 
 const KEY = Buffer.from("ed*wijdi$h6fe3ew", "utf8");
 export const enc = (obj) => {
@@ -63,9 +63,23 @@ export const pages =
     ok(lists[req.pageNum - 1] ?? []);
 export const sec = (iso) => Date.parse(iso) / 1000;
 
-export async function call(body, method = "POST") {
+// Tokens for the tests: "admin" is the owner (a verified email in ADMIN_EMAILS), "other" is not.
+export const ADMIN_EMAIL = "owner@example.com";
+const WHO = {
+  admin: { uid: "owner", email: ADMIN_EMAIL, email_verified: true },
+  other: { uid: "u2", email: "other@example.com", email_verified: true },
+  unverified: { uid: "owner2", email: ADMIN_EMAIL, email_verified: false },
+};
+deps.verify = async (token) => {
+  if (!WHO[token]) throw new Error("bad token");
+  return WHO[token];
+};
+
+/** Call the handler as `who` ("admin" by default; null for no sign-in). */
+export async function call(body, method = "POST", who = "admin") {
   const out = res();
-  await handler({ method, body }, out);
+  const headers = who ? { authorization: `Bearer ${who}` } : {};
+  await handler({ method, headers, body }, out);
   return out;
 }
 
@@ -74,6 +88,7 @@ beforeEach(() => {
   Date.now = () => clock.now;
   process.env.RENPHO_EMAIL = "me@example.com";
   process.env.RENPHO_PASSWORD = "pw";
+  process.env.ADMIN_EMAILS = ADMIN_EMAIL;
   errors.length = 0;
   console.error = (...a) => errors.push(a.map(String).join(" "));
 });

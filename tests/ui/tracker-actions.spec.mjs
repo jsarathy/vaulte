@@ -17,16 +17,18 @@ const day = (date, kcal, id = "m" + date) => ({
 });
 
 const start = async (p, init = {}) => {
-  const api = { renpho: [], polar: [] };
+  const api = { renpho: [], polar: [], auth: [] };
   p.__api = api;
   await p.route("**/api/renpho-sync", async (r) => {
     api.renpho.push(JSON.parse(r.request().postData()));
+    api.auth.push(["renpho", r.request().headers().authorization]);
     const { status = 200, body = {}, delay = 0 } = p.__renpho || {};
     await new Promise((res) => setTimeout(res, delay));
     r.fulfill({ status, json: body });
   });
   await p.route("**/api/polar-sync", async (r) => {
     api.polar.push(JSON.parse(r.request().postData()));
+    api.auth.push(["polar", r.request().headers().authorization]);
     const { status = 200, body = {}, delay = 0 } = p.__polarSync || {};
     await new Promise((res) => setTimeout(res, delay));
     r.fulfill({ status, json: body });
@@ -320,6 +322,7 @@ test("Renpho sync and purge", async ({ page: p }) => {
   expect(await msg("Renpho login failed").evaluate((e) => e.style.color)).toBe("rgb(198, 40, 40)");
   await expect(btn).toHaveText("⟳ Sync Renpho");
   expect(p.__api.renpho[0]).toEqual({ userId: "u", fromDate: "2026-09-01" });
+  expect(p.__api.auth[0]).toEqual(["renpho", "Bearer mock-id-token"]); // the sign-in proof (Fix 119)
   p.__renpho = { status: 500, body: {} };
   await btn.click();
   await expect(msg("Sync failed")).toBeVisible();
@@ -399,6 +402,7 @@ test("Polar sync", async ({ page: p }) => {
   await expect(btn).toHaveText("⏳ Syncing…");
   await expect(msg("All up to date.")).toBeVisible();
   expect(p.__api.polar).toEqual([{ userId: "u" }]);
+  expect(p.__api.auth).toEqual([["polar", "Bearer mock-id-token"]]); // the sign-in proof (Fix 119)
   await expect(p.getByText("Synced 4 Oct, 10:00")).toBeVisible(); // last sync = now
   await expect(btn).toHaveText("🔄 Sync");
   await expect(msg("All up to date.")).toHaveCount(0, { timeout: 7000 }); // after 5 s

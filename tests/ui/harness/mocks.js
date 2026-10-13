@@ -2,6 +2,11 @@
 // src/api/claude.js in the UI test harness. No network, no real data.
 // Tests read/drive it through window.__* (calls recorded, failures switchable).
 
+import { setTokenSource } from "../../../src/api/authToken.js";
+
+// Signed in: the sign-in proof that src/firebase.js arranges for calls to server functions.
+setTokenSource(async () => "mock-id-token");
+
 // ── firebase / firebase/firestore ────────────────────────────────────────────
 export const db = {};
 export const auth = { currentUser: null }; // set by the auth mocks below

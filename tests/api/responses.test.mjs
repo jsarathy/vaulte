@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
 import claude, { deps as claudeDeps } from "../../api/claude.js";
 import polarAuth from "../../api/polar-auth.js";
-import polarDisconnect from "../../api/polar-disconnect.js";
-import polarSync from "../../api/polar-sync.js";
+import polarDisconnect, { deps as disconnectDeps } from "../../api/polar-disconnect.js";
+import polarSync, { deps as syncDeps } from "../../api/polar-sync.js";
 import appleSync from "../../api/apple-sync.js";
 
 const realFetch = globalThis.fetch;
@@ -110,6 +110,10 @@ test("polar-auth: says what is missing", () => {
   );
 });
 
+// The Polar functions take the user from the ID token; here the token is the user id itself.
+syncDeps.verify = disconnectDeps.verify = async (token) => ({ uid: token });
+const AS = (uid) => ({ authorization: `Bearer ${uid}` });
+
 // ---- polar-sync.js
 test("polar-sync: refusals, and a failure is logged and returned", async () => {
   const get = res();
@@ -117,7 +121,7 @@ test("polar-sync: refusals, and a failure is logged and returned", async () => {
   assert.deepEqual([get.statusCode, get.body], [405, { error: "Method not allowed" }]);
   const none = res();
   await polarSync({ method: "POST", body: {} }, none);
-  assert.deepEqual([none.statusCode, none.body], [400, { error: "Missing userId" }]);
+  assert.deepEqual([none.statusCode, none.body], [401, { error: "Not signed in" }]);
   const spies = silence();
   globalThis.fetch = async (url, opts) => {
     if (String(url).includes("polaraccesslink.com")) throw new Error("polar is down");
@@ -127,7 +131,7 @@ test("polar-sync: refusals, and a failure is logged and returned", async () => {
     .doc("users/u-sync/polar/connection")
     .set({ connected: true, access_token: "t", polar_user_id: "1" });
   const out = res();
-  await polarSync({ method: "POST", body: { userId: "u-sync" } }, out);
+  await polarSync({ method: "POST", headers: AS("u-sync"), body: {} }, out);
   assert.equal(out.statusCode, 500);
   assert.equal(out.body.error, "polar is down");
   assert.equal(logged(spies.error, "Polar sync error:").length, 1);
@@ -145,7 +149,7 @@ test("polar-disconnect: refusals and their messages", async () => {
   assert.deepEqual([get.statusCode, get.body], [405, { error: "Method not allowed" }]);
   const none = res();
   await polarDisconnect({ method: "POST", body: {} }, none);
-  assert.deepEqual([none.statusCode, none.body], [400, { error: "Missing userId" }]);
+  assert.deepEqual([none.statusCode, none.body], [401, { error: "Not signed in" }]);
 });
 
 test("polar-disconnect: deletes then re-registers with the right headers, waiting in between, and logs both", async () => {
@@ -158,7 +162,7 @@ test("polar-disconnect: deletes then re-registers with the right headers, waitin
     return { status: opts.method === "DELETE" ? 204 : 200, ok: true, text: async () => "" };
   };
   const out = res();
-  await polarDisconnect({ method: "POST", body: { userId: "u-dc" } }, out);
+  await polarDisconnect({ method: "POST", headers: AS("u-dc"), body: {} }, out);
   assert.deepEqual(out.body, { ok: true, action: "deregistered_and_reregistered" });
   const [del, reg] = calls;
   assert.deepEqual(del.opts.headers, { Authorization: "Bearer tok-1", Accept: "application/json" });
@@ -190,7 +194,7 @@ test("polar-disconnect: when Polar fails the connection is still cleared and the
     return realFetch(url, opts);
   };
   const out = res();
-  await polarDisconnect({ method: "POST", body: { userId: "u-dc2" } }, out);
+  await polarDisconnect({ method: "POST", headers: AS("u-dc2"), body: {} }, out);
   assert.deepEqual([out.statusCode, out.body], [500, { error: "polar refused" }]);
   assert.equal(logged(spies.error, "polar-disconnect error:").length, 1);
   assert.equal((await read("users/u-dc2/polar/connection")).connected, false);

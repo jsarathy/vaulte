@@ -8,13 +8,23 @@
 // break without notice. Credentials stay server-side: never call this from the
 // client with the email/password in the body.
 //
+// The Renpho account is the owner's (one set of credentials in the environment), so only a signed-in
+// admin (a verified email in ADMIN_EMAILS) may call it (Fix 119): anyone else would be reading the
+// owner's weight and body measurements.
+//
 // Required Vercel env vars:
 //   RENPHO_EMAIL
 //   RENPHO_PASSWORD
 
+import { callerOf } from "./_admin/caller.js";
+import { isAdmin } from "./_admin/users.js";
+import { verifyIdToken } from "./_admin/verify.js";
 import { login } from "./_renpho/client.js";
 import { fetchGirths, girthRecords } from "./_renpho/girth.js";
 import { fetchMeasurements, fetchScales, weightRecords } from "./_renpho/weight.js";
+
+/** The token check; a test replaces it. */
+export const deps = { verify: verifyIdToken };
 
 const NO_SCALE = {
   records: [],
@@ -49,6 +59,9 @@ async function sync(body) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  const caller = await callerOf(req, deps.verify);
+  if (caller.error) return res.status(caller.error.status).json(caller.error.body);
+  if (!isAdmin(caller.claims)) return res.status(403).json({ error: "Not allowed" });
   if (!process.env.RENPHO_EMAIL || !process.env.RENPHO_PASSWORD)
     return res.status(500).json({ error: "RENPHO_EMAIL / RENPHO_PASSWORD not configured" });
   try {

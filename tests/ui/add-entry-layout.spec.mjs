@@ -138,6 +138,7 @@ test("Polar Reconnect", async ({ page: p }) => {
       r.request().method(),
       r.request().headers()["content-type"],
       r.request().postData(),
+      r.request().headers().authorization,
     ]);
     await new Promise((res) => setTimeout(res, 400));
     if (fail) return r.abort();
@@ -163,7 +164,9 @@ test("Polar Reconnect", async ({ page: p }) => {
   await reconnect().click();
   await expect(reconnect()).toHaveText("Working…");
   await p.waitForURL("**/api/polar-auth?userId=u");
-  expect(posted).toEqual([["POST", "application/json", JSON.stringify({ userId: "u" })]]);
+  expect(posted).toEqual([
+    ["POST", "application/json", JSON.stringify({ userId: "u" }), "Bearer mock-id-token"],
+  ]); // with the sign-in proof (Fix 119)
   expect(logs.some((l) => l.startsWith("Disconnect result:"))).toBe(true);
 
   // Disconnect failing doesn't stop the re-authorisation

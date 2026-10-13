@@ -1,5 +1,8 @@
-// api/polar-fetch-hr.js — POST { userId, sessionId }: fetch a stored session's heart-rate samples
-// from Polar, save them on the session and return them.
+// api/polar-fetch-hr.js — POST { sessionId }: fetch a stored session's heart-rate samples
+// from Polar, save them on the session and return them. Only a signed-in person may call it (their
+// Firebase ID token, Fix 119); it reads that person's own session (the user id is the token's).
+import { callerOf } from "./_admin/caller.js";
+import { verifyIdToken } from "./_admin/verify.js";
 import { getAdminDb, loadV4, saveV4 } from "./_polar/store.js";
 import { fetchV4Hr } from "./_polar/v4.js";
 import {
@@ -39,11 +42,16 @@ async function findSamples({ session, urls, headers, polarUserId }) {
   };
 }
 
-function rejection(req) {
-  if (req.method !== "POST") return fail(405, { error: "Method not allowed" });
-  const { userId, sessionId } = req.body;
-  if (!userId || !sessionId) return fail(400, { error: "Missing userId or sessionId" });
-  return null;
+/** The token check; a test replaces it. */
+export const deps = { verify: verifyIdToken };
+
+/** The { status, body } to send when the request cannot be served; otherwise { caller } (the user). */
+async function checked(req) {
+  if (req.method !== "POST") return { rejected: fail(405, { error: "Method not allowed" }) };
+  const caller = await callerOf(req, deps.verify);
+  if (caller.error) return { rejected: fail(caller.error.status, caller.error.body) };
+  if (!req.body?.sessionId) return { rejected: fail(400, { error: "Missing sessionId" }) };
+  return { caller };
 }
 
 /** The session and connection to fetch for, or the { status, body } reply that says why not. */
@@ -99,10 +107,13 @@ async function fromV4(db, { ids, ref, session, attempts }) {
 }
 
 export default async function handler(req, res) {
-  const rejected = rejection(req);
+  const { rejected, caller } = await checked(req);
   if (rejected) return res.status(rejected.status).json(rejected.body);
   try {
-    const { status, body } = await fetchHr(getAdminDb(), req.body);
+    const { status, body } = await fetchHr(getAdminDb(), {
+      userId: caller.uid,
+      sessionId: req.body.sessionId,
+    });
     return status === 200 ? res.json(body) : res.status(status).json(body);
   } catch (err) {
     console.error("polar-fetch-hr error:", err);

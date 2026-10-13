@@ -1,12 +1,18 @@
 // api/polar-disconnect.js
 // Deregisters from Polar Accesslink then immediately re-registers with the same member-id.
 // This forces a new OAuth consent (new token with training_data scope) without breaking
-// the registration state that the callback depends on.
+// the registration state that the callback depends on. Only a signed-in person may call it (their
+// Firebase ID token, Fix 119); it acts on that person's own connection (the user id is the token's).
 
+import { callerOf } from "./_admin/caller.js";
+import { verifyIdToken } from "./_admin/verify.js";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 const POLAR_USERS = "https://www.polaraccesslink.com/v3/users";
+
+/** The token check; a test replaces it. */
+export const deps = { verify: verifyIdToken };
 
 function getAdminDb() {
   if (!getApps().length) {
@@ -65,13 +71,13 @@ async function markDisconnectedAfterError(userId) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: "Missing userId" });
+  const caller = await callerOf(req, deps.verify);
+  if (caller.error) return res.status(caller.error.status).json(caller.error.body);
   try {
-    return res.json(await disconnect(getAdminDb(), userId));
+    return res.json(await disconnect(getAdminDb(), caller.uid));
   } catch (err) {
     console.error("polar-disconnect error:", err);
-    await markDisconnectedAfterError(userId);
+    await markDisconnectedAfterError(caller.uid);
     return res.status(500).json({ error: err.message });
   }
 }

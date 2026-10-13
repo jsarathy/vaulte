@@ -1,6 +1,7 @@
 // src/api/trackerActions.js — NutritionTracker's writes and sync calls: weight plan, body rows,
 // weight rows, and the Renpho / Polar sync endpoints.
 import { db } from "../firebase";
+import { authHeader } from "./authToken.js";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
 
 const userDoc = (userId, ...path) => doc(db, "users", userId, ...path);
@@ -17,7 +18,7 @@ export const deleteWeightRows = (userId, rows) =>
 async function postSync(url, body) {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
     body: JSON.stringify(body),
   });
   const data = await res.json();
