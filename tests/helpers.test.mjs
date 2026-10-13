@@ -14,6 +14,7 @@ import {
   getDayTotals,
   calcMacros,
   ensureMealSlots,
+  emptyDay,
   makeMeals,
   DEFAULT_MEAL_SLOTS,
 } from "../src/constants/helpers.js";
@@ -414,4 +415,18 @@ describe("calcFatBurned", () => {
     assert.equal(r.fatKcal, Math.round(r.fatKcal));
     assert.equal(r.fatGrams, Math.round(r.fatGrams));
   });
+});
+
+test("emptyDay: the date, no notes, and the standard meal slots with nothing in them and their own ids", () => {
+  const day = emptyDay("2026-10-04");
+  assert.deepEqual(Object.keys(day), ["date", "notes", "meals"]);
+  assert.equal(day.date, "2026-10-04");
+  assert.equal(day.notes, "");
+  assert.deepEqual(
+    day.meals.map((m) => [m.name, m.is_exercise, m.items]),
+    DEFAULT_MEAL_SLOTS.map((s) => [s.name, s.is_exercise, []]),
+  );
+  assert.equal(new Set(day.meals.map((m) => m.id)).size, day.meals.length);
+  assert.notEqual(emptyDay("2026-10-04").meals[0].id, day.meals[0].id); // each call has its own ids
+  assert.notEqual(emptyDay("2026-10-04").meals[0].items, day.meals[0].items); // and its own lists
 });

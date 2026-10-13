@@ -1,5 +1,5 @@
 // tests/constantsEdges.test.mjs — edge cases in src/constants (meds, recipeLinks) that the mutation
-// runs showed no test guarded (Fix 81). The data files exercises.js, recipes.js and seedDays.js
+// runs showed no test guarded (Fix 81). The data files exercises.js and recipes.js
 // are not mutated: they are lists, not logic.
 import { test } from "node:test";
 import assert from "node:assert/strict";

@@ -2,9 +2,8 @@
 import { db } from "../firebase";
 import { doc, setDoc, getDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { collection, query, orderBy, limit } from "firebase/firestore";
-import { genId } from "../constants/helpers";
+import { emptyDay } from "../constants/helpers";
 import { INITIAL_RECIPES } from "../constants/recipes";
-import { seedDays } from "../constants/seedDays";
 
 const dayRef = (uid, date) => doc(db, "users", uid, "nutrition_days", date);
 const recipeRef = (uid, id) => doc(db, "users", uid, "recipes", id);
@@ -62,14 +61,13 @@ export async function loadDay(uid, date) {
   return snap.exists() ? snap.data() : null;
 }
 
-/** Write the example days and the starter recipes for a new account; the days, newest first. */
+/** Write today as an empty day (the standard meal slots, nothing in them) and the starter recipes for a
+ *  new account; the days, newest first. */
 export async function seedInitialData(uid) {
-  const days = seedDays(genId);
-  for (const day of days) {
-    await setDoc(dayRef(uid, day.date), day);
-  }
+  const day = emptyDay(new Date().toLocaleDateString("en-CA")); // YYYY-MM-DD, local time
+  await setDoc(dayRef(uid, day.date), day);
   for (const recipe of INITIAL_RECIPES) {
     await setDoc(recipeRef(uid, recipe.id), recipe);
   }
-  return days.sort((a, b) => b.date.localeCompare(a.date));
+  return [day];
 }

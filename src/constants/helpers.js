@@ -34,6 +34,9 @@ const emptyMeal = (slot) => ({
 });
 export const makeMeals = () => DEFAULT_MEAL_SLOTS.map(emptyMeal);
 
+/** A day with the standard meal slots and nothing in them (what a new account starts with). */
+export const emptyDay = (date) => ({ date, notes: "", meals: makeMeals() });
+
 export const ACTIVITY_LEVELS = [
   { label: "Sedentary", desc: "Desk job, little/no exercise", factor: 1.2 },
   { label: "Lightly Active", desc: "Light exercise 1–3×/week", factor: 1.375 },
