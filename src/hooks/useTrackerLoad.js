@@ -18,6 +18,7 @@ import {
   compareStart,
 } from "../lib/trackerStart.js";
 import { mergeDays, mergeRows, keepIfTouched } from "../lib/trackerStart.js";
+import { useIntegrations } from "../context/IntegrationsContext.js";
 
 async function loadRecipes(userId, set) {
   const recipes = await loadAllRecipes(userId);
@@ -109,8 +110,6 @@ function loadRest(userId, firstDays, set) {
     later("earlier days", loadEarlierDays(userId, firstDays, set)),
     later("weight", loadWeight(userId, set)),
     later("chat history", loadChat(userId, set)),
-    later("polar connection", loadPolarConnection(userId, set)),
-    later("polar sessions", loadPolarSessions(userId, set)),
   ];
   // Fill in an estimated Wt/portion for any saved recipe without one, once the rest is in
   Promise.all(reads).then(() =>
@@ -147,9 +146,17 @@ function showPolarReturn(userId, set) {
 }
 
 export function useTrackerLoad(userId, set) {
+  const integrations = useIntegrations();
   useEffect(() => {
     if (!userId) return set.loading(false);
     loadTracker(userId, set);
   }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Polar is the owner's own (Fix 128): read only when the integrations are on (known after the page
+  // has asked the server who is an admin)
+  useEffect(() => {
+    if (!userId || !integrations) return;
+    later("polar connection", loadPolarConnection(userId, set));
+    later("polar sessions", loadPolarSessions(userId, set));
+  }, [userId, integrations]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => showPolarReturn(userId, set), [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 }

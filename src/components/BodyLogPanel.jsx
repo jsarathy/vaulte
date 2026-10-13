@@ -3,6 +3,7 @@
 import { columnStyle } from "../lib/phoneLayout.js";
 import { useBodyLogEdits, useTapeSync } from "../hooks/useBodyLog.js";
 import BodyLogTable from "./BodyLogTable.jsx";
+import { useIntegrations } from "../context/IntegrationsContext.js";
 
 const S = {
   bar: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" },
@@ -32,16 +33,19 @@ function SyncNote({ msg }) {
 }
 
 export default function BodyLogPanel({ userId, bodyLog, setBodyLog, phone }) {
+  const integrations = useIntegrations(); // the tape is read through Renpho, the owner's own (Fix 128)
   const edits = useBodyLogEdits(userId, bodyLog, setBodyLog);
   const tape = useTapeSync(userId, bodyLog, setBodyLog);
   return (
     <div style={columnStyle(phone, 55)}>
       <div style={phone ? { ...S.bar, flexWrap: "wrap", gap: "8px 10px" } : S.bar}>
         <div style={S.title}>📏 Body Log</div>
-        <button onClick={tape.syncBody} disabled={tape.syncing} style={S.sync(tape.syncing)}>
-          {tape.syncing ? "Syncing…" : "⟳ Sync Renpho"}
-        </button>
-        <SyncNote msg={tape.syncMsg} />
+        {integrations && (
+          <button onClick={tape.syncBody} disabled={tape.syncing} style={S.sync(tape.syncing)}>
+            {tape.syncing ? "Syncing…" : "⟳ Sync Renpho"}
+          </button>
+        )}
+        {integrations && <SyncNote msg={tape.syncMsg} />}
       </div>
       <BodyLogTable bodyLog={bodyLog} edits={edits} />
     </div>

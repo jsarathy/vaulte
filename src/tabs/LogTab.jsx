@@ -8,6 +8,7 @@ import CalorieBar from "../components/CalorieBar.jsx";
 import MealCard from "../components/MealCard.jsx";
 import PolarDetailModal from "../components/PolarDetailModal.jsx";
 import AppleActivityCard from "../components/AppleActivityCard.jsx";
+import { useIntegrations } from "../context/IntegrationsContext.js";
 import { usePolarDetail } from "../hooks/usePolarDetail.js";
 import { useCollapsedMeals } from "../hooks/useCollapsedMeals.js";
 import { useAppleKcal } from "../hooks/useAppleKcal.js";
@@ -18,6 +19,7 @@ const calculator = (p) => ({
 });
 
 function DayLog({ p, polar, cards, appleKcal, setAppleKcal }) {
+  const integrations = useIntegrations();
   const day = p.currentDayData;
   const totals = getDayTotals(day);
   const budget = dayBudget(totals, appleKcal, calculator(p));
@@ -35,22 +37,25 @@ function DayLog({ p, polar, cards, appleKcal, setAppleKcal }) {
           entry={{ ...entry, deleteItem: p.deleteItem }}
         />
       ))}
-      {/* Apple Watch activity (below Evening Exercise) */}
-      <AppleActivityCard
-        userId={p.userId}
-        date={p.currentDate}
-        dayData={day}
-        weightKg={p.calcWeight}
-        collapsed={cards.isClosed("apple_activity")}
-        onToggle={() => cards.toggle("apple_activity")}
-        onKcal={setAppleKcal}
-      />
+      {/* Apple Watch activity (below Evening Exercise); the owner's integration only */}
+      {integrations && (
+        <AppleActivityCard
+          userId={p.userId}
+          date={p.currentDate}
+          dayData={day}
+          weightKg={p.calcWeight}
+          collapsed={cards.isClosed("apple_activity")}
+          onToggle={() => cards.toggle("apple_activity")}
+          onKcal={setAppleKcal}
+        />
+      )}
     </>
   );
 }
 
 export default function LogTab(props) {
   const cards = useCollapsedMeals();
+  const integrations = useIntegrations();
   const polar = usePolarDetail(props.userId);
   const [appleKcal, setAppleKcal] = useAppleKcal(props.currentDate);
   if (!props.currentDayData)
@@ -61,7 +66,7 @@ export default function LogTab(props) {
     );
   return (
     <>
-      <PolarDetailModal detail={polar} userId={props.userId} />
+      {integrations && <PolarDetailModal detail={polar} userId={props.userId} />}
       <DayLog
         p={props}
         polar={polar}
