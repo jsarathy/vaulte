@@ -64,6 +64,14 @@ export function compareStart(days) {
 export const POLAR_RETURN = new Map([
   ["connected", { ok: true, text: "Polar connected — click Sync to pull sessions." }],
   ["error", { ok: false, text: "Polar connection failed." }],
+  [
+    "v4connected",
+    {
+      ok: true,
+      text: "Polar heart-rate history connected — open a session and tap Fetch HR data.",
+    },
+  ],
+  ["v4token", { ok: false, text: "Polar heart-rate history sign-in failed at the token step." }],
 ]);
 
 /** How long a Polar return message stays once the Polar card shows it. */

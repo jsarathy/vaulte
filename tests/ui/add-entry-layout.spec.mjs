@@ -89,6 +89,38 @@ test("Polar header: not connected, connected, syncing, messages", async ({ page:
   ]);
 });
 
+test("Polar History: asks first, then goes to Polar's v4 sign-in without disconnecting", async ({
+  page: p,
+}) => {
+  const dialogs = [];
+  let answer = false;
+  p.on("dialog", (d) => {
+    dialogs.push([d.type(), d.message()]);
+    if (answer) d.accept();
+    else d.dismiss();
+  });
+  let disconnected = false;
+  await p.route("**/api/polar-disconnect", (r) => {
+    disconnected = true;
+    r.fulfill({ json: { ok: true } });
+  });
+  await p.route("**/api/polar-auth**", (r) =>
+    r.fulfill({ contentType: "text/html", body: "auth" }),
+  );
+  await start(p, { __polar: { connected: true, sessions: [] } });
+  const history = p.getByRole("button", { name: "History" });
+  await history.click(); // dismissed: stays
+  await expect.poll(() => dialogs.length).toBe(1);
+  expect(dialogs[0][0]).toBe("confirm");
+  expect(dialogs[0][1]).toMatch(/newer data service/);
+  await p.waitForTimeout(300);
+  expect(p.url()).not.toContain("polar-auth");
+  answer = true;
+  await history.click();
+  await p.waitForURL("**/api/polar-auth?userId=u&v=4");
+  expect(disconnected).toBe(false);
+});
+
 test("Polar Reconnect", async ({ page: p }) => {
   const dialogs = [];
   let answer = false;

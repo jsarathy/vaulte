@@ -2,7 +2,7 @@
 // Reconnect, the last sync message, and the sessions list.
 import { useEffect } from "react";
 import PolarSessionsPanel from "./PolarSessionsPanel";
-import { reconnectPolar } from "../api/polarReconnect";
+import { connectPolarV4, reconnectPolar } from "../api/polarReconnect";
 import { usePhoneFold } from "../hooks/usePhoneFold.js";
 import FoldTitle from "./FoldTitle.jsx";
 
@@ -88,6 +88,14 @@ function ConnectedControls({ userId, polar }) {
         style={S.reconnect}
       >
         Reconnect
+      </button>
+      <button
+        onClick={() => connectPolarV4(userId)}
+        id="polar-history-btn"
+        title="Sign in to Polar's newer data service to read past heart-rate data"
+        style={S.reconnect}
+      >
+        History
       </button>
     </div>
   );

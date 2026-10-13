@@ -26,3 +26,13 @@ export async function reconnectPolar(userId, button) {
   await disconnect(userId);
   window.location.href = `/api/polar-auth?userId=${userId}`;
 }
+
+const V4_CONFIRM =
+  "This signs in to Polar's newer data service, which can read past heart-rate data. You will go to Polar and come back. Continue?";
+
+/** Sign in to Polar's newer API (v4) alongside the existing connection; asks first. */
+export function connectPolarV4(userId) {
+  if (!userId) return alert("Not logged in — please refresh and try again.");
+  if (!confirm(V4_CONFIRM)) return;
+  window.location.href = `/api/polar-auth?userId=${userId}&v=4`;
+}
