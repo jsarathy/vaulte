@@ -104,8 +104,16 @@ test("Polar return messages", () => {
     text: "Polar connected — click Sync to pull sessions.",
   });
   assert.deepEqual(POLAR_RETURN.get("error"), { ok: false, text: "Polar connection failed." });
+  assert.deepEqual(POLAR_RETURN.get("v4connected"), {
+    ok: true,
+    text: "Polar heart-rate history connected — open a session and tap Fetch HR data.",
+  });
+  assert.deepEqual(POLAR_RETURN.get("v4token"), {
+    ok: false,
+    text: "Polar heart-rate history sign-in failed at the token step.",
+  });
   assert.equal(POLAR_RETURN.has("constructor"), false);
-  assert.equal(POLAR_RETURN.size, 2);
+  assert.equal(POLAR_RETURN.size, 4);
 });
 
 test("the first screen reads the last 5 days", () => {

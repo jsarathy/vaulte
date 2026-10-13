@@ -1,6 +1,7 @@
 // api/polar-fetch-hr.js — POST { userId, sessionId }: fetch a stored session's heart-rate samples
 // from Polar, save them on the session and return them.
-import { getAdminDb } from "./_polar/store.js";
+import { getAdminDb, loadV4, saveV4 } from "./_polar/store.js";
+import { fetchV4Hr } from "./_polar/v4.js";
 import {
   authHeaders,
   candidateUrls,
@@ -55,6 +56,17 @@ async function load(db, { userId, sessionId }) {
   return { ref, session: sessionDoc.data(), conn: connDoc.data() };
 }
 
+/** { hr, attempts }: the heart rate from Polar's newer API (v4) when the person has signed in to
+ *  it, with the refreshed tokens stored; hr null and no attempts when they have not. */
+async function viaV4(db, { userId }, session) {
+  const conn = await loadV4(db, userId);
+  if (!conn) return { hr: null, attempts: [], signedIn: false };
+  const deps = { env: process.env, fetcher: fetch, now: Date.now() };
+  const out = await fetchV4Hr({ conn, session }, deps);
+  if (out.saved) await saveV4(db, userId, out.saved);
+  return { hr: out.hr, attempts: out.attempts, signedIn: true };
+}
+
 /** { status, body }: the samples saved on the session, or why not. */
 async function fetchHr(db, ids) {
   const loaded = await load(db, ids);
@@ -68,11 +80,22 @@ async function fetchHr(db, ids) {
     headers,
     polarUserId: conn.polar_user_id,
   });
-  if (!data) return outsideWindow(session) ? TOO_OLD(attempts) : UNAVAILABLE(attempts);
+  if (!data) return fromV4(db, { ids, ref, session, attempts });
   const hr = hrChannel(data);
   if (hr.status) return hr;
   await ref.update(hr); // so the next open shows the chart immediately
   return { status: 200, body: { ok: true, ...hr } };
+}
+
+/** The v4 route when v3 had nothing: the heart rate saved on the session, or why not. */
+async function fromV4(db, { ids, ref, session, attempts }) {
+  const v4 = await viaV4(db, ids, session);
+  const all = [...attempts, ...v4.attempts];
+  if (v4.hr) {
+    await ref.update(v4.hr);
+    return { status: 200, body: { ok: true, ...v4.hr } };
+  }
+  return outsideWindow(session) && !v4.signedIn ? TOO_OLD(all) : UNAVAILABLE(all);
 }
 
 export default async function handler(req, res) {

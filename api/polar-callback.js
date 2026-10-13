@@ -8,6 +8,8 @@
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { exchangeV4Code, V4_SCOPE } from "./_polar/v4.js";
+import { saveV4 } from "./_polar/store.js";
 
 const TOKEN_URL = "https://polarremote.com/v2/oauth2/token";
 const POLAR_USERS = "https://www.polaraccesslink.com/v3/users";
@@ -25,7 +27,8 @@ const appUrl = () => process.env.VAULTE_APP_URL || "https://vaulte-roan.vercel.a
 // The Firebase userId from the OAuth state (see polar-auth.js); null if the state is unreadable.
 function decodeState(state) {
   try {
-    return { uid: JSON.parse(Buffer.from(state, "base64url").toString("utf8")).uid };
+    const { uid, v } = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
+    return { uid, v };
   } catch {
     return null;
   }
@@ -99,6 +102,19 @@ async function connect(code, uid) {
   return "connected";
 }
 
+// A sign-in to Polar's newer API (state `v: 4`): the tokens go to users/{uid}/polar/connection_v4.
+async function connectV4(code, uid) {
+  const deps = { env: process.env, fetcher: fetch, now: Date.now() };
+  const out = await exchangeV4Code(code, process.env.POLAR_REDIRECT_URI, deps);
+  if (!out.ok) {
+    console.error("Polar v4 token exchange failed:", out.status, out.detail);
+    return "v4token";
+  }
+  const connected_at = new Date().toISOString();
+  await saveV4(getAdminDb(), uid, { ...out.tokens, scope: V4_SCOPE, connected_at });
+  return "v4connected";
+}
+
 export default async function handler(req, res) {
   const { code, state, error } = req.query;
   const back = (outcome) => res.redirect(302, `${appUrl()}/?polar=${outcome}`);
@@ -107,7 +123,7 @@ export default async function handler(req, res) {
   const decoded = decodeState(state);
   if (!decoded) return back("error&reason=bad_state");
   try {
-    return back(await connect(code, decoded.uid));
+    return back(await (decoded.v === 4 ? connectV4 : connect)(code, decoded.uid));
   } catch (err) {
     console.error("Polar callback error:", err);
     return back("error&reason=server_error");

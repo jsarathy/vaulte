@@ -29,3 +29,14 @@ export function saveSessions(db, userId, sessions) {
   batch.update(connectionRef(db, userId), { last_sync_at: new Date().toISOString() });
   return batch.commit();
 }
+
+const v4Ref = (db, userId) => db.doc(`users/${userId}/polar/connection_v4`);
+
+/** The stored v4 connection ({ access_token, refresh_token, expires_at, … }); null when none. */
+export async function loadV4(db, userId) {
+  const doc = await v4Ref(db, userId).get();
+  return doc.exists && doc.data().access_token ? doc.data() : null;
+}
+
+/** Store the v4 connection (the sign-in tokens, or the same after a refresh). */
+export const saveV4 = (db, userId, data) => v4Ref(db, userId).set(data);
