@@ -33,13 +33,27 @@ function save(testInfo, scripts) {
   );
 }
 
+// Fix 124: the harness checks every Firestore and Storage call against firestore.rules and
+// storage.rules and reports a refused one here. A refused call fails the test, even when the app
+// caught the error and went on. A spec that refuses on purpose clears `page.rulesViolations` itself.
+async function watchRules(page) {
+  const violations = [];
+  page.rulesViolations = violations;
+  await page.exposeFunction("__reportRulesViolation", (message) => violations.push(message));
+  return violations;
+}
+
 export const test = base.extend({
   page: async ({ page }, use, testInfo) => {
     await page.addInitScript(addNoMotion, NO_MOTION);
-    if (process.env.UI_COVERAGE !== "1") return use(page);
-    await page.coverage.startJSCoverage({ resetOnNavigation: false });
-    await use(page);
-    save(testInfo, await page.coverage.stopJSCoverage());
+    const violations = await watchRules(page);
+    if (process.env.UI_COVERAGE !== "1") await use(page);
+    else {
+      await page.coverage.startJSCoverage({ resetOnNavigation: false });
+      await use(page);
+      save(testInfo, await page.coverage.stopJSCoverage());
+    }
+    expect(violations, "calls the Firestore or Storage rules do not allow").toEqual([]);
   },
 });
 
