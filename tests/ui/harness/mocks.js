@@ -364,19 +364,34 @@ const signedIn = (user) => {
   auth.currentUser = user;
   return { user };
 };
-const userFor = (uid, email, extra = {}) => ({
-  uid,
-  email,
-  displayName: null,
-  photoURL: null,
-  ...extra,
-});
+// A password account that has confirmed its address, unless the spec says otherwise (Fix 130).
+// reload() learns of a confirmation when window.__confirmed is set; getIdToken(true) is counted in
+// window.__forcedTokens.
+const withAuthMethods = (user) => {
+  user.reload = async () => {
+    authCall("reload", { uid: user.uid });
+    if (window.__confirmed) user.emailVerified = true;
+  };
+  user.getIdToken = async (force) => {
+    if (force) window.__forcedTokens = (window.__forcedTokens ?? 0) + 1;
+    return "mock-id-token";
+  };
+  return user;
+};
+const userFor = (uid, email, extra = {}) =>
+  withAuthMethods({
+    uid,
+    email,
+    displayName: null,
+    photoURL: null,
+    emailVerified: true,
+    providerData: [{ providerId: "password" }],
+    ...extra,
+  });
 export const onAuthStateChanged = (_a, cb) => {
   setTimeout(async () => {
     await authHold("start");
-    auth.currentUser = window.__authUser
-      ? { ...window.__authUser, getIdToken: async () => "mock-id-token" }
-      : null;
+    auth.currentUser = window.__authUser ? withAuthMethods({ ...window.__authUser }) : null;
     cb(auth.currentUser);
   }, window.__authDelay || 0);
   return () => {};
@@ -384,12 +399,14 @@ export const onAuthStateChanged = (_a, cb) => {
 export const createUserWithEmailAndPassword = async (_a, email, password) => {
   await authWait("createUser");
   authCall("createUser", { email, password });
-  return signedIn(userFor("new-u", email));
+  return signedIn(userFor("new-u", email, { emailVerified: false }));
 };
 export const signInWithEmailAndPassword = async (_a, email, password) => {
   await authWait("signIn");
   authCall("signIn", { email, password });
-  return signedIn(userFor(window.__signInUid ?? "u", email));
+  return signedIn(
+    userFor(window.__signInUid ?? "u", email, { emailVerified: !window.__signedInUnconfirmed }),
+  );
 };
 export const signOut = async () => {
   authCall("signOut", {});

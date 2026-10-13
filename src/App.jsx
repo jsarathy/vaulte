@@ -6,6 +6,7 @@ import { bg, globalStyle } from "./styles/authStyles.js";
 import LandingPage from "./components/LandingPage.jsx";
 import SignupPage from "./components/SignupPage.jsx";
 import LoginPage from "./components/LoginPage.jsx";
+import VerifyPage from "./components/VerifyPage.jsx";
 import { ToastClock } from "./components/AuthBits.jsx";
 // The signed-in app is its own download, fetched only after sign-in (Fix 43.2.2).
 const AccountPage = lazy(() => import("./components/AccountPage.jsx"));
@@ -64,6 +65,7 @@ function Pages({ pages }) {
         go={go}
       />
     );
+  if (page === "verify" && profile) return <VerifyPage pages={pages} />;
   if (page === "account" && profile)
     return (
       <Suspense fallback={<LoadingPage />}>

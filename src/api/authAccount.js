@@ -17,9 +17,12 @@ import {
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { profileFromGoogle, profileFromSignup } from "../lib/authProfile.js";
+import { needsConfirmation } from "../lib/confirmGate.js";
 
 const VERCEL_URL = "https://vaulte-roan.vercel.app";
 const actionCodeSettings = { url: VERCEL_URL, handleCodeInApp: true };
+// the confirmation link returns here, and the app says the address is confirmed (Fix 130)
+const CONFIRMED_URL = `${VERCEL_URL}/?confirmed=1`;
 const MAGIC_EMAIL_KEY = "vaulte:magicEmail";
 
 export const saveProfile = async (uid, data) => {
@@ -38,7 +41,7 @@ export async function createAccount(form) {
   await saveProfile(cred.user.uid, profile);
   // the confirmation email (Fix 126); the account exists either way, and Claude asks again if it fails
   // (Firebase's own page confirms it and sends the person back; the app does not handle the code)
-  await sendEmailVerification(cred.user, { url: VERCEL_URL }).catch((err) =>
+  await sendEmailVerification(cred.user, { url: CONFIRMED_URL }).catch((err) =>
     console.warn("confirmation email not sent:", err.message),
   );
   return profile;
@@ -84,7 +87,26 @@ export async function signInWithGoogle() {
 
 /** The current user's profile whenever Firebase reports who is signed in; null when nobody. */
 export const watchSignedIn = (onChange) =>
-  onAuthStateChanged(auth, async (user) => onChange(user ? await fetchProfile(user.uid) : null));
+  onAuthStateChanged(auth, async (user) => {
+    // a stored session may not know yet that the address has been confirmed
+    if (needsConfirmation(user)) await user.reload().catch(() => {});
+    onChange(user ? await fetchProfile(user.uid) : null);
+  });
+
+/** True while the signed-in person has to confirm their email address before using the app. */
+export const awaitingConfirmation = () => needsConfirmation(auth.currentUser);
+
+/** Look again: true once the address is confirmed (and the sign-in token carries it). */
+export async function checkConfirmed() {
+  await auth.currentUser.reload();
+  if (needsConfirmation(auth.currentUser)) return false;
+  await auth.currentUser.getIdToken(true);
+  return true;
+}
+
+/** Send the confirmation email again. */
+export const resendConfirmation = () =>
+  sendEmailVerification(auth.currentUser, { url: CONFIRMED_URL });
 
 export const logOut = () => signOut(auth);
 

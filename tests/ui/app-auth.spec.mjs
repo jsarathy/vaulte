@@ -97,9 +97,20 @@ test("Create Account: required fields, password length, duplicate email, success
   // the confirmation email (Fix 126): sent to the new account, the link returning to the app
   const sent = (await calls(page)).filter(([fn]) => fn === "sendVerification");
   expect(sent).toEqual([
-    ["sendVerification", { uid: "new-u", settings: { url: "https://vaulte-roan.vercel.app" } }],
+    [
+      "sendVerification",
+      { uid: "new-u", settings: { url: "https://vaulte-roan.vercel.app/?confirmed=1" } },
+    ],
   ]);
+  // the app waits for the confirmation (Fix 130): not the account, the "check your email" page
+  await expect(page.locator("h2")).toHaveText("Check Your Email");
+  await expect(page.locator("text=Welcome, Jane.")).toHaveCount(0);
+  await page.getByRole("button", { name: "I've confirmed — continue" }).click();
+  await expect(page.locator("text=Not confirmed yet.")).toBeVisible();
+  await page.evaluate(() => (window.__confirmed = true)); // the person opens the link
+  await page.getByRole("button", { name: "I've confirmed — continue" }).click();
   await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
+  expect(await page.evaluate(() => window.__forcedTokens)).toBe(1); // the token now carries it
   const [doc] = await saved(page);
   expect(doc.path).toBe("users/new-u");
   expect(doc.merge).toBe(true);
@@ -135,8 +146,8 @@ test("while a sign-up or sign-in runs the button is disabled with a spinner", as
   await expect(create.locator(".spinner")).toBeVisible();
   await expect(button(page, "Continue with Google")).toBeDisabled();
   await page.evaluate(() => window.__authRelease("createUser"));
-  await expect(page.locator("text=Welcome, J.")).toBeVisible({ timeout: 15_000 });
-  await page.click("text=Sign Out");
+  await expect(page.locator("h2")).toHaveText("Check Your Email"); // the new address is unconfirmed
+  await page.click("text=Sign out");
   await page.click("text=Sign In");
   await fill(page, "Email Address", "jane@example.com");
   await fill(page, "Password", "pw");
@@ -404,10 +415,96 @@ test("sign-up: if the confirmation email cannot be sent the account is still cre
   await fill(page, "Password", "123456");
   await page.click("text=Create My Account");
   await expect(page.locator("text=ACCOUNT CREATED")).toBeVisible();
-  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("h2")).toHaveText("Check Your Email"); // Resend is there for this
   expect(w.errs).toEqual([]);
   expect((await saved(page))[0].path).toBe("users/new-u");
   expect(w.warned.some((m) => m.includes("confirmation email not sent: Too many requests."))).toBe(
     true,
   );
+});
+
+const VERIFY_USER = {
+  uid: "u",
+  email: "jane@example.com",
+  emailVerified: false,
+  providerData: [{ providerId: "password" }],
+};
+
+test("an unconfirmed password account is held on the check-your-email page; Resend sends the email again", async ({
+  page,
+}) => {
+  await start(page, { __authUser: VERIFY_USER, __docs: { "users/u": PROFILE } });
+  await expect(page.locator("h2")).toHaveText("Check Your Email");
+  await expect(page.locator("text=jane@example.com")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Resend the email" }).click();
+  await expect(page.locator("text=CONFIRMATION EMAIL SENT")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send it again" })).toBeVisible();
+  expect((await calls(page)).filter(([fn]) => fn === "sendVerification")).toEqual([
+    [
+      "sendVerification",
+      { uid: "u", settings: { url: "https://vaulte-roan.vercel.app/?confirmed=1" } },
+    ],
+  ]);
+});
+
+test("a failed Resend shows its message", async ({ page }) => {
+  await start(page, {
+    __authUser: VERIFY_USER,
+    __docs: { "users/u": PROFILE },
+    __authFail: { sendVerification: ["auth/too-many-requests", "Too many requests."] },
+  });
+  await page.getByRole("button", { name: "Resend the email" }).click();
+  await expect(page.locator("text=Too many requests.")).toBeVisible();
+});
+
+test("a person who confirmed in another tab enters at once when the page opens (the stored user is looked at again)", async ({
+  page,
+}) => {
+  await start(page, {
+    __authUser: VERIFY_USER,
+    __docs: { "users/u": PROFILE },
+    __confirmed: true,
+  });
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
+  expect((await calls(page)).filter(([fn]) => fn === "reload").length).toBe(1);
+});
+
+test("Sign out from the check-your-email page returns to the landing page", async ({ page }) => {
+  await start(page, { __authUser: VERIFY_USER, __docs: { "users/u": PROFILE } });
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.locator("text=WELCOME TO")).toBeVisible();
+  expect((await calls(page)).at(-1)).toEqual(["signOut", {}]);
+});
+
+test("a password sign-in with an unconfirmed address also waits for the confirmation", async ({
+  page,
+}) => {
+  await start(page, { __docs: { "users/u": PROFILE }, __signedInUnconfirmed: true });
+  await page.click("text=Sign In");
+  await fill(page, "Email Address", "jane@example.com");
+  await fill(page, "Password", "123456");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await expect(page.locator("h2")).toHaveText("Check Your Email");
+});
+
+test("the confirmation link brings the person back: EMAIL CONFIRMED, and the address is cleaned", async ({
+  page,
+}) => {
+  await start(page, {});
+  await page.goto("/app.html?confirmed=1&x=2");
+  await expect(page.locator("text=EMAIL CONFIRMED")).toBeVisible({ timeout: 15_000 });
+  expect(new URL(page.url()).search).toBe("?x=2");
+});
+
+test("a Google account is never held for confirmation", async ({ page }) => {
+  await start(page, {
+    __authUser: {
+      uid: "u",
+      email: "jane@example.com",
+      providerData: [{ providerId: "google.com" }],
+    },
+    __docs: { "users/u": PROFILE },
+  });
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
 });
