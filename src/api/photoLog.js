@@ -1,6 +1,7 @@
 // src/api/photoLog.js — Claude call for "Log from Photo" (through the /api/claude proxy).
 import { normaliseImage, fileToBase64 } from "../utils/imageUtils";
 import { photoRequest, parsePhotoReply } from "../lib/photoLog.js";
+import { authHeader } from "./authToken.js";
 
 /** JPEG-normalised copy of the chosen photo (HEIC etc. converted, large images reduced). */
 export const preparePhoto = (file) => normaliseImage(file);
@@ -9,7 +10,7 @@ export const preparePhoto = (file) => normaliseImage(file);
 export async function claudeIdentifyFoods(file) {
   const res = await fetch("/api/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
     body: JSON.stringify(photoRequest(await fileToBase64(file))),
   });
   return parsePhotoReply(await res.json());

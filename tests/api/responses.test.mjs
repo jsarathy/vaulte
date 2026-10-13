@@ -4,7 +4,7 @@
 import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
-import claude from "../../api/claude.js";
+import claude, { deps as claudeDeps } from "../../api/claude.js";
 import polarAuth from "../../api/polar-auth.js";
 import polarDisconnect from "../../api/polar-disconnect.js";
 import polarSync from "../../api/polar-sync.js";
@@ -26,6 +26,8 @@ const said = (spy) => spy.mock.calls.map((c) => c.arguments);
 const logged = (spy, label) => said(spy).filter((a) => a[0] === label);
 
 // ---- claude.js
+claudeDeps.verify = async () => ({ uid: "u1" }); // signed in (the token check has its own tests)
+const SIGNED_IN = { authorization: "Bearer good" };
 test("claude: refuses other methods and a missing key with their messages", async () => {
   const get = res();
   await claude({ method: "GET" }, get);
@@ -34,7 +36,7 @@ test("claude: refuses other methods and a missing key with their messages", asyn
   delete process.env.ANTHROPIC_API_KEY;
   try {
     const out = res();
-    await claude({ method: "POST", body: {} }, out);
+    await claude({ method: "POST", headers: SIGNED_IN, body: {} }, out);
     assert.deepEqual(
       [out.statusCode, out.body],
       [500, { error: "ANTHROPIC_API_KEY not configured" }],
@@ -52,7 +54,7 @@ test("claude: forwards the body to Anthropic with the key and version, and relay
     return { status: 429, json: async () => ({ error: "slow down", content: "text" }) };
   };
   const out = res();
-  await claude({ method: "POST", body: { model: "m", messages: [] } }, out);
+  await claude({ method: "POST", headers: SIGNED_IN, body: { model: "m", messages: [] } }, out);
   assert.equal(seen.url, "https://api.anthropic.com/v1/messages");
   assert.equal(seen.opts.method, "POST");
   assert.deepEqual(seen.opts.headers, {
@@ -74,7 +76,7 @@ test("claude: only web-search results lose their encrypted blobs", async () => {
   ];
   globalThis.fetch = async () => ({ status: 200, json: async () => ({ content }) });
   const out = res();
-  await claude({ method: "POST", body: {} }, out);
+  await claude({ method: "POST", headers: SIGNED_IN, body: {} }, out);
   assert.deepEqual(out.body.content, [
     { type: "web_search_tool_result", content: [{ url: "u" }] },
     { type: "web_search_tool_result", content: "an error text" },
@@ -88,7 +90,7 @@ test("claude: a failed call to Anthropic is a 500 with the error text", async ()
     throw new Error("connection reset");
   };
   const out = res();
-  await claude({ method: "POST", body: {} }, out);
+  await claude({ method: "POST", headers: SIGNED_IN, body: {} }, out);
   assert.deepEqual([out.statusCode, out.body], [500, { error: "connection reset" }]);
 });
 

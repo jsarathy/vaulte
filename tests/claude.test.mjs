@@ -14,6 +14,7 @@ import {
 import { claudeLookupFood } from "../src/api/foodLookup.js";
 import { photoRequest } from "../src/lib/photoLog.js";
 import { setUsageUser } from "../src/api/usageContext.js";
+import { setTokenSource } from "../src/api/authToken.js";
 
 let calls, reply;
 const text = (t) => ({ content: [{ type: "text", text: t }] });
@@ -391,4 +392,34 @@ test("every Claude call carries its feature name and the user", async () => {
   );
   assert.equal(features.length, 8);
   setUsageUser(null);
+});
+
+test("every Claude call carries the signed-in user's ID token; with nobody signed in it carries none", async () => {
+  const headersSeen = [];
+  const reply = { content: [{ type: "text", text: "{}" }] };
+  globalThis.fetch = async (url, opts) => {
+    headersSeen.push(opts.headers);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => reply,
+      text: async () => JSON.stringify(reply),
+    };
+  };
+  const callBoth = async () => {
+    await claudeChat([{ role: "user", content: "hi" }], []);
+    await claudeLookupFood({ name: "apple", qty: 1, unit: "portion" }).catch(() => {}); // the reply's content is not the point
+  };
+  setTokenSource(async () => "id-token-1");
+  await callBoth();
+  assert.equal(headersSeen.length, 2);
+  for (const h of headersSeen) {
+    assert.equal(h.Authorization, "Bearer id-token-1");
+    assert.equal(h["Content-Type"], "application/json");
+  }
+  headersSeen.length = 0;
+  setTokenSource(null);
+  await callBoth();
+  assert.equal(headersSeen.length, 2);
+  for (const h of headersSeen) assert.deepEqual(h, { "Content-Type": "application/json" });
 });

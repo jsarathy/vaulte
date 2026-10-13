@@ -2,7 +2,17 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { res } from "./setup.mjs";
-import handler from "../../api/claude.js";
+import handler, { deps } from "../../api/claude.js";
+import { verifyIdToken } from "../../api/_admin/verify.js";
+
+const realVerify = deps.verify; // what the proxy checks tokens with, before the tests stand in for it
+
+// The token check stands in for Google's keys: "tok-<uid>" is a good token for that user.
+deps.verify = async (token) => {
+  if (!token.startsWith("tok-")) throw new Error("bad token");
+  return { uid: token.slice(4) };
+};
+const AS = (uid) => ({ authorization: `Bearer tok-${uid}` });
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -17,7 +27,7 @@ test("rejects non-POST; missing API key is a 500", async () => {
   assert.equal(out.statusCode, 405);
   delete process.env.ANTHROPIC_API_KEY;
   out = res();
-  await handler({ method: "POST", body: {} }, out);
+  await handler({ method: "POST", headers: AS("u1"), body: {} }, out);
   assert.equal(out.statusCode, 500);
 });
 
@@ -28,7 +38,7 @@ test("forwards the body with the key and passes the status through", async () =>
     return { status: 429, json: async () => ({ error: { type: "rate_limit" } }) };
   };
   const out = res();
-  await handler({ method: "POST", body: { model: "m", messages: [] } }, out);
+  await handler({ method: "POST", headers: AS("u1"), body: { model: "m", messages: [] } }, out);
   assert.equal(seen.url, "https://api.anthropic.com/v1/messages");
   assert.equal(seen.opts.headers["x-api-key"], "test-key");
   assert.deepEqual(JSON.parse(seen.opts.body), { model: "m", messages: [] });
@@ -49,7 +59,64 @@ test("strips web-search encrypted_content (keeps responses under Vercel's size l
     }),
   });
   const out = res();
-  await handler({ method: "POST", body: {} }, out);
+  await handler({ method: "POST", headers: AS("u1"), body: {} }, out);
   assert.deepEqual(out.body.content[0].content, [{ url: "u1", title: "t1" }]);
   assert.equal(out.body.content[1].text, "answer");
+});
+
+test("a request with no sign-in, a malformed header or a bad token is a 401 and never reaches Anthropic", async () => {
+  let reached = false;
+  globalThis.fetch = async () => {
+    reached = true;
+    return { status: 200, json: async () => ({}) };
+  };
+  const body = { model: "m", messages: [] };
+  const cases = [
+    [{ method: "POST", body }, "Not signed in"],
+    [{ method: "POST", headers: {}, body }, "Not signed in"],
+    [{ method: "POST", headers: { authorization: "" }, body }, "Not signed in"],
+    [{ method: "POST", headers: { authorization: "Bearer " }, body }, "Not signed in"],
+    [
+      { method: "POST", headers: { authorization: "Bearer nonsense" }, body },
+      "Invalid or expired sign-in",
+    ],
+    [
+      { method: "POST", headers: { authorization: "Basic tok-u1" }, body },
+      "Invalid or expired sign-in",
+    ],
+  ];
+  for (const [req, message] of cases) {
+    const out = res();
+    await handler(req, out);
+    assert.equal(out.statusCode, 401, message);
+    assert.deepEqual(out.body, { error: message });
+  }
+  assert.equal(reached, false);
+});
+
+test("the sign-in is checked before the API key: no key and no token is a 401, not a 500", async () => {
+  delete process.env.ANTHROPIC_API_KEY;
+  const out = res();
+  await handler({ method: "POST", body: {} }, out);
+  assert.equal(out.statusCode, 401);
+});
+
+test("the Bearer word is case-insensitive and the token is what is verified", async () => {
+  const seen = [];
+  deps.verify = async (t) => {
+    seen.push(t);
+    return { uid: "u9" };
+  };
+  globalThis.fetch = async () => ({ status: 200, json: async () => ({ content: [] }) });
+  const out = res();
+  await handler(
+    { method: "POST", headers: { authorization: "bearer   abc.def.ghi" }, body: {} },
+    out,
+  );
+  assert.equal(out.statusCode, 200);
+  assert.deepEqual(seen, ["abc.def.ghi"]);
+});
+
+test("the proxy checks tokens with the real verifyIdToken (Google's keys), not a stand-in", () => {
+  assert.equal(realVerify, verifyIdToken);
 });
