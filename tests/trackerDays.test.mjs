@@ -19,6 +19,7 @@ import {
   withBodyRow,
   withSyncedSessions,
   polarSyncedText,
+  polarSyncMessage,
 } from "../src/lib/weightSync.js";
 
 const day = (date, kcal) => ({
@@ -155,4 +156,18 @@ test("Polar sync merge and message", () => {
   );
   assert.equal(polarSyncedText(1), "Synced 1 session.");
   assert.equal(polarSyncedText(3), "Synced 3 sessions.");
+});
+
+test("polarSyncMessage: what was new, and the earlier sessions that got heart rate", () => {
+  assert.equal(polarSyncMessage({ newSessions: 0 }), "All up to date.");
+  assert.equal(polarSyncMessage({ newSessions: 0, hrBackfilled: 0 }), "All up to date.");
+  assert.equal(polarSyncMessage({ newSessions: 2 }), "Synced 2 sessions.");
+  assert.equal(
+    polarSyncMessage({ newSessions: 0, hrBackfilled: 1 }),
+    "All up to date. Heart rate added to 1 earlier session.",
+  );
+  assert.equal(
+    polarSyncMessage({ newSessions: 1, hrBackfilled: 3 }),
+    "Synced 1 session. Heart rate added to 3 earlier sessions.",
+  );
 });
