@@ -9,19 +9,26 @@ export const bmiOf = (kg, heightCm) => (kg / Math.pow(heightCm / 100, 2)).toFixe
 /** VO₂ max band: under 35 Fair, under 45 Good, else Excellent. */
 export const vo2Band = (vo2max) => (vo2max < 35 ? "Fair" : vo2max < 45 ? "Good" : "Excellent");
 
-/** Personal Stats rows. */
+const has = (v) => v != null && v !== ""; // filled in
+const show = (v, text) => (has(v) ? text(v) : "—");
+const SEX = { m: "Male", "": "—" }; // anything else reads as Female
+const bmiRange = (lo, hi, h) =>
+  has(lo) && has(hi) && has(h) ? `${bmiOf(lo, h)}–${bmiOf(hi, h)}` : "—";
+
+/** Personal Stats rows; a field the person has not filled in shows "—" (a new account's plan is blank). */
 export function personalStats(cfg) {
-  const { targetWeightMinKg: lo, targetWeightMaxKg: hi } = cfg;
+  const { targetWeightMinKg: lo, targetWeightMaxKg: hi, startWeightKg: w, heightCm: h } = cfg;
+  const base = cumLossBaseline(cfg);
   return [
-    ["Age", `${cfg.age} yr`],
-    ["Sex", cfg.sex === "m" ? "Male" : "Female"],
-    ["Height", `${cfg.heightCm} cm`],
-    ["Start Weight", `${cfg.startWeightKg.toFixed(1)} kg`],
-    ["Start BMI", bmiOf(cfg.startWeightKg, cfg.heightCm)],
-    ["Target", `${lo}–${hi} kg`],
-    ["Target BMI", `${bmiOf(lo, cfg.heightCm)}–${bmiOf(hi, cfg.heightCm)}`],
-    ["VO₂ Max", `${cfg.vo2max} — ${vo2Band(cfg.vo2max)}`],
-    ["Cum-loss base", `${cumLossBaseline(cfg).toFixed(2)} kg`],
+    ["Age", show(cfg.age, (v) => `${v} yr`)],
+    ["Sex", SEX[cfg.sex] ?? "Female"],
+    ["Height", show(h, (v) => `${v} cm`)],
+    ["Start Weight", show(w, (v) => `${Number(v).toFixed(1)} kg`)],
+    ["Start BMI", has(h) ? show(w, (v) => bmiOf(v, h)) : "—"],
+    ["Target", has(lo) ? show(hi, (v) => `${lo}–${v} kg`) : "—"],
+    ["Target BMI", bmiRange(lo, hi, h)],
+    ["VO₂ Max", show(cfg.vo2max, (v) => `${v} — ${vo2Band(v)}`)],
+    ["Cum-loss base", show(base, (v) => `${v.toFixed(2)} kg`)],
   ];
 }
 

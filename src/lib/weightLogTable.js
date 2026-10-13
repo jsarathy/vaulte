@@ -10,6 +10,7 @@ const DEFAULT_CUM_LOSS_BASELINE_KG = 86.45;
  * unreadable or not above 0.
  */
 export function cumLossBaseline(cfg) {
+  if (cfg.cumLossBaselineKg === null && cfg.startWeightKg === null) return null; // a blank plan (Fix 132)
   const kg = Number(cfg.cumLossBaselineKg); // blank / cleared → 0, unreadable → NaN
   return kg > 0 ? kg : DEFAULT_CUM_LOSS_BASELINE_KG;
 }
@@ -57,7 +58,7 @@ export function twoWeekFigure(loss) {
 
 /** Cum Loss as shown ("-2.3 kg", a gain "+1.0 kg"); null without a reading. */
 export const cumLossFigure = (row, baseline) =>
-  row.actual != null ? lossText(baseline - row.actual) : null;
+  row.actual != null && baseline != null ? lossText(baseline - row.actual) : null;
 
 /** Dated today or earlier (a missing or unreadable date never is). */
 const isPast = (date, now) => new Date(date) <= now;

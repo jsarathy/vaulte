@@ -10,6 +10,7 @@ import {
   planMilestones,
   phaseBadge,
 } from "../src/lib/planSummary.js";
+import { BLANK_PLAN_CONFIG, DEFAULT_PLAN_CONFIG } from "../src/constants/weightPlan.js";
 
 const cfg = {
   age: 60,
@@ -109,4 +110,34 @@ test("milestones and badges", () => {
     background: "#E8F5E9",
     color: "#2E7D32",
   });
+});
+
+test("a blank plan (a new account) shows dashes for every figure it has not been given (Fix 132)", () => {
+  const blank = Object.fromEntries(
+    Object.entries(DEFAULT_PLAN_CONFIG).map(([k, v]) => [
+      k,
+      Array.isArray(v) ? [] : typeof v === "string" ? "" : null,
+    ]),
+  );
+  assert.deepEqual(
+    personalStats(blank).map(([, v]) => v),
+    Array(9).fill("—"),
+  );
+  assert.deepEqual(curveSummary(blank).slice(0, 3), [
+    ["Anchors", "1 points"],
+    ["Plan length", "—"],
+    ["End weight", "—"],
+  ]);
+  assert.deepEqual(planMilestones(blank), []);
+  assert.deepEqual(blank, BLANK_PLAN_CONFIG);
+  assert.equal(blank.planAnchors.length, 0);
+  assert.equal(Object.keys(blank).length, Object.keys(DEFAULT_PLAN_CONFIG).length);
+});
+
+test("a plan with only some figures shows the rest as dashes", () => {
+  const some = { ...BLANK_PLAN_CONFIG, heightCm: 170, startWeightKg: 80, sex: "f" };
+  assert.deepEqual(
+    personalStats(some).map(([, v]) => v),
+    ["—", "Female", "170 cm", "80.0 kg", "27.7", "—", "—", "—", "86.45 kg"],
+  );
 });

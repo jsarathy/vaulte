@@ -4,6 +4,7 @@ import { doc, setDoc, getDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { emptyDay } from "../constants/helpers";
 import { INITIAL_RECIPES } from "../constants/recipes";
+import { BLANK_PLAN_CONFIG } from "../constants/weightPlan";
 
 const dayRef = (uid, date) => doc(db, "users", uid, "nutrition_days", date);
 const recipeRef = (uid, id) => doc(db, "users", uid, "recipes", id);
@@ -61,9 +62,10 @@ export async function loadDay(uid, date) {
   return snap.exists() ? snap.data() : null;
 }
 
-/** Write today as an empty day (the standard meal slots, nothing in them) and the starter recipes for a
- *  new account; the days, newest first. */
+/** Write today as an empty day (the standard meal slots, nothing in them), the starter recipes and a
+ *  blank weight plan (Fix 132) for a new account; the days, newest first. */
 export async function seedInitialData(uid) {
+  await setDoc(doc(db, "users", uid, "weight_plan", "settings"), BLANK_PLAN_CONFIG);
   const day = emptyDay(new Date().toLocaleDateString("en-CA")); // YYYY-MM-DD, local time
   await setDoc(dayRef(uid, day.date), day);
   for (const recipe of INITIAL_RECIPES) {

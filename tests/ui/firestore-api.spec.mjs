@@ -96,15 +96,22 @@ test("seedInitialData: today as an empty day with the standard meal slots, and e
 }) => {
   await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
   await start(p);
-  const { returned, recipes, slots } = await api(p, async (f) => ({
+  const { returned, recipes, slots, blank } = await api(p, async (f) => ({
     returned: await f.seedInitialData("u"),
     recipes: window.__initialRecipes,
     slots: window.__mealSlots,
+    blank: window.__blankPlan,
   }));
   const all = await saves(p);
   const dayWrites = all.filter((s) => s.path.startsWith(U("nutrition_days/")));
   const recipeWrites = all.filter((s) => s.path.startsWith(U("recipes/")));
-  expect(all.length).toBe(dayWrites.length + recipeWrites.length);
+  const planWrites = all.filter((s) => s.path === U("weight_plan/settings"));
+  expect(all.length).toBe(dayWrites.length + recipeWrites.length + planWrites.length);
+  // a blank weight plan (Fix 132): every field of the defaults, empty
+  expect(planWrites.map((s) => s.data)).toEqual([blank]);
+  expect(Object.values(blank).every((v) => v === null || v === "" || Array.isArray(v))).toBe(true);
+  expect(blank.planAnchors).toEqual([]);
+  expect(blank.sex).toBe("");
   expect(dayWrites.map((s) => s.path)).toEqual([U("nutrition_days/2026-10-04")]);
   expect(recipeWrites).toEqual(recipes.map((r) => ({ path: U(`recipes/${r.id}`), data: r })));
   expect(recipes.length).toBeGreaterThan(0);

@@ -123,3 +123,10 @@ test("editing a row", () => {
   assert.equal(editedRow(log, 5, { dose: "x" }), null);
   assert.deepEqual(log[0], { date: "a", week: 1 }); // untouched
 });
+
+test("a blank plan has no cum-loss baseline, so no Cum Loss figure (Fix 132)", () => {
+  assert.equal(cumLossBaseline({ cumLossBaselineKg: null, startWeightKg: null }), null);
+  assert.equal(cumLossBaseline({ cumLossBaselineKg: null, startWeightKg: 80 }), 86.45); // only a blank plan
+  assert.equal(cumLossBaseline({ cumLossBaselineKg: 90, startWeightKg: null }), 90);
+  assert.equal(cumLossFigure({ actual: 80 }, null), null);
+});

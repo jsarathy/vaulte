@@ -9,9 +9,11 @@
       import * as api from "../../../src/api/firestore.js";
       import { INITIAL_RECIPES } from "../../../src/constants/recipes.js";
       import { DEFAULT_MEAL_SLOTS } from "../../../src/constants/helpers.js";
+      import { BLANK_PLAN_CONFIG } from "../../../src/constants/weightPlan.js";
       window.firestoreApi = api;
       window.__initialRecipes = INITIAL_RECIPES;
       window.__mealSlots = DEFAULT_MEAL_SLOTS;
+      window.__blankPlan = BLANK_PLAN_CONFIG;
     </script>
   </body>
 </html>
