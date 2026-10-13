@@ -70,6 +70,15 @@ export const DEFAULT_PLAN_CONFIG = {
   lever2CaloriesKcal: 1675,
 };
 
+/** The plan a new account starts with (Fix 132): every field of the defaults, empty, for the person to
+ *  fill in. Numbers are null, text is "", the curve has no anchors. */
+export const BLANK_PLAN_CONFIG = Object.fromEntries(
+  Object.entries(DEFAULT_PLAN_CONFIG).map(([key, value]) => [
+    key,
+    Array.isArray(value) ? [] : typeof value === "string" ? "" : null,
+  ]),
+);
+
 // ── Curve primitives ────────────────────────────────────────────────
 
 /** Sorted anchor points, week 0 prepended from startWeightKg / startDate. */

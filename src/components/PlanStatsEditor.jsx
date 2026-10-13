@@ -50,6 +50,11 @@ function SexAndStart({ plan, form }) {
           onChange={(e) => form.setField("sex", e.target.value)}
           style={inputStyle("70px")}
         >
+          {plan.sex === "" && (
+            <option value="" disabled hidden>
+              Choose…
+            </option>
+          )}
           <option value="m">Male</option>
           <option value="f">Female</option>
         </select>
