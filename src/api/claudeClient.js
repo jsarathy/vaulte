@@ -2,7 +2,7 @@
 // body as JSON (with a readable error when the platform itself failed), the API's own errors,
 // and the model's final text — parsed against a schema with Structured Outputs, or as is.
 // Every request names its feature, so the server can keep a record of what each call costs (Fix 41).
-import { authHeader } from "./authToken.js";
+import { claudeFetch } from "./claudeFetch.js";
 import { usageField } from "./usageContext.js";
 
 const MODEL = "claude-sonnet-4-6";
@@ -74,11 +74,7 @@ export const finalText = extractFinalText;
 
 /** POST the request (the model filled in) and give back the reply's body, checked. */
 async function post(body, feature) {
-  const res = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeader()) },
-    body: JSON.stringify({ model: MODEL, ...body, ...usageField(feature) }),
-  });
+  const res = await claudeFetch({ model: MODEL, ...body, ...usageField(feature) });
   const data = await safeJson(res);
   assertOk(res, data);
   return data;

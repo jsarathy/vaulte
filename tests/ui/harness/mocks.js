@@ -2,7 +2,7 @@
 // src/api/claude.js in the UI test harness. No network, no real data.
 // Tests read/drive it through window.__* (calls recorded, failures switchable).
 
-import { setTokenSource } from "../../../src/api/authToken.js";
+import { setAuthTools, setTokenSource } from "../../../src/api/authToken.js";
 import firestoreRulesText from "../../../firestore.rules?raw";
 import storageRulesText from "../../../storage.rules?raw";
 import {
@@ -15,6 +15,11 @@ import {
 
 // Signed in: the sign-in proof that src/firebase.js arranges for calls to server functions.
 setTokenSource(async () => "mock-id-token");
+// and its confirmation tools, as src/firebase.js arranges them (calls recorded in window.__authCalls)
+setAuthTools({
+  refresh: async () => window.__authCalls?.push({ fn: "refresh" }),
+  resend: async () => window.__authCalls?.push({ fn: "resendConfirmation" }),
+});
 
 // ── firebase / firebase/firestore ────────────────────────────────────────────
 export const db = {};
@@ -376,6 +381,10 @@ export const deleteUser = async (user) => {
 export const updatePassword = async (user, password) => {
   await authWait("updatePassword");
   authCall("updatePassword", { uid: user?.uid, password });
+};
+export const sendEmailVerification = async (user, settings) => {
+  await authWait("sendVerification");
+  authCall("sendVerification", { uid: user?.uid, settings });
 };
 export const sendSignInLinkToEmail = async (_a, email, settings) => {
   await authWait("sendLink");

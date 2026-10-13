@@ -94,7 +94,11 @@ function useSignup(session, run) {
     const problem = signupProblem(signupData);
     if (problem) return session.setError(problem);
     await run(
-      async () => session.enter(await createAccount(signupData), "ACCOUNT CREATED"),
+      async () =>
+        session.enter(
+          await createAccount(signupData),
+          "ACCOUNT CREATED. CHECK YOUR EMAIL TO CONFIRM IT.",
+        ),
       signupErrorMessage,
     );
   };

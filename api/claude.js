@@ -59,10 +59,20 @@ async function logUsage({ meta, request, response, data, started }) {
   }
 }
 
+/** 403 for a person whose email address is not confirmed (Fix 126); the header lets the app tell
+ *  this apart from any other 403 and ask them to confirm. */
+function refuseUnconfirmed(res) {
+  res.setHeader("X-Vaulte-Reason", "email_not_confirmed");
+  return res
+    .status(403)
+    .json({ error: "Confirm your email address to use Claude.", code: "email_not_confirmed" });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const caller = await callerOf(req, deps.verify);
   if (caller.error) return res.status(caller.error.status).json(caller.error.body);
+  if (caller.claims.email_verified !== true) return refuseUnconfirmed(res);
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
   try {

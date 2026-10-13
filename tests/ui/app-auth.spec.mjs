@@ -93,6 +93,12 @@ test("Create Account: required fields, password length, duplicate email, success
   await fill(page, "Postcode", "SW1");
   await page.click("text=Create My Account");
   await expect(page.locator("text=ACCOUNT CREATED")).toBeVisible();
+  await expect(page.locator("text=CHECK YOUR EMAIL TO CONFIRM IT")).toBeVisible();
+  // the confirmation email (Fix 126): sent to the new account, the link returning to the app
+  const sent = (await calls(page)).filter(([fn]) => fn === "sendVerification");
+  expect(sent).toEqual([
+    ["sendVerification", { uid: "new-u", settings: { url: "https://vaulte-roan.vercel.app" } }],
+  ]);
   await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
   const [doc] = await saved(page);
   expect(doc.path).toBe("users/new-u");
@@ -380,4 +386,28 @@ test("Sign Out returns to the landing page and clears the sign-in form", async (
   expect((await calls(page)).at(-1)).toEqual(["signOut", {}]);
   await page.click("text=Sign In");
   await expect(input(page, "Email Address")).toHaveValue("");
+});
+
+test("sign-up: if the confirmation email cannot be sent the account is still created", async ({
+  page,
+}) => {
+  const w = { errs: [], warned: [] };
+  page.on("pageerror", (e) => w.errs.push(e.message));
+  page.on("console", (m) => m.type() === "warning" && w.warned.push(m.text()));
+  await start(page, {
+    __authFail: { sendVerification: ["auth/too-many-requests", "Too many requests."] },
+  });
+  await page.click("text=Create Account");
+  await fill(page, "First Name", "Jane");
+  await fill(page, "Last Name", "Smith");
+  await fill(page, "Email Address", "jane@example.com");
+  await fill(page, "Password", "123456");
+  await page.click("text=Create My Account");
+  await expect(page.locator("text=ACCOUNT CREATED")).toBeVisible();
+  await expect(page.locator("text=Welcome, Jane.")).toBeVisible({ timeout: 15_000 });
+  expect(w.errs).toEqual([]);
+  expect((await saved(page))[0].path).toBe("users/new-u");
+  expect(w.warned.some((m) => m.includes("confirmation email not sent: Too many requests."))).toBe(
+    true,
+  );
 });

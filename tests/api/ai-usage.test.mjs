@@ -6,7 +6,7 @@ import { res, clearFirestore, db } from "./setup.mjs";
 import handler, { deps } from "../../api/claude.js";
 
 // A good token for any user: "tok-<uid>".
-deps.verify = async (token) => ({ uid: token.slice(4) });
+deps.verify = async (token) => ({ uid: token.slice(4), email_verified: true });
 
 const realFetch = globalThis.fetch;
 let sent;
