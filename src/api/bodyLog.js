@@ -2,6 +2,7 @@
 // Renpho tape-measure sync.
 import { db } from "../firebase";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { authHeader } from "./authToken.js";
 
 const rowDoc = (userId, date) => doc(db, "users", userId, "body_log", date);
 
@@ -15,7 +16,7 @@ export const deleteBodyRow = (userId, date) => deleteDoc(rowDoc(userId, date));
 export async function fetchTapeRecords(userId) {
   const res = await fetch("/api/renpho-sync", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
     body: JSON.stringify({ userId, kind: "girth" }),
   });
   const data = await res.json().catch(() => ({}));

@@ -3,7 +3,13 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
-import handler from "../../api/polar-fetch-hr.js";
+import handler, { deps } from "../../api/polar-fetch-hr.js";
+
+// A good token for any user: "tok-<uid>".
+deps.verify = async (token) => {
+  if (!token.startsWith("tok-")) throw new Error("bad token");
+  return { uid: token.slice(4) };
+};
 
 const UID = "user-1";
 const SID = "ex-11";
@@ -43,9 +49,10 @@ const quiet = () => {
   console.error = (...a) => logs.push("ERR " + a.join(" "));
   return { logs, restore: () => Object.assign(console, { log, error }) };
 };
-const call = async (body, method = "POST") => {
+const call = async (body, method = "POST", uid = UID) => {
   const out = res();
-  await handler({ method, body }, out);
+  const headers = uid ? { authorization: `Bearer tok-${uid}` } : {};
+  await handler({ method, headers, body }, out);
   return out;
 };
 const connect = (extra = {}) =>
@@ -74,17 +81,35 @@ afterEach(() => {
   q.restore();
 });
 
-test("rejects: method, missing ids", async () => {
+test("rejects: method, no sign-in, a bad token, a missing session id", async () => {
   stubPolar({});
-  let r = await call({ userId: UID, sessionId: SID }, "GET");
+  let r = await call({ sessionId: SID }, "GET");
   assert.equal(r.statusCode, 405);
   assert.deepEqual(r.body, { error: "Method not allowed" });
-  for (const body of [{}, { userId: UID }, { sessionId: SID }, { userId: "", sessionId: SID }]) {
+  r = await call({ sessionId: SID }, "POST", null);
+  assert.deepEqual([r.statusCode, r.body], [401, { error: "Not signed in" }]);
+  r = res();
+  await handler(
+    { method: "POST", headers: { authorization: "Bearer nonsense" }, body: { sessionId: SID } },
+    r,
+  );
+  assert.deepEqual([r.statusCode, r.body], [401, { error: "Invalid or expired sign-in" }]);
+  for (const body of [{}, { userId: UID }, { sessionId: "" }, undefined]) {
     r = await call(body);
     assert.equal(r.statusCode, 400);
-    assert.deepEqual(r.body, { error: "Missing userId or sessionId" });
+    assert.deepEqual(r.body, { error: "Missing sessionId" });
   }
   assert.deepEqual(calls, []);
+});
+
+test("it reads the session of the person in the token, whatever user id the request names", async () => {
+  await seed({ polar_user_id: 888 });
+  await connect();
+  stubPolar({});
+  // someone else names user-1 and the session: they look in their own (empty) data
+  const r = await call({ userId: UID, sessionId: SID }, "POST", "intruder");
+  assert.deepEqual([r.statusCode, r.body], [404, { error: "Session not found" }]);
+  assert.deepEqual(calls, []); // user-1's Polar account was not asked about
 });
 
 test("404 when the session is unknown; 401 when Polar is not connected", async () => {

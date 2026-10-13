@@ -1,4 +1,5 @@
 // src/api/polarReconnect.js — Polar "Reconnect": re-authorise with the permissions HR data needs.
+import { authHeader } from "./authToken.js";
 
 const CONFIRM =
   "This will re-authorise your Polar account with updated permissions (needed for HR data). Continue?";
@@ -8,7 +9,7 @@ async function disconnect(userId) {
   try {
     const r = await fetch("/api/polar-disconnect", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
       body: JSON.stringify({ userId }),
     });
     console.log("Disconnect result:", await r.json());

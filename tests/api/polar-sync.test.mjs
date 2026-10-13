@@ -3,7 +3,13 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
-import handler from "../../api/polar-sync.js";
+import handler, { deps } from "../../api/polar-sync.js";
+
+// A good token for any user: "tok-<uid>".
+deps.verify = async (token) => {
+  if (!token.startsWith("tok-")) throw new Error("bad token");
+  return { uid: token.slice(4) };
+};
 
 const UID = "user-1";
 const CONN = `users/${UID}/polar/connection`;
@@ -35,9 +41,10 @@ const stubPolar = (routes) => {
     };
   };
 };
-const call = async (body, method = "POST") => {
+const call = async (body, method = "POST", uid = UID) => {
   const out = res();
-  await handler({ method, body }, out);
+  const headers = uid ? { authorization: `Bearer tok-${uid}` } : {};
+  await handler({ method, headers, body }, out);
   return out;
 };
 const connect = (extra = {}) =>
@@ -93,11 +100,18 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-test("rejects non-POST and a missing userId; not connected is a 401 with no Polar call", async () => {
+test("rejects non-POST; no sign-in is a 401; not connected is a 401 with no Polar call", async () => {
   stubPolar({});
   assert.equal((await call({ userId: UID }, "GET")).statusCode, 405);
   assert.equal((await call({ userId: UID }, "PUT")).statusCode, 405);
-  assert.equal((await call({})).statusCode, 400);
+  const anon = await call({ userId: UID }, "POST", null);
+  assert.deepEqual([anon.statusCode, anon.body], [401, { error: "Not signed in" }]);
+  const bad = res();
+  await handler(
+    { method: "POST", headers: { authorization: "Bearer nonsense" }, body: { userId: UID } },
+    bad,
+  );
+  assert.deepEqual([bad.statusCode, bad.body], [401, { error: "Invalid or expired sign-in" }]);
   assert.equal((await call({ userId: UID })).statusCode, 401); // no connection doc
   await db().doc(CONN).set({ connected: false, access_token: "old" });
   const out = await call({ userId: UID });
@@ -294,4 +308,17 @@ test("recent list failing, or every session already having HR: no change, sync s
   out = await call({ userId: UID });
   assert.equal(out.statusCode, 200);
   assert.ok(calls.every((c) => !c.url.includes("/v3/exercises?")));
+});
+
+test("it syncs the person in the token, whatever user id the request names", async () => {
+  await connect();
+  stubPolar({ [`${POLAR}/v3/users/777/exercise-transactions`]: { status: 204 } });
+  // another signed-in person names user-1 in the body: their own (missing) connection is used
+  const other = await call({ userId: UID }, "POST", "intruder");
+  assert.deepEqual([other.statusCode, other.body], [401, { error: "Polar account not connected" }]);
+  assert.equal(calls.length, 0); // user-1's Polar account was never touched
+  // user-1's own token works with no userId in the body at all
+  const mine = await call({});
+  assert.equal(mine.statusCode, 200);
+  assert.ok(calls.length > 0);
 });

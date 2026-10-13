@@ -262,6 +262,7 @@ test("fetching heart rate after the sync", async ({ page: p }) => {
   await expect(fetchBtn).toBeEnabled();
   expect(requests[0].body).toEqual({ userId: "u", sessionId: "s1" });
   expect(requests[0].headers["content-type"]).toBe("application/json");
+  expect(requests[0].headers.authorization).toBe("Bearer mock-id-token"); // the sign-in proof (Fix 119)
   matchGolden("fetch-error", await shape(p));
 
   reply = { status: 404, json: { error: "No samples" } };

@@ -6,7 +6,10 @@ import assert from "node:assert/strict";
 import { res, clearFirestore, read, db } from "./setup.mjs";
 import auth from "../../api/polar-auth.js";
 import callback from "../../api/polar-callback.js";
-import fetchHr from "../../api/polar-fetch-hr.js";
+import fetchHr, { deps } from "../../api/polar-fetch-hr.js";
+
+// A good token for any user: "tok-<uid>".
+deps.verify = async (token) => ({ uid: token.slice(4) });
 
 const APP = "https://vaulte.example";
 const UID = "user-1";
@@ -44,8 +47,8 @@ const call = async (handler, req) => {
   await handler(req, out);
   return out;
 };
-const fetchFor = (body = { userId: UID, sessionId: SID }) =>
-  call(fetchHr, { method: "POST", body });
+const fetchFor = (body = { sessionId: SID }) =>
+  call(fetchHr, { method: "POST", headers: { authorization: `Bearer tok-${UID}` }, body });
 const seedSession = (fields = {}) =>
   db()
     .doc(SESSION)

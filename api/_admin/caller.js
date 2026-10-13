@@ -5,13 +5,14 @@ import { verifyIdToken } from "./verify.js";
 
 const rejected = (error) => ({ error: { status: 401, body: { error } } });
 
-/** { uid } for a valid ID token, else { error: { status: 401, body } } to send back. `verify` is
- *  the token check (a function's `deps.verify`, so tests can stand in for Google's keys). */
+/** { uid, claims } for a valid ID token, else { error: { status: 401, body } } to send back.
+ *  `verify` is the token check (a function's `deps.verify`, so tests can stand in for Google's keys). */
 export async function callerOf(req, verify = verifyIdToken) {
   const token = String(req.headers?.authorization || "").replace(/^Bearer\s+/i, "");
   if (!token) return rejected("Not signed in");
   try {
-    return { uid: (await verify(token)).uid };
+    const claims = await verify(token);
+    return { uid: claims.uid, claims };
   } catch {
     return rejected("Invalid or expired sign-in");
   }
