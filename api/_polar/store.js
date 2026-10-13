@@ -40,3 +40,13 @@ export async function loadV4(db, userId) {
 
 /** Store the v4 connection (the sign-in tokens, or the same after a refresh). */
 export const saveV4 = (db, userId, data) => v4Ref(db, userId).set(data);
+
+/** The stored sessions that have no heart rate (hr_samples null), as { id, ...fields }. */
+export async function sessionsWithoutHr(db, userId) {
+  const col = db.collection(`users/${userId}/polar_sessions`);
+  const snap = await col.where("hr_samples", "==", null).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/** A stored session's document. */
+export const sessionDoc = (db, userId, id) => db.doc(`users/${userId}/polar_sessions/${id}`);

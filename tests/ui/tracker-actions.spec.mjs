@@ -434,6 +434,22 @@ test("Polar sync", async ({ page: p }) => {
   await btn.click();
   await expect(msg("Synced 1 session.")).toBeVisible();
 
+  // Fix 125: earlier sessions that got heart rate during the sync: said so, and the list is read again
+  const withHr = {
+    id: "b",
+    sport: "CYCLING",
+    start_time: "2026-10-03T08:00:00",
+    calories: 2,
+    hr_samples: [90, 95],
+  };
+  await p.evaluate((row) => {
+    window.__collections["users/u/polar_sessions"] = [row];
+  }, withHr);
+  p.__polarSync = { body: { newSessions: 0, sessions: [], hrBackfilled: 2 } };
+  await btn.click();
+  await expect(msg("All up to date. Heart rate added to 2 earlier sessions.")).toBeVisible();
+  await expect(p.getByText("1 unlogged session")).toBeVisible(); // the list was read again: one session left
+
   // Failure: the reason in red, for 6 s (a fresh page: earlier messages' timers would clear it)
   await start(p, { __docs: { [P("polar/connection")]: { connected: true } } });
   await tab(p, "Add entry");

@@ -42,3 +42,12 @@ export function withSyncedSessions(sessions, synced) {
 }
 
 export const polarSyncedText = (n) => `Synced ${n} session${n !== 1 ? "s" : ""}.`;
+
+/** The message after a Polar sync: what was new, and (Fix 125) how many earlier sessions got heart
+ *  rate from Polar's newer service while it ran. */
+export function polarSyncMessage({ newSessions, hrBackfilled }) {
+  const news = newSessions === 0 ? "All up to date." : polarSyncedText(newSessions);
+  if (!hrBackfilled) return news;
+  const s = hrBackfilled !== 1 ? "s" : "";
+  return `${news} Heart rate added to ${hrBackfilled} earlier session${s}.`;
+}
