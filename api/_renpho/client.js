@@ -9,7 +9,7 @@ import crypto from "crypto";
 
 const API_BASE = "https://cloud.renpho.com";
 const ENC_KEY = Buffer.from("ed*wijdi$h6fe3ew", "utf8"); // 16-byte AES-128 key used by the app
-const APP_VERSION = "6.6.0";
+const APP_VERSION = "7.0.0";
 const PLATFORM = "android";
 const SUCCESS_CODES = new Set([0, "0", 101, "101", 200, "200", 20000, "20000"]);
 const TOKEN_TTL_MS = 50 * 60 * 1000;
@@ -45,7 +45,7 @@ export const decryptResponse = (data) => JSON.parse(aesDecrypt(data));
 /** Throws unless Renpho reports success (by message or one of its success codes). */
 export function checkResponse(result, context) {
   const code = result?.code;
-  const msg = String(result?.msg ?? "");
+  const msg = String(result?.msg || result?.message || "");
   if (msg.toLowerCase() === "success" || SUCCESS_CODES.has(code)) return;
   throw new Error(`${context} failed: code=${code}, msg=${msg}`);
 }
@@ -59,7 +59,12 @@ const authHeaders = ({ token, userId }) => ({
 
 /** POST a JSON body; signed with the login token when auth is given. */
 export async function post(endpoint, body, auth = {}) {
-  const headers = { "Content-Type": "application/json", ...(auth.token && authHeaders(auth)) };
+  const headers = {
+    "Content-Type": "application/json",
+    appVersion: APP_VERSION,
+    platform: PLATFORM,
+    ...(auth.token && authHeaders(auth)),
+  };
   const res = await fetch(`${API_BASE}/${endpoint}`, {
     method: "POST",
     headers,

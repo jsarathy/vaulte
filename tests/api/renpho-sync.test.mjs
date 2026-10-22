@@ -63,12 +63,16 @@ test("logs in with the app's payload; token reused for 50 minutes", async () => 
   const [first, second] = calls;
   assert.equal(first.endpoint, LOGIN);
   assert.equal(first.method, "POST");
-  assert.deepEqual(first.headers, { "Content-Type": "application/json" });
+  assert.deepEqual(first.headers, {
+    "Content-Type": "application/json",
+    appVersion: "7.0.0",
+    platform: "android",
+  });
   assert.deepEqual(first.body.questionnaire, {});
   assert.deepEqual(first.body.login, {
     password: "pw",
     areaCode: "US",
-    appRevision: "6.6.0",
+    appRevision: "7.0.0",
     cellphoneType: "VaulteSync",
     systemType: "11",
     email: "me@example.com",
@@ -86,7 +90,7 @@ test("logs in with the app's payload; token reused for 50 minutes", async () => 
     "Content-Type": "application/json",
     token: "tok-1",
     userId: "77",
-    appVersion: "6.6.0",
+    appVersion: "7.0.0",
     platform: "android",
   });
   assert.deepEqual(second.body, {});
@@ -435,4 +439,12 @@ test("success codes and messages Renpho uses", async () => {
     });
     assert.equal((await call({})).statusCode, 502, String(code));
   }
+});
+
+test("a Renpho error is reported with the text it sends under message", async () => {
+  clock.now += 3_600_000;
+  stubCloud({ [LOGIN]: () => ({ body: { code: -114, message: "Decryption failed" } }) });
+  const out = await call({});
+  assert.equal(out.statusCode, 502);
+  assert.equal(out.body.error, "Login failed: code=-114, msg=Decryption failed");
 });
