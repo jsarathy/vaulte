@@ -62,7 +62,13 @@ const connect = (extra = {}) =>
 const seed = (fields = {}) =>
   db()
     .doc(SESSION)
-    .set({ sport: "CYCLING", duration_s: 3750, ...fields });
+    .set({
+      sport: "CYCLING",
+      duration_s: 3750,
+      // fetched now, so the fixed start dates below never age out of Polar's 30-day window
+      fetched_at: new Date().toISOString(),
+      ...fields,
+    });
 const ok = (json) => ({ status: 200, json });
 const samples = (data, extra = {}) => ({
   samples: [
