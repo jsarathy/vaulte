@@ -55,17 +55,25 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      actions: read
+      checks: read
     steps:
       - name: Open or update the issue
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           title="Ubuntu 26.04 canary failed"
+          # Fix 143: say which step and test failed, from the check-run annotations (no log download needed).
+          details=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" --jq '.jobs[] | select(.conclusion=="failure") | "\(.id)\t\(.name)"' | while IFS=$'\t' read -r id name; do
+            echo "**$name**"
+            gh api "repos/$REPO/check-runs/$id/annotations" --jq '.[] | select(.message | startswith("Process completed") | not) | "- " + (.message | gsub("\n+"; " / ") | .[0:500])'
+          done | head -c 3000)
           open=$(gh issue list --repo "$REPO" --state open --search "$title in:title" --json number --jq '.[0].number')
           if [ -n "$open" ]; then
-            gh issue comment "$open" --repo "$REPO" --body "Failed again: $RUN_URL"
+            gh issue comment "$open" --repo "$REPO" --body "Failed again: $RUN_URL"$'\n\n'"$details"
           else
-            gh issue create --repo "$REPO" --title "$title" --body "The Ubuntu 26.04 canary (Fix 45) failed: $RUN_URL. ubuntu-latest moves to 26.04 between 2026-10-19 and 2026-11-19; fix the failing step so CI keeps working."
+            gh issue create --repo "$REPO" --title "$title" --body "The Ubuntu 26.04 canary (Fix 45) failed: $RUN_URL. ubuntu-latest moves to 26.04 between 2026-10-19 and 2026-11-19; fix the failing step so CI keeps working."$'\n\n'"$details"
           fi
