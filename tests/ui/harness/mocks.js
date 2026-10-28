@@ -316,10 +316,13 @@ export const claudeScaleRecipeNutrition = async (r, qty, unit) => {
   };
 };
 window.__est = [];
+window.__estGate = {};
 window.__estDelay = window.__noBackfill || window.__fastEst ? {} : { "Paneer Bhurji": 2500 };
 export const claudeEstimatePortionWeight = async (r) => {
   window.__est.push(r.name);
   await new Promise((res) => setTimeout(res, window.__estDelay[r.name] ?? 120));
+  // Tests that must observe the "saving" state hold the estimate here until they release it.
+  if (window.__estGate[r.name]) await window.__estGate[r.name];
   if (r.name === "Nimbu Pani") throw new Error("Mock estimate failure");
   const total = r.ingredients.reduce(
     (s, i) => s + (parseFloat(String(i.amount).match(/^(\d+(\.\d+)?)g$/)?.[1]) || 100),

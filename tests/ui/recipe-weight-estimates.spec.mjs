@@ -277,10 +277,12 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
   await p.waitForTimeout(200);
   await p.locator('input[type="number"][min="1"]').fill("3");
   await ev(() => {
-    window.__estDelay["Huel RTD Strawberries & Cream"] = 1500;
+    window.__estGate["Huel RTD Strawberries & Cream"] = new Promise((res) => {
+      window.__estRelease = res;
+    });
   });
   await p.getByText("✓ Save Changes").click();
-  await p.waitForTimeout(100);
+  await p.getByText("⏳ Recalculating & saving…").waitFor();
   await p.locator("button", { hasText: "×" }).first().click();
   await p.mouse.click(5, 880);
   await p.waitForTimeout(100);
@@ -289,7 +291,8 @@ test("Fix 20 — estimated Wt/portion backfill", async ({ page: p }) => {
     (await p.getByText("✏️ Edit Recipe").count()) === 1 &&
       (await p.getByText("⏳ Recalculating & saving…").count()) === 1,
   );
-  await p.waitForTimeout(1800);
+  await ev(() => window.__estRelease());
+  await p.getByText("📖 Saved Recipes").waitFor();
   ok(
     "save then completes and closes to list",
     (await p.getByText("✏️ Edit Recipe").count()) === 0 &&
