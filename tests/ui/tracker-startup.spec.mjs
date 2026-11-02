@@ -54,7 +54,10 @@ const start = async (p, init, path = "/tracker.html", fixTime = true) => {
     (u) => new URL(u).pathname.startsWith("/api/"),
     (r) => r.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
-  if (fixTime) await p.clock.setFixedTime(new Date("2026-10-04T10:00:00"));
+  // Frozen for most tests; the Polar message tests need real timers, so they only set the date and let it run
+  const day = new Date("2026-10-04T10:00:00");
+  if (fixTime) await p.clock.setFixedTime(day);
+  else await p.clock.setSystemTime(day);
   await p.addInitScript((i) => Object.assign(window, i), init);
   await p.goto(path);
 };
